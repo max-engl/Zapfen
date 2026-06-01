@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "762698214203",
+    "project_id": "zapfen",
+    "storage_bucket": "zapfen.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:762698214203:android:8af6de5520615ec9a8651e",
+        "android_client_info": {
+          "package_name": "de.maxengl.zapfen.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDhuDp6KeJQ3g7f0nIHQMlq0_krjFzxx-I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

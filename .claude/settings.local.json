@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter pub *)",
+      "Bash(curl -s \"https://pub.dev/api/packages/maplibre_gl\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); v=d['latest']['version']; print\\('maplibre_gl:', v\\)\")",
+      "Bash(curl -s \"https://pub.dev/api/packages/maplibre\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); v=d['latest']['version']; print\\('maplibre:', v\\)\")",
+      "Bash(flutter analyze *)",
+      "Bash(find /Users/maxengl/Documents/RandomProgramming -name \"ios-frame*\" 2>/dev/null)",
+      "Read(//Users/maxengl/Documents/RandomProgramming/**)",
+      "Bash(python3 -m http.server 9877)",
+      "Bash(curl -s http://localhost:9877/ios-frame.jsx)",
+      "Bash(dart analyze *)",
+      "Bash(curl -s --max-time 3 http://10.170.55.179:3000/)",
+      "Bash(curl -s http://10.170.55.179:3000/posts?page=1)",
+      "Bash(limit=10 2>&1)",
+      "Bash(curl -s http://10.170.55.179:3000/posts/map)",
+      "Bash(grep -E \"\\\\.\\(js|jsx|ts|tsx|css\\)$\")"
+    ]
+  }
+}

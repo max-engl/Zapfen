@@ -1,0 +1,1208 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:fullscreen_image_viewer/fullscreen_image_viewer.dart'
+    show FullscreenImageViewer;
+import 'package:provider/provider.dart';
+import 'package:sliver_tools/sliver_tools.dart';
+import '../core/app_cache_manager.dart';
+import '../theme.dart';
+import '../features/auth/providers/auth_provider.dart';
+import '../features/posts/models/comment.dart';
+import '../features/posts/models/feed_post.dart';
+import '../features/posts/models/post_reaction.dart';
+import '../features/posts/providers/comment_provider.dart';
+import '../features/posts/providers/feed_provider.dart';
+import '../features/posts/providers/profile_posts_provider.dart';
+import '../features/posts/services/comment_service.dart';
+import '../features/posts/services/post_service.dart';
+import '../widgets/avatar.dart';
+import '../widgets/shimmer_box.dart';
+
+// ── Main screen ───────────────────────────────────────────────────────────────
+
+class PostDetailScreen extends StatelessWidget {
+  final FeedPost post;
+
+  const PostDetailScreen({super.key, required this.post});
+
+  @override
+  Widget build(BuildContext context) {
+    final commentService = context.read<CommentService>();
+    return ChangeNotifierProvider(
+      create: (_) => CommentProvider(commentService, postId: post.id)..load(),
+      child: _PostDetailBody(post: post),
+    );
+  }
+}
+
+class _PostDetailBody extends StatefulWidget {
+  final FeedPost post;
+  const _PostDetailBody({required this.post});
+
+  @override
+  State<_PostDetailBody> createState() => _PostDetailBodyState();
+}
+
+class _PostDetailBodyState extends State<_PostDetailBody> {
+  late FeedPost _post;
+  final _commentController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _post = widget.post;
+    _recordView();
+  }
+
+  Future<void> _recordView() async {
+    try {
+      final postService = context.read<PostService>();
+      final views = await postService.recordView(_post.id);
+      if (mounted) setState(() => _post = _post.copyWith(views: views));
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  void _onReact(String emoji) async {
+    final feedProvider = context.read<FeedProvider>();
+    await feedProvider.toggleReaction(_post.id, emoji);
+    final updated = feedProvider.posts.firstWhere(
+      (p) => p.id == _post.id,
+      orElse: () => _post,
+    );
+    if (mounted) setState(() => _post = updated);
+  }
+
+  Future<void> _sendComment() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty) return;
+    _commentController.clear();
+
+    final commentProvider = context.read<CommentProvider>();
+    final feedProvider = context.read<FeedProvider>();
+
+    try {
+      final isReply = commentProvider.replyingToId != null;
+      if (isReply) {
+        await commentProvider.addReply(text);
+      } else {
+        await commentProvider.addComment(text);
+      }
+      feedProvider.updateCommentCount(_post.id, 1);
+      setState(() => _post = _post.copyWith(comments: _post.comments + 1));
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = PintThemeProvider.of(context);
+    final currentUserId = context.read<AuthProvider>().user?.id;
+    final isOwner = _post.userId == currentUserId;
+
+    void onDelete() {
+      context.read<FeedProvider>().deletePost(_post.id);
+      context.read<ProfilePostsProvider>().deletePost(_post.id);
+      Navigator.of(context).pop();
+    }
+
+    return Scaffold(
+      backgroundColor: t.bg,
+      resizeToAvoidBottomInset: true,
+      appBar: _PostAppBar(
+        post: _post,
+        t: t,
+        onDelete: isOwner ? onDelete : null,
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: 460,
+                    child: _ZoomablePhoto(post: _post),
+                  ),
+                ),
+
+                // Caption + meta
+                SliverToBoxAdapter(
+                  child: Container(
+                    color: t.bg,
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Consumer<CommentProvider>(
+                      builder: (_, cp, __) => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 9,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: t.goldSoft,
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(color: t.goldBorder),
+                                ),
+                                child: Text(
+                                  _post.drinkLabel.isNotEmpty
+                                      ? _post.drinkLabel
+                                      : _post.caption,
+                                  style: TextStyle(
+                                    color: t.goldText,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.place_outlined,
+                                size: 12,
+                                color: t.textMuted,
+                              ),
+                              const SizedBox(width: 2),
+                              Flexible(
+                                child: Text(
+                                  '${_post.username}\'s spot',
+                                  style: TextStyle(
+                                    color: t.textMuted,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          RichText(
+                            text: TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: '@${_post.username} ',
+                                  style: TextStyle(
+                                    color: t.text,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.14,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: _post.caption,
+                                  style: TextStyle(
+                                    color: t.text,
+                                    fontSize: 14,
+                                    height: 1.45,
+                                    letterSpacing: -0.1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.visibility_outlined,
+                                size: 12,
+                                color: t.textMuted,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${_post.views} Aufrufe',
+                                style: TextStyle(
+                                  color: t.textMuted,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Text(
+                                '${_post.totalReactions} Reaktionen',
+                                style: TextStyle(
+                                  color: t.textMuted,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Text(
+                                '${cp.totalCount} Kommentare',
+                                style: TextStyle(
+                                  color: t.textMuted,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                SliverToBoxAdapter(child: Divider(height: 1, color: t.divider)),
+
+                // Reactions bar
+                SliverToBoxAdapter(
+                  child: _ReactionBar(
+                    reactions: _post.reactions,
+                    myReaction: _post.myReaction,
+                    onReact: _onReact,
+                  ),
+                ),
+
+                SliverToBoxAdapter(child: Divider(height: 1, color: t.divider)),
+
+                // Comments
+                MultiSliver(
+                  children: [
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                        child: Text(
+                          'KOMMENTARE',
+                          style: TextStyle(
+                            color: t.textMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2.4,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Consumer<CommentProvider>(
+                      builder: (_, cp, __) {
+                        if (cp.loading) {
+                          return SliverList.builder(
+                            itemCount: 3,
+                            itemBuilder: (_, __) => Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(
+                                    width: 34,
+                                    height: 34,
+                                    child: ShimmerBox.circle(),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        SizedBox(
+                                          height: 11,
+                                          child: ShimmerBox(
+                                            borderRadius: BorderRadius.circular(
+                                              5,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        SizedBox(
+                                          height: 11,
+                                          child: ShimmerBox(
+                                            borderRadius: BorderRadius.circular(
+                                              5,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        FractionallySizedBox(
+                                          widthFactor: 0.6,
+                                          child: SizedBox(
+                                            height: 11,
+                                            child: ShimmerBox(
+                                              borderRadius:
+                                                  BorderRadius.circular(5),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+                        if (cp.error != null) {
+                          return SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Text(
+                                cp.error!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: t.textMuted,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                        if (cp.comments.isEmpty) {
+                          return SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Text(
+                                'Noch keine Kommentare. Sei der Erste!',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: t.textFaint,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                        return SliverList.builder(
+                          itemCount: cp.comments.length,
+                          itemBuilder: (_, i) {
+                            final c = cp.comments[i];
+                            return _CommentThread(
+                              comment: c,
+                              currentUserId: currentUserId,
+                              t: t,
+                              onReply: () => cp.startReply(c.id, c.username),
+                              onReact: (emoji) =>
+                                  cp.reactToComment(c.id, emoji),
+                              onDelete: c.userId == currentUserId
+                                  ? () => cp.deleteComment(c.id)
+                                  : null,
+                              onReactToReply: (replyId, emoji) =>
+                                  cp.reactToComment(replyId, emoji),
+                              onDeleteReply: (replyId, uid) =>
+                                  uid == currentUserId
+                                  ? () => cp.deleteComment(replyId)
+                                  : null,
+                            );
+                          },
+                        );
+                      },
+                    ),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          'Ende des Beitrags',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: t.textFaint, fontSize: 11),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Consumer<CommentProvider>(
+            builder: (_, cp, __) => _Composer(
+              controller: _commentController,
+              replyingToUsername: cp.replyingToUsername,
+              onCancelReply: cp.cancelReply,
+              onSend: _sendComment,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── AppBar ────────────────────────────────────────────────────────────────────
+
+class _PostAppBar extends StatelessWidget implements PreferredSizeWidget {
+  final FeedPost post;
+  final PintTheme t;
+  final VoidCallback? onDelete;
+
+  const _PostAppBar({required this.post, required this.t, this.onDelete});
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBar(
+      backgroundColor: t.bg,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      leading: GestureDetector(
+        onTap: () => Navigator.of(context).pop(),
+        child: Container(
+          margin: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: t.surfaceWeak,
+            shape: BoxShape.circle,
+            border: Border.all(color: t.border),
+          ),
+          child: Icon(Icons.close, color: t.text, size: 18),
+        ),
+      ),
+      title: Row(
+        children: [
+          PintAvatar(size: 34, imageUrl: post.avatarUrl, avatarColor: post.avatarColor, initials: post.avatarInitial, ring: true),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  post.username,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: t.text,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.14,
+                  ),
+                ),
+                Text(
+                  '@${post.username} · ${post.timeAgo}',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: t.textMuted, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        if (onDelete != null)
+          GestureDetector(
+            onTap: () => showModalBottomSheet<void>(
+              context: context,
+              builder: (ctx) => SafeArea(
+                child: ListTile(
+                  leading: const Icon(Icons.delete_outline, color: Colors.red),
+                  title: const Text(
+                    'Beitrag löschen',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    onDelete!();
+                  },
+                ),
+              ),
+            ),
+            child: Container(
+              margin: const EdgeInsets.only(right: 12),
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: t.surfaceWeak,
+                shape: BoxShape.circle,
+                border: Border.all(color: t.border),
+              ),
+              child: Icon(Icons.more_horiz, color: t.text, size: 20),
+            ),
+          )
+        else
+          Container(
+            margin: const EdgeInsets.only(right: 12),
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: t.surfaceWeak,
+              shape: BoxShape.circle,
+              border: Border.all(color: t.border),
+            ),
+            child: Icon(Icons.more_horiz, color: t.text, size: 20),
+          ),
+      ],
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Divider(height: 1, color: t.divider),
+      ),
+    );
+  }
+}
+
+// ── Zoomable photo ────────────────────────────────────────────────────────────
+
+class _ZoomablePhoto extends StatefulWidget {
+  final FeedPost post;
+  const _ZoomablePhoto({required this.post});
+
+  @override
+  State<_ZoomablePhoto> createState() => _ZoomablePhotoState();
+}
+
+class _ZoomablePhotoState extends State<_ZoomablePhoto> {
+  bool _swapped = false;
+
+  void _openFullscreen(BuildContext context, String imageUrl, String cacheKey) {
+    FullscreenImageViewer.open(
+      context: context,
+      child: CachedNetworkImage(
+        imageUrl: imageUrl,
+        cacheKey: cacheKey,
+        cacheManager: AppCacheManager.instance,
+        fit: BoxFit.contain,
+        errorWidget: (_, __, ___) => Container(color: Colors.black),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final post = widget.post;
+    final hasSelfie = post.selfieUrl.isNotEmpty;
+    final mainUrl = _swapped ? post.selfieUrl : post.imageUrl;
+    final mainKey = _swapped
+        ? (post.selfiePath ?? '${post.id}_selfie')
+        : (post.imagePath ?? post.id);
+    final overlayUrl = _swapped ? post.imageUrl : post.selfieUrl;
+    final overlayKey = _swapped
+        ? (post.imagePath ?? post.id)
+        : (post.selfiePath ?? '${post.id}_selfie');
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        if (mainUrl.isNotEmpty) _openFullscreen(context, mainUrl, mainKey);
+      },
+      child: Container(
+        color: Colors.black,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Hero(
+              tag: 'post_image_${post.id}',
+              child: mainUrl.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: mainUrl,
+                      cacheKey: mainKey,
+                      cacheManager: AppCacheManager.instance,
+                      fit: BoxFit.cover,
+                      errorWidget: (_, __, ___) =>
+                          Container(color: Colors.black),
+                    )
+                  : Container(color: const Color(0xFF1A1A1A)),
+            ),
+
+            Positioned(
+              bottom: 14,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    color: Colors.black.withValues(alpha: 0.55),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.open_in_full_rounded,
+                          size: 12,
+                          color: Colors.white70,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          'Tippen zum Vollbild',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            if (hasSelfie)
+              Positioned(
+                top: 14,
+                right: 14,
+                child: GestureDetector(
+                  onTap: () => setState(() => _swapped = !_swapped),
+                  child: Container(
+                    width: 88,
+                    height: 116,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        width: 2,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: overlayUrl.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: overlayUrl,
+                              cacheKey: overlayKey,
+                              cacheManager: AppCacheManager.instance,
+                              fit: BoxFit.cover,
+                              errorWidget: (_, __, ___) =>
+                                  Container(color: const Color(0xFF1E3A2F)),
+                            )
+                          : Container(color: const Color(0xFF1E3A2F)),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Reaction bar ──────────────────────────────────────────────────────────────
+
+class _ReactionBar extends StatelessWidget {
+  final List<PostReaction> reactions;
+  final String? myReaction;
+  final void Function(String emoji) onReact;
+
+  const _ReactionBar({
+    required this.reactions,
+    required this.myReaction,
+    required this.onReact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = PintThemeProvider.of(context);
+
+    // Build a unified view: show all emojis that have reactions, plus an "add" button
+    final Map<String, int> countMap = {
+      for (final r in reactions) r.emoji: r.count,
+    };
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          // Existing reaction pills
+          ...countMap.entries.map((entry) {
+            final emoji = entry.key;
+            final count = entry.value;
+            final isMine = myReaction == emoji;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: GestureDetector(
+                onTap: () => onReact(emoji),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isMine ? t.goldSoft : t.surfaceWeak,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: isMine ? t.goldBorderStrong : t.border,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(emoji, style: const TextStyle(fontSize: 16)),
+                      const SizedBox(width: 6),
+                      Text(
+                        '$count',
+                        style: TextStyle(
+                          color: isMine ? t.goldText : t.text,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+
+          // "Add reaction" button
+          GestureDetector(
+            onTap: () => _showEmojiPicker(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: t.surfaceWeak,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: t.border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.add_reaction_outlined,
+                    size: 16,
+                    color: t.textMuted,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Reagieren',
+                    style: TextStyle(
+                      color: t.textMuted,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEmojiPicker(BuildContext context) {
+    showEmojiPickerSheet(context, onSelect: onReact);
+  }
+}
+
+// ── Emoji picker sheet (shared) ───────────────────────────────────────────────
+
+void showEmojiPickerSheet(
+  BuildContext context, {
+  required void Function(String) onSelect,
+}) {
+  final t = PintThemeProvider.of(context);
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: t.bg,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Reagieren',
+              style: TextStyle(
+                color: t.text,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: kReactionEmojis.map((emoji) {
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    onSelect(emoji);
+                  },
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: t.surfaceWeak,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: t.border),
+                    ),
+                    child: Center(
+                      child: Text(emoji, style: const TextStyle(fontSize: 26)),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+// ── Comment thread (comment + its replies) ────────────────────────────────────
+
+class _CommentThread extends StatelessWidget {
+  final Comment comment;
+  final String? currentUserId;
+  final PintTheme t;
+  final VoidCallback onReply;
+  final void Function(String emoji) onReact;
+  final VoidCallback? onDelete;
+  final void Function(String replyId, String emoji) onReactToReply;
+  final VoidCallback? Function(String replyId, String uid) onDeleteReply;
+
+  const _CommentThread({
+    required this.comment,
+    required this.currentUserId,
+    required this.t,
+    required this.onReply,
+    required this.onReact,
+    this.onDelete,
+    required this.onReactToReply,
+    required this.onDeleteReply,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _CommentRow(
+          comment: comment,
+          t: t,
+          isOwner: comment.userId == currentUserId,
+          onReply: onReply,
+          onReact: onReact,
+          onDelete: onDelete,
+          indentLevel: 0,
+        ),
+        ...comment.replies.map(
+          (reply) => _CommentRow(
+            comment: reply,
+            t: t,
+            isOwner: reply.userId == currentUserId,
+            onReply: onReply,
+            onReact: (emoji) => onReactToReply(reply.id, emoji),
+            onDelete: onDeleteReply(reply.id, reply.userId),
+            indentLevel: 1,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Comment row ───────────────────────────────────────────────────────────────
+
+class _CommentRow extends StatelessWidget {
+  final Comment comment;
+  final PintTheme t;
+  final bool isOwner;
+  final VoidCallback onReply;
+  final void Function(String emoji) onReact;
+  final VoidCallback? onDelete;
+  final int indentLevel;
+
+  const _CommentRow({
+    required this.comment,
+    required this.t,
+    required this.isOwner,
+    required this.onReply,
+    required this.onReact,
+    this.onDelete,
+    this.indentLevel = 0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final leftPad = 16.0 + indentLevel * 40.0;
+    return Container(
+      padding: EdgeInsets.fromLTRB(leftPad, 12, 16, 12),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: t.divider)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (indentLevel > 0)
+            Padding(
+              padding: const EdgeInsets.only(right: 8, top: 2),
+              child: Icon(
+                Icons.subdirectory_arrow_right,
+                size: 14,
+                color: t.textFaint,
+              ),
+            ),
+          PintAvatar(size: 32, imageUrl: comment.avatarUrl, avatarColor: comment.avatarColor, initials: comment.avatarInitial),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      comment.username,
+                      style: TextStyle(
+                        color: t.text,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.1,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '· ${comment.timeAgo}',
+                      style: TextStyle(color: t.textFaint, fontSize: 11),
+                    ),
+                    const Spacer(),
+                    if (onDelete != null)
+                      GestureDetector(
+                        onTap: onDelete,
+                        child: Icon(Icons.close, size: 14, color: t.textFaint),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  comment.text,
+                  style: TextStyle(
+                    color: t.text,
+                    fontSize: 14,
+                    height: 1.45,
+                    letterSpacing: -0.1,
+                  ),
+                ),
+                const SizedBox(height: 6),
+
+                // Reaction summary + action row
+                Row(
+                  children: [
+                    // Existing reaction pills (compact)
+                    ...comment.reactions
+                        .where((r) => r.count > 0)
+                        .take(3)
+                        .map(
+                          (r) => Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: GestureDetector(
+                              onTap: () => onReact(r.emoji),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: r.reactedByMe
+                                      ? t.goldSoft
+                                      : t.surfaceWeak,
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(
+                                    color: r.reactedByMe
+                                        ? t.goldBorderStrong
+                                        : t.border,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      r.emoji,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      '${r.count}',
+                                      style: TextStyle(
+                                        color: r.reactedByMe
+                                            ? t.goldText
+                                            : t.textMuted,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    // React button
+                    GestureDetector(
+                      onTap: () =>
+                          showEmojiPickerSheet(context, onSelect: onReact),
+                      child: Icon(
+                        Icons.add_reaction_outlined,
+                        size: 14,
+                        color: t.textMuted,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    if (indentLevel == 0)
+                      GestureDetector(
+                        onTap: onReply,
+                        child: Text(
+                          'Antworten',
+                          style: TextStyle(
+                            color: t.textMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Composer ──────────────────────────────────────────────────────────────────
+
+class _Composer extends StatefulWidget {
+  final TextEditingController controller;
+  final String? replyingToUsername;
+  final VoidCallback onCancelReply;
+  final VoidCallback onSend;
+
+  const _Composer({
+    required this.controller,
+    required this.replyingToUsername,
+    required this.onCancelReply,
+    required this.onSend,
+  });
+
+  @override
+  State<_Composer> createState() => _ComposerState();
+}
+
+class _ComposerState extends State<_Composer> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(() => setState(() {}));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = PintThemeProvider.of(context);
+    final hasText = widget.controller.text.trim().isNotEmpty;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.replyingToUsername != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            color: t.surfaceWeak,
+            child: Row(
+              children: [
+                Icon(Icons.reply, size: 14, color: t.textMuted),
+                const SizedBox(width: 6),
+                Text(
+                  'Antwort an @${widget.replyingToUsername}',
+                  style: TextStyle(
+                    color: t.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: widget.onCancelReply,
+                  child: Icon(Icons.close, size: 16, color: t.textMuted),
+                ),
+              ],
+            ),
+          ),
+        Container(
+          padding: EdgeInsets.fromLTRB(
+            14,
+            10,
+            14,
+            MediaQuery.of(context).padding.bottom + 10,
+          ),
+          decoration: BoxDecoration(
+            color: t.bg,
+            border: Border(top: BorderSide(color: t.border)),
+          ),
+          child: Row(
+            children: [
+              PintAvatar(
+                size: 32,
+                imageUrl: context.read<AuthProvider>().user?.avatarUrl,
+                avatarColor: context.read<AuthProvider>().user?.avatarColor,
+                initials: context.read<AuthProvider>().user?.avatarInitial,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: t.surfaceWeak,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: t.border),
+                  ),
+                  child: TextField(
+                    controller: widget.controller,
+                    onSubmitted: (_) => widget.onSend(),
+                    style: TextStyle(
+                      color: t.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: -0.1,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: widget.replyingToUsername != null
+                          ? 'Antwort auf @${widget.replyingToUsername}…'
+                          : 'Kommentar eingeben…',
+                      hintStyle: TextStyle(color: t.textFaint, fontSize: 14),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              GestureDetector(
+                onTap: hasText ? widget.onSend : null,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: hasText ? t.gold : t.surfaceWeak,
+                    shape: BoxShape.circle,
+                    border: hasText ? null : Border.all(color: t.border),
+                  ),
+                  child: Icon(
+                    Icons.send_rounded,
+                    size: 17,
+                    color: hasText ? t.goldInk : t.textFaint,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
