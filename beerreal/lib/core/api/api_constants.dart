@@ -1,5 +1,5 @@
 class ApiConstants {
-  static const String host = '10.170.54.9';
+  static const String host = '80.158.76.30';
   static String get baseUrl => 'http://$host:3000';
 
   // Auth
@@ -7,7 +7,7 @@ class ApiConstants {
   static const String register = '/auth/register';
   static const String me = '/auth/me';
 
-  // Posts
+  // Postst
   static const String feed = '/posts';
   static const String myPosts = '/posts/me';
   static const String mapPosts = '/posts/map';
@@ -59,6 +59,8 @@ class ApiConstants {
 
   // Achievements
   static const String achievementsMe = '/achievements/me';
+  static const String achievementLocationTargets =
+      '/achievements/location-targets';
 
   // Notifications
   static const String notifications = '/notifications';

@@ -1,5 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:fullscreen_image_viewer/fullscreen_image_viewer.dart'
+    show FullscreenImageViewer;
 import 'package:provider/provider.dart';
 import '../core/app_cache_manager.dart';
 import '../theme.dart';
@@ -98,12 +100,26 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                 padding: const EdgeInsets.fromLTRB(18, 4, 18, 0),
                 child: Row(
                   children: [
-                    PintAvatar(
-                      size: 72,
-                      ring: true,
-                      imageUrl: widget.friend.avatarUrl,
-                      avatarColor: widget.friend.avatarColor,
-                      initials: widget.friend.avatarInitial,
+                    GestureDetector(
+                      onTap: (widget.friend.avatarUrl?.isNotEmpty ?? false)
+                          ? () => FullscreenImageViewer.open(
+                              context: context,
+                              child: CachedNetworkImage(
+                                imageUrl: widget.friend.avatarUrl!,
+                                cacheManager: AppCacheManager.instance,
+                                fit: BoxFit.contain,
+                                errorWidget: (_, __, ___) =>
+                                    Container(color: Colors.black),
+                              ),
+                            )
+                          : null,
+                      child: PintAvatar(
+                        size: 72,
+                        ring: true,
+                        imageUrl: widget.friend.avatarUrl,
+                        avatarColor: widget.friend.avatarColor,
+                        initials: widget.friend.avatarInitial,
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Column(

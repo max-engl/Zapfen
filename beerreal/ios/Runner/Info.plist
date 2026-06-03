@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Used to take photos for posts.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Used to show your location on the map.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Used to show your location on the map.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

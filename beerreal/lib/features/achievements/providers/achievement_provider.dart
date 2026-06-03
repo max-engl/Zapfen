@@ -24,7 +24,7 @@ class AchievementProvider extends ChangeNotifier {
     try {
       _achievements = await _service.fetchMine();
     } catch (_) {
-      _error = 'Achievements konnten nicht geladen werden.';
+      _error = 'Erfolge konnten nicht geladen werden.';
     } finally {
       _loading = false;
       notifyListeners();

@@ -7,6 +7,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:provider/provider.dart';
 import '../theme.dart';
+import '../features/achievements/models/achievement.dart';
+import '../features/achievements/services/achievement_service.dart';
 import '../features/posts/models/feed_post.dart';
 import '../features/posts/services/post_service.dart';
 import '../widgets/pint_loading.dart';
@@ -21,9 +23,11 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   List<FeedPost> _posts = [];
+  List<AchievementLocationTarget> _achievementTargets = [];
   bool _loading = true;
   String? _error;
   FeedPost? _selected;
+  AchievementLocationTarget? _selectedTarget;
   ll.LatLng? _deviceLocation;
   bool _locationPermissionDenied = false;
   bool _showHeatmap = true;
@@ -34,6 +38,7 @@ class _MapScreenState extends State<MapScreen> {
 
   static const _fallbackCenter = ll.LatLng(48.8566, 2.3522);
   static const _defaultZoom = 14.5;
+  static const _markerZoom = 17.0;
 
   @override
   void initState() {
@@ -56,11 +61,17 @@ class _MapScreenState extends State<MapScreen> {
     });
     try {
       final postsResult = context.read<PostService>().getMapPosts();
+      final targetsResult = context
+          .read<AchievementService>()
+          .fetchLocationTargets();
       await _startLocationTracking();
-      final posts = await postsResult;
+      final results = await Future.wait<Object>([postsResult, targetsResult]);
+      final posts = results[0] as List<FeedPost>;
+      final targets = results[1] as List<AchievementLocationTarget>;
       if (!mounted) return;
       setState(() {
         _posts = posts;
+        _achievementTargets = targets;
         _loading = false;
       });
       _rebuildStream.add(null);
@@ -121,6 +132,13 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  void _focusMarker(ll.LatLng point) {
+    final zoom = _mapController.camera.zoom < _markerZoom
+        ? _markerZoom
+        : _mapController.camera.zoom;
+    _mapController.move(point, zoom);
+  }
+
   ll.LatLng get _initialCenter => _deviceLocation ?? _fallbackCenter;
 
   @override
@@ -172,7 +190,10 @@ class _MapScreenState extends State<MapScreen> {
           options: MapOptions(
             initialCenter: _initialCenter,
             initialZoom: _defaultZoom,
-            onTap: (_, __) => setState(() => _selected = null),
+            onTap: (_, __) => setState(() {
+              _selected = null;
+              _selectedTarget = null;
+            }),
           ),
           children: [
             TileLayer(
@@ -203,6 +224,23 @@ class _MapScreenState extends State<MapScreen> {
                 ),
                 reset: _rebuildStream.stream,
               ),
+            if (_achievementTargets.isNotEmpty)
+              CircleLayer(
+                circles: _achievementTargets
+                    .map(
+                      (target) => CircleMarker(
+                        point: ll.LatLng(target.latitude, target.longitude),
+                        radius: target.radiusMeters,
+                        useRadiusInMeter: true,
+                        color: (target.earned ? t.gold : t.goldSoft).withValues(
+                          alpha: target.earned ? 0.18 : 0.12,
+                        ),
+                        borderColor: target.earned ? t.gold : t.goldBorder,
+                        borderStrokeWidth: target.earned ? 2 : 1.5,
+                      ),
+                    )
+                    .toList(),
+              ),
             MarkerLayer(
               markers: [
                 // User location dot
@@ -214,18 +252,51 @@ class _MapScreenState extends State<MapScreen> {
                     child: _UserDot(),
                   ),
                 // Post pins
-                ..._posts.map(
-                  (post) => Marker(
-                    point: ll.LatLng(post.lat!, post.lng!),
-                    width: 110,
-                    height: 44,
+                ..._posts
+                    .where((post) => post.lat != null && post.lng != null)
+                    .map(
+                      (post) => Marker(
+                        point: ll.LatLng(post.lat!, post.lng!),
+                        width: 110,
+                        height: 44,
+                        alignment: Alignment.bottomCenter,
+                        rotate: true,
+                        child: _PostPin(
+                          post: post,
+                          t: t,
+                          selected: _selected?.id == post.id,
+                          onTap: () {
+                            final point = ll.LatLng(post.lat!, post.lng!);
+                            _focusMarker(point);
+                            setState(() {
+                              _selected = post;
+                              _selectedTarget = null;
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                // Achievement locations
+                ..._achievementTargets.map(
+                  (target) => Marker(
+                    point: ll.LatLng(target.latitude, target.longitude),
+                    width: 132,
+                    height: 54,
                     alignment: Alignment.bottomCenter,
                     rotate: true,
-                    child: _PostPin(
-                      post: post,
+                    child: _AchievementPin(
+                      target: target,
                       t: t,
-                      selected: _selected?.id == post.id,
-                      onTap: () => setState(() => _selected = post),
+                      selected: _selectedTarget?.id == target.id,
+                      onTap: () {
+                        _focusMarker(
+                          ll.LatLng(target.latitude, target.longitude),
+                        );
+                        setState(() {
+                          _selected = null;
+                          _selectedTarget = target;
+                        });
+                      },
                     ),
                   ),
                 ),
@@ -346,6 +417,18 @@ class _MapScreenState extends State<MapScreen> {
               onDismiss: () => setState(() => _selected = null),
             ),
           ),
+
+        if (_selectedTarget != null)
+          Positioned(
+            left: 14,
+            right: 14,
+            bottom: 100,
+            child: _AchievementTargetCard(
+              target: _selectedTarget!,
+              t: t,
+              onDismiss: () => setState(() => _selectedTarget = null),
+            ),
+          ),
       ],
     );
   }
@@ -447,6 +530,84 @@ class _PostPin extends StatelessWidget {
             CustomPaint(
               size: const Size(10, 7),
               painter: _Arrow(color: arrowColor),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AchievementPin extends StatelessWidget {
+  final AchievementLocationTarget target;
+  final PintTheme t;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _AchievementPin({
+    required this.target,
+    required this.t,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = target.earned || selected ? t.gold : t.surface;
+    final fg = target.earned || selected ? t.goldInk : t.text;
+    final borderColor = target.earned || selected ? Colors.white : t.gold;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedOpacity(
+        opacity: selected ? 1 : 0.88,
+        duration: const Duration(milliseconds: 180),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              constraints: const BoxConstraints(maxWidth: 122),
+              padding: const EdgeInsets.fromLTRB(7, 5, 10, 5),
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: borderColor, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    target.earned
+                        ? Icons.check_circle_rounded
+                        : Icons.emoji_events_outlined,
+                    size: 13,
+                    color: target.earned || selected ? t.goldInk : t.goldText,
+                  ),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text(
+                      target.name,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: fg,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            CustomPaint(
+              size: const Size(10, 7),
+              painter: _Arrow(color: borderColor),
             ),
           ],
         ),
@@ -615,6 +776,129 @@ class _PostCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AchievementTargetCard extends StatelessWidget {
+  final AchievementLocationTarget target;
+  final PintTheme t;
+  final VoidCallback onDismiss;
+
+  const _AchievementTargetCard({
+    required this.target,
+    required this.t,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final radiusLabel = target.radiusMeters >= 1000
+        ? '${(target.radiusMeters / 1000).toStringAsFixed(1)} km'
+        : '${target.radiusMeters.round()} m';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: target.earned ? t.goldBorder : t.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.16),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: target.earned ? t.gold : t.goldSoft,
+              shape: BoxShape.circle,
+              border: Border.all(color: target.earned ? t.gold : t.goldBorder),
+            ),
+            child: Icon(
+              target.earned ? Icons.check_rounded : Icons.emoji_events_outlined,
+              size: 21,
+              color: target.earned ? t.goldInk : t.goldText,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  target.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: t.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  target.blurb,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: t.textMuted, fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.radio_button_checked, size: 12, color: t.gold),
+                    const SizedBox(width: 4),
+                    Text(
+                      radiusLabel,
+                      style: TextStyle(
+                        color: t.textFaint,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        target.statusLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: target.earned ? t.goldText : t.textFaint,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onDismiss,
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: t.surfaceWeak,
+                border: Border.all(color: t.border),
+              ),
+              child: Icon(Icons.close, size: 14, color: t.textMuted),
+            ),
+          ),
+        ],
       ),
     );
   }

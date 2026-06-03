@@ -14,4 +14,16 @@ class AchievementService {
         .map((e) => Achievement.fromJson(e as Map<String, dynamic>))
         .toList();
   }
+
+  Future<List<AchievementLocationTarget>> fetchLocationTargets() async {
+    final res = await _apiClient.dio.get(
+      ApiConstants.achievementLocationTargets,
+    );
+    final list = res.data['targets'] as List<dynamic>;
+    return list
+        .map(
+          (e) => AchievementLocationTarget.fromJson(e as Map<String, dynamic>),
+        )
+        .toList();
+  }
 }

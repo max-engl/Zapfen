@@ -130,6 +130,7 @@ Future<void> _main() async {
         Provider<ProfileService>.value(value: profileService),
         Provider<PostCacheManager>.value(value: postCacheManager),
         Provider<ReportService>.value(value: reportService),
+        Provider<AchievementService>.value(value: achievementService),
         ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
         ChangeNotifierProvider<FeedProvider>(
           create: (_) => FeedProvider(postService, FeedDatabase.instance),

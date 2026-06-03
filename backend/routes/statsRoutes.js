@@ -18,29 +18,40 @@ async function getFriendIds(userId) {
   );
 }
 
+function utcDay(date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
 function buildTimeline(posts, range, now) {
   if (range === 'week') {
+    const today = utcDay(now);
     const counts = Array(7).fill(0);
     const labels = [];
+    const slotTimes = [];
+
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      labels.push(DAY_NAMES[d.getDay()]);
+      const d = new Date(today);
+      d.setUTCDate(d.getUTCDate() - i);
+      labels.push(DAY_NAMES[d.getUTCDay()]);
+      slotTimes.push(d.getTime());
     }
+
     for (const post of posts) {
-      const daysAgo = Math.floor((now - post.createdAt) / 86400000);
-      const idx = 6 - daysAgo;
-      if (idx >= 0 && idx < 7) counts[idx]++;
+      const postDay = utcDay(post.createdAt).getTime();
+      const idx = slotTimes.indexOf(postDay);
+      if (idx >= 0) counts[idx]++;
     }
+
     return labels.map((label, i) => ({ label, count: counts[i] }));
   }
 
   if (range === 'month') {
+    const today = utcDay(now);
     const counts = Array(4).fill(0);
     for (const post of posts) {
-      const daysAgo = Math.floor((now - post.createdAt) / 86400000);
-      const idx = 3 - Math.floor(daysAgo / 7);
-      if (idx >= 0 && idx < 4) counts[idx]++;
+      const daysAgo = Math.round((today - utcDay(post.createdAt)) / 86400000);
+      const weekIdx = Math.min(Math.floor(daysAgo / 7), 3);
+      counts[3 - weekIdx]++;
     }
     return ['W1', 'W2', 'W3', 'W4'].map((label, i) => ({ label, count: counts[i] }));
   }
@@ -49,13 +60,13 @@ function buildTimeline(posts, range, now) {
   const counts = Array(12).fill(0);
   const labels = [];
   for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    labels.push(['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'][d.getMonth()]);
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    labels.push(['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'][d.getUTCMonth()]);
   }
   for (const post of posts) {
     const monthDiff =
-      (now.getFullYear() - post.createdAt.getFullYear()) * 12 +
-      (now.getMonth() - post.createdAt.getMonth());
+      (now.getUTCFullYear() - post.createdAt.getUTCFullYear()) * 12 +
+      (now.getUTCMonth() - post.createdAt.getUTCMonth());
     const idx = 11 - monthDiff;
     if (idx >= 0 && idx < 12) counts[idx]++;
   }
@@ -70,13 +81,15 @@ router.get('/', authMiddleware, async (req, res) => {
     const range = ['week', 'month', 'year'].includes(req.query.range) ? req.query.range : 'week';
 
     const now = new Date();
-    let periodMs;
-    if (range === 'week')  periodMs = 7  * 86400000;
-    else if (range === 'month') periodMs = 30 * 86400000;
-    else                        periodMs = 365 * 86400000;
+    let periodDays;
+    if (range === 'week')       periodDays = 7;
+    else if (range === 'month') periodDays = 30;
+    else                        periodDays = 365;
 
-    const periodStart = new Date(now - periodMs);
-    const prevStart   = new Date(now - periodMs * 2);
+    // Start from midnight (UTC) of the first day of the period so we
+    // don't miss posts created before the current time of day.
+    const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - periodDays));
+    const prevStart   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - periodDays * 2));
 
     let userFilter = {};
     let totalUsers;
