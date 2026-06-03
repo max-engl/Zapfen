@@ -6,6 +6,7 @@ class PintTopBar extends StatelessWidget {
   final VoidCallback onBell;
   final VoidCallback onToggleTheme;
   final VoidCallback onLeaderboard;
+  final VoidCallback onStats;
   final int unreadNotifications;
 
   const PintTopBar({
@@ -13,6 +14,7 @@ class PintTopBar extends StatelessWidget {
     required this.onBell,
     required this.onToggleTheme,
     required this.onLeaderboard,
+    required this.onStats,
     this.unreadNotifications = 0,
   });
 
@@ -59,9 +61,20 @@ class PintTopBar extends StatelessWidget {
             onTap: onLeaderboard,
           ),
           const SizedBox(width: 8),
+          // Stats
+          _IconBtn(
+            icon: Icons.bar_chart_rounded,
+            color: t.text,
+            bg: t.surfaceWeak,
+            border: t.border,
+            onTap: onStats,
+          ),
+          const SizedBox(width: 8),
           // Theme toggle
           _IconBtn(
-            icon: t.isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+            icon: t.isDark
+                ? Icons.light_mode_outlined
+                : Icons.dark_mode_outlined,
             color: t.text,
             bg: t.surfaceWeak,
             border: t.border,
@@ -94,7 +107,9 @@ class PintTopBar extends StatelessWidget {
                     ),
                     child: Center(
                       child: Text(
-                        unreadNotifications > 99 ? '99+' : '$unreadNotifications',
+                        unreadNotifications > 99
+                            ? '99+'
+                            : '$unreadNotifications',
                         style: TextStyle(
                           color: t.goldInk,
                           fontSize: 9,

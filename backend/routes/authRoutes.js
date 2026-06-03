@@ -9,15 +9,16 @@ const { generateAvatarColor, getAvatarInitial } = require("../utils/avatarUtil")
 const router = express.Router();
 
 function createToken(user) {
+    const raw = process.env.JWT_EXPIRES_IN || "7d";
+    // If purely numeric, treat as seconds (not ms); otherwise pass as-is (e.g. "30d")
+    const expiresIn = /^\d+$/.test(raw) ? parseInt(raw, 10) : raw;
     return jwt.sign(
         {
             userId: user._id,
             role: user.role,
         },
         process.env.JWT_SECRET,
-        {
-            expiresIn: process.env.JWT_EXPIRES_IN || "7d",
-        }
+        { expiresIn }
     );
 }
 

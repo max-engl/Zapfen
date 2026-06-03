@@ -14,6 +14,8 @@ const leaderboardRoutes = require("./routes/leaderboardRoutes");
 const statsRoutes = require("./routes/statsRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const appNotificationRoutes = require("./routes/appNotificationRoutes");
+const achievementRoutes = require("./routes/achievementRoutes");
+const { reportRouter, adminRouter } = require("./routes/reportRoutes");
 
 // Edit this list to change the default drinks shown to all users.
 const DEFAULT_DRINKS = [
@@ -120,6 +122,9 @@ app.use("/leaderboard", leaderboardRoutes);
 app.use("/stats", statsRoutes);
 app.use("/notify", notificationRoutes);
 app.use("/notifications", appNotificationRoutes);
+app.use("/achievements", achievementRoutes);
+app.use("/reports", reportRouter);
+app.use("/admin", adminRouter);
 
 const PORT = process.env.PORT || 3000;
 

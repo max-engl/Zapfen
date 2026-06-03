@@ -198,7 +198,12 @@ class _Photo extends StatefulWidget {
   final PintTheme t;
   final VoidCallback? onTap;
   final String heroTagPrefix;
-  const _Photo({required this.post, required this.t, this.onTap, this.heroTagPrefix = ''});
+  const _Photo({
+    required this.post,
+    required this.t,
+    this.onTap,
+    this.heroTagPrefix = '',
+  });
 
   @override
   State<_Photo> createState() => _PhotoState();
@@ -263,7 +268,8 @@ class _PhotoState extends State<_Photo> {
                               cacheKey: mainKey,
                               cacheManager: AppCacheManager.instance,
                               fit: BoxFit.cover,
-                              fadeInDuration: _renderedImageKeys.contains(mainKey)
+                              fadeInDuration:
+                                  _renderedImageKeys.contains(mainKey)
                                   ? Duration.zero
                                   : const Duration(milliseconds: 200),
                               placeholder: _renderedImageKeys.contains(mainKey)
@@ -296,82 +302,92 @@ class _PhotoState extends State<_Photo> {
                       gestures: {
                         ImmediateMultiDragGestureRecognizer:
                             GestureRecognizerFactoryWithHandlers<
-                                ImmediateMultiDragGestureRecognizer>(
-                          () => ImmediateMultiDragGestureRecognizer(
-                            debugOwner: this,
-                          ),
-                          (instance) {
-                            instance.onStart = (Offset _) {
-                              setState(() => _dragging = true);
-                              return _SelfieDrag(
-                                onMove: (delta) => setState(() {
-                                  _selfiePos = Offset(
-                                    (_selfiePos!.dx + delta.dx)
-                                        .clamp(0.0, size.width - _overlayW),
-                                    (_selfiePos!.dy + delta.dy)
-                                        .clamp(0.0, size.height - _overlayH),
+                              ImmediateMultiDragGestureRecognizer
+                            >(
+                              () => ImmediateMultiDragGestureRecognizer(
+                                debugOwner: this,
+                              ),
+                              (instance) {
+                                instance.onStart = (Offset _) {
+                                  setState(() => _dragging = true);
+                                  return _SelfieDrag(
+                                    onMove: (delta) => setState(() {
+                                      _selfiePos = Offset(
+                                        (_selfiePos!.dx + delta.dx).clamp(
+                                          0.0,
+                                          size.width - _overlayW,
+                                        ),
+                                        (_selfiePos!.dy + delta.dy).clamp(
+                                          0.0,
+                                          size.height - _overlayH,
+                                        ),
+                                      );
+                                    }),
+                                    onEnd: (_) => setState(() {
+                                      _dragging = false;
+                                      _selfiePos = _snapToCorner(
+                                        _selfiePos!,
+                                        size,
+                                      );
+                                    }),
+                                    onCancel: () => setState(() {
+                                      _dragging = false;
+                                      _selfiePos = _snapToCorner(
+                                        _selfiePos!,
+                                        size,
+                                      );
+                                    }),
                                   );
-                                }),
-                                onEnd: (_) => setState(() {
-                                  _dragging = false;
-                                  _selfiePos =
-                                      _snapToCorner(_selfiePos!, size);
-                                }),
-                                onCancel: () => setState(() {
-                                  _dragging = false;
-                                  _selfiePos =
-                                      _snapToCorner(_selfiePos!, size);
-                                }),
-                              );
-                            };
-                          },
-                        ),
+                                };
+                              },
+                            ),
                       },
                       child: GestureDetector(
                         onTap: () => setState(() => _swapped = !_swapped),
                         child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        curve: Curves.easeOutCubic,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            width: 2,
-                          ),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x40000000),
-                              blurRadius: 8,
-                              offset: Offset(0, 3),
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeOutCubic,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              width: 2,
                             ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: SizedBox(
-                            width: _overlayW,
-                            height: _overlayH,
-                            child: overlayUrl.isNotEmpty
-                                ? CachedNetworkImage(
-                                    imageUrl: overlayUrl,
-                                    cacheKey: overlayKey,
-                                    cacheManager: AppCacheManager.instance,
-                                    fit: BoxFit.cover,
-                                    progressIndicatorBuilder: (_, __, ___) =>
-                                        ShimmerBox(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                    errorWidget: (_, __, ___) =>
-                                        Container(color: t.surfaceWeak),
-                                  )
-                                : Container(color: t.surfaceWeak),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x40000000),
+                                blurRadius: 8,
+                                offset: Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: SizedBox(
+                              width: _overlayW,
+                              height: _overlayH,
+                              child: overlayUrl.isNotEmpty
+                                  ? CachedNetworkImage(
+                                      imageUrl: overlayUrl,
+                                      cacheKey: overlayKey,
+                                      cacheManager: AppCacheManager.instance,
+                                      fit: BoxFit.cover,
+                                      progressIndicatorBuilder: (_, __, ___) =>
+                                          ShimmerBox(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                          ),
+                                      errorWidget: (_, __, ___) =>
+                                          Container(color: t.surfaceWeak),
+                                    )
+                                  : Container(color: t.surfaceWeak),
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
               ],
             );
           },
@@ -421,7 +437,12 @@ class _Actions extends StatelessWidget {
   final VoidCallback? onTap;
   final PintTheme t;
 
-  const _Actions({required this.post, required this.onReact, required this.t, this.onTap});
+  const _Actions({
+    required this.post,
+    required this.onReact,
+    required this.t,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -31,8 +31,11 @@ import 'features/leaderboard/services/leaderboard_service.dart';
 import 'features/leaderboard/providers/leaderboard_provider.dart';
 import 'features/stats/services/stats_service.dart';
 import 'features/stats/providers/stats_provider.dart';
+import 'features/reports/services/report_service.dart';
 import 'features/notifications/services/notification_api_service.dart';
 import 'features/notifications/providers/notification_provider.dart';
+import 'features/achievements/services/achievement_service.dart';
+import 'features/achievements/providers/achievement_provider.dart';
 import 'widgets/avatar.dart';
 import 'widgets/pint_loading.dart';
 import 'widgets/top_bar.dart';
@@ -46,6 +49,7 @@ import 'screens/friends_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/leaderboard_screen.dart';
 import 'screens/notifications_screen.dart';
+import 'screens/stats_screen.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -53,13 +57,42 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 void main() async {
+  try {
+    await _main();
+  } catch (e, st) {
+    debugPrint('[startup] FATAL: $e\n$st');
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'Startup error:\n$e',
+                style: const TextStyle(color: Colors.red, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Keep more decoded images in RAM so scroll-back never re-decodes from disk.
   PaintingBinding.instance.imageCache.maximumSizeBytes = 256 << 20; // 256 MB
 
+  debugPrint('[startup] Firebase.initializeApp...');
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  debugPrint('[startup] Firebase ready');
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  debugPrint('[startup] NotificationService.init...');
   await NotificationService.init();
+  debugPrint('[startup] NotificationService ready');
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
@@ -68,6 +101,8 @@ void main() async {
   final tokenStorage = TokenStorage();
   final apiClient = ApiClient(tokenStorage);
   final authService = AuthService(apiClient, tokenStorage);
+  final authProvider = AuthProvider(authService);
+  apiClient.onUnauthorized = () => authProvider.forceLogout();
   final postService = PostService(apiClient);
   final commentService = CommentService(apiClient);
   final friendService = FriendService(apiClient);
@@ -75,7 +110,9 @@ void main() async {
   final drinkService = DrinkService(apiClient);
   final leaderboardService = LeaderboardService(apiClient);
   final statsService = StatsService(apiClient);
+  final reportService = ReportService(apiClient);
   final notificationApiService = NotificationApiService(apiClient);
+  final achievementService = AchievementService(apiClient);
 
   // Initialize post cache manager
   final prefs = await SharedPreferences.getInstance();
@@ -92,9 +129,8 @@ void main() async {
         Provider<FriendService>.value(value: friendService),
         Provider<ProfileService>.value(value: profileService),
         Provider<PostCacheManager>.value(value: postCacheManager),
-        ChangeNotifierProvider<AuthProvider>(
-          create: (_) => AuthProvider(authService),
-        ),
+        Provider<ReportService>.value(value: reportService),
+        ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
         ChangeNotifierProvider<FeedProvider>(
           create: (_) => FeedProvider(postService, FeedDatabase.instance),
         ),
@@ -116,6 +152,9 @@ void main() async {
         ),
         ChangeNotifierProvider<NotificationProvider>(
           create: (_) => NotificationProvider(notificationApiService),
+        ),
+        ChangeNotifierProvider<AchievementProvider>(
+          create: (_) => AchievementProvider(achievementService),
         ),
       ],
       child: const PintRoot(),
@@ -148,7 +187,7 @@ class _PintRootState extends State<PintRoot> {
 
   static const _themePrefKey = 'pint_theme_dark';
   static const _onboardingPrefKey = 'pint_onboarding_done';
-  static const _forceOnboarding = true; // set false to skip in prod
+  static const _forceOnboarding = false; // set false to skip in prod
 
   @override
   void initState() {
@@ -201,6 +240,7 @@ class _PintRootState extends State<PintRoot> {
     final isDark = prefs.getBool(_themePrefKey) ?? false;
     final onboardingDone = prefs.getBool(_onboardingPrefKey) ?? false;
     if (mounted) {
+      debugPrint('[startup] _onboardingChecked = true');
       setState(() {
         _theme = isDark ? PintTheme.dark : PintTheme.light;
         _onboardingDone = _forceOnboarding ? false : onboardingDone;
@@ -247,8 +287,10 @@ class _PintRootState extends State<PintRoot> {
     if (authStatus == AuthStatus.authenticated && !_preloadStarted) {
       _preloadStarted = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        debugPrint('[startup] auth OK — starting cache preload');
         context.read<FriendProvider>().preloadFromCache();
         context.read<FeedProvider>().preloadFromCache().then((_) {
+          debugPrint('[startup] _feedPreloaded = true');
           if (mounted) setState(() => _feedPreloaded = true);
         });
       });
@@ -401,6 +443,11 @@ class _PintAppState extends State<PintApp> {
                     );
                   },
                   onToggleTheme: widget.onToggleTheme,
+                  onStats: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const StatsScreen()),
+                    );
+                  },
                   onLeaderboard: () {
                     context.read<LeaderboardProvider>().refresh();
                     Navigator.of(context).push(

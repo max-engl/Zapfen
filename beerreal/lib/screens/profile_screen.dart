@@ -184,14 +184,23 @@ class _ProfileScreenState extends State<ProfileScreen>
                 Expanded(
                   child: _AnimatedTile(
                     animation: _statAnim(0),
-                    child: _StatTile(value: pp.streak, label: 'Serie', t: t, gold: true),
+                    child: _StatTile(
+                      value: pp.streak,
+                      label: 'Serie',
+                      t: t,
+                      gold: true,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _AnimatedTile(
                     animation: _statAnim(1),
-                    child: _StatTile(value: pp.totalPints, label: 'Biere', t: t),
+                    child: _StatTile(
+                      value: pp.totalPints,
+                      label: 'Biere',
+                      t: t,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -542,7 +551,10 @@ class _HeatmapGridState extends State<_HeatmapGrid>
                               ? (widget.t.isDark
                                     ? const Color(0xFF6B7280)
                                     : const Color(0xFF9CA3AF))
-                              : widget.t.streakCell[v.clamp(0, widget.t.streakCell.length - 1)],
+                              : widget.t.streakCell[v.clamp(
+                                  0,
+                                  widget.t.streakCell.length - 1,
+                                )],
                           borderRadius: BorderRadius.circular(3),
                         ),
                       ),

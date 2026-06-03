@@ -54,6 +54,12 @@ class ApiConstants {
   // Stats
   static const String stats = '/stats';
 
+  // Reports
+  static String reportPost(String postId) => '/reports/posts/$postId';
+
+  // Achievements
+  static const String achievementsMe = '/achievements/me';
+
   // Notifications
   static const String notifications = '/notifications';
   static const String notificationsReadAll = '/notifications/read-all';

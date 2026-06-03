@@ -1,0 +1,17 @@
+import '../../../core/api/api_client.dart';
+import '../../../core/api/api_constants.dart';
+import '../models/achievement.dart';
+
+class AchievementService {
+  final ApiClient _apiClient;
+
+  AchievementService(this._apiClient);
+
+  Future<List<Achievement>> fetchMine() async {
+    final res = await _apiClient.dio.get(ApiConstants.achievementsMe);
+    final list = res.data['achievements'] as List<dynamic>;
+    return list
+        .map((e) => Achievement.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+}

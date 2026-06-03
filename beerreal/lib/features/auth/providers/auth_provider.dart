@@ -21,6 +21,7 @@ class AuthProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   Future<void> checkAuth() async {
+    debugPrint('[startup] checkAuth start');
     _status = AuthStatus.checking;
     notifyListeners();
     try {
@@ -28,9 +29,11 @@ class AuthProvider extends ChangeNotifier {
       _status = _user != null
           ? AuthStatus.authenticated
           : AuthStatus.unauthenticated;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[startup] checkAuth error: $e');
       _status = AuthStatus.unauthenticated;
     }
+    debugPrint('[startup] checkAuth done → $_status');
     notifyListeners();
   }
 
@@ -75,10 +78,12 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } on DioException catch (e) {
       _errorMessage = _extractError(e);
+      debugPrint('[auth] register failed — status=${e.response?.statusCode} extracted="$_errorMessage" body=${e.response?.data}');
       notifyListeners();
       return false;
-    } catch (_) {
+    } catch (e) {
       _errorMessage = 'Something went wrong. Please try again.';
+      debugPrint('[auth] register unexpected error: $e');
       notifyListeners();
       return false;
     }
@@ -93,6 +98,14 @@ class AuthProvider extends ChangeNotifier {
     await _authService.logout();
     await AppCacheManager.instance.emptyCache();
     PaintingBinding.instance.imageCache.clear();
+    _user = null;
+    _status = AuthStatus.unauthenticated;
+    notifyListeners();
+  }
+
+  /// Called by ApiClient when a 401 is received — clears state without
+  /// async side-effects so it's safe to call from a Dio interceptor.
+  void forceLogout() {
     _user = null;
     _status = AuthStatus.unauthenticated;
     notifyListeners();
