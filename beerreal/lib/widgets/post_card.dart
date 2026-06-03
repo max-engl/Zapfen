@@ -1,11 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../core/app_cache_manager.dart';
 import '../core/geocoding_service.dart';
 import '../theme.dart';
 import '../features/posts/models/feed_post.dart';
-import '../screens/post_detail_screen.dart' show showEmojiPickerSheet;
+import '../features/posts/models/post_reaction.dart';
 import 'avatar.dart';
 import 'report_post_sheet.dart';
 import 'shimmer_box.dart';
@@ -80,12 +81,7 @@ class _Header extends StatelessWidget {
           onTap: onProfileTap,
           child: Row(
             children: [
-              PintAvatar(
-                size: 36,
-                imageUrl: post.avatarUrl,
-                avatarColor: post.avatarColor,
-                initials: post.avatarInitial,
-              ),
+              _LiveAvatar(post: post, size: 36, t: t),
               const SizedBox(width: 10),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -205,6 +201,43 @@ class _Photo extends StatefulWidget {
 
   @override
   State<_Photo> createState() => _PhotoState();
+}
+
+class _LiveAvatar extends StatelessWidget {
+  final FeedPost post;
+  final double size;
+  final PintTheme t;
+
+  const _LiveAvatar({required this.post, required this.size, required this.t});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        PintAvatar(
+          size: size,
+          imageUrl: post.avatarUrl,
+          avatarColor: post.avatarColor,
+          initials: post.avatarInitial,
+        ),
+        if (post.drinkingNow)
+          Positioned(
+            right: -1,
+            bottom: -1,
+            child: Container(
+              width: 11,
+              height: 11,
+              decoration: BoxDecoration(
+                color: const Color(0xFF22C55E),
+                shape: BoxShape.circle,
+                border: Border.all(color: t.bg, width: 2),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }
 
 class _PhotoState extends State<_Photo> {
@@ -466,75 +499,9 @@ class _Actions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasReaction = post.myReaction != null;
-    final topReactions = post.reactions.take(2).toList();
-
     return Row(
       children: [
-        // Reaction button: shows user's emoji or a generic react button
-        GestureDetector(
-          onTap: () => showEmojiPickerSheet(context, onSelect: onReact),
-          onLongPress: hasReaction ? () => onReact(post.myReaction!) : null,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: hasReaction ? t.goldSoft : t.surfaceWeak,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: hasReaction ? t.goldBorderStrong : t.border,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                hasReaction
-                    ? Text(
-                        post.myReaction!,
-                        style: const TextStyle(fontSize: 14),
-                      )
-                    : Icon(
-                        Icons.add_reaction_outlined,
-                        size: 14,
-                        color: t.text,
-                      ),
-                const SizedBox(width: 6),
-                if (topReactions.isNotEmpty)
-                  ...topReactions.map(
-                    (r) => Padding(
-                      padding: const EdgeInsets.only(right: 3),
-                      child: Text(
-                        r.emoji,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  )
-                else
-                  Text(
-                    post.totalReactions > 0
-                        ? '${post.totalReactions}'
-                        : 'Reagieren',
-                    style: TextStyle(
-                      color: hasReaction ? t.goldText : t.text,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                if (post.totalReactions > 0 && topReactions.isNotEmpty) ...[
-                  const SizedBox(width: 4),
-                  Text(
-                    '${post.totalReactions}',
-                    style: TextStyle(
-                      color: hasReaction ? t.goldText : t.textMuted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
+        _QuickReactions(post: post, onReact: onReact, t: t),
         const SizedBox(width: 10),
         GestureDetector(
           onTap: onTap,
@@ -565,6 +532,68 @@ class _Actions extends StatelessWidget {
         const Spacer(),
         Text(post.timeAgo, style: TextStyle(color: t.textFaint, fontSize: 11)),
       ],
+    );
+  }
+}
+
+class _QuickReactions extends StatelessWidget {
+  final FeedPost post;
+  final void Function(String emoji) onReact;
+  final PintTheme t;
+
+  const _QuickReactions({
+    required this.post,
+    required this.onReact,
+    required this.t,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final counts = {for (final r in post.reactions) r.emoji: r.count};
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: kReactionEmojis.map((emoji) {
+        final selected = post.myReaction == emoji;
+        final count = counts[emoji] ?? 0;
+        return Padding(
+          padding: const EdgeInsets.only(right: 6),
+          child: GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onReact(emoji);
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              constraints: const BoxConstraints(minWidth: 38, minHeight: 34),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+              decoration: BoxDecoration(
+                color: selected ? t.goldSoft : t.surfaceWeak,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: selected ? t.goldBorderStrong : t.border,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(emoji, style: const TextStyle(fontSize: 14)),
+                  if (count > 0) ...[
+                    const SizedBox(width: 4),
+                    Text(
+                      '$count',
+                      style: TextStyle(
+                        color: selected ? t.goldText : t.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

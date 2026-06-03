@@ -18,20 +18,34 @@ const ACHIEVEMENTS = [
         }),
     },
     {
-        id: "streak",
+        id: "five_day_streak",
         icon: "streak",
-        name: "Hot Streak",
-        blurb: "Poured 7 days in a row.",
+        name: "5-day streak",
+        blurb: "Logged a beer 5 days in a row.",
         getProgress: (posts) => {
             const streak = computeStreak(posts);
-            return { earned: streak >= 7, current: streak };
+            return { earned: streak >= 5, have: streak, goal: 5 };
+        },
+    },
+    {
+        id: "first_beer_abroad",
+        icon: "globe",
+        name: "First beer abroad",
+        blurb: "Logged your first beer outside Germany.",
+        getProgress: (posts) => {
+            const post = posts.find((p) => {
+                if (p.location?.coordinates?.length !== 2) return false;
+                const [lng, lat] = p.location.coordinates;
+                return getCountryCode(lat, lng) !== "DE";
+            });
+            return { earned: Boolean(post), date: post?.createdAt ?? null, have: post ? 1 : 0, goal: 1 };
         },
     },
     {
         id: "century",
         icon: "century",
-        name: "Century Club",
-        blurb: "Logged 100 lifetime pints.",
+        name: "100 beers logged",
+        blurb: "Logged 100 lifetime beers.",
         getProgress: (posts) => ({
             earned: posts.length >= 100,
             have: posts.length,
@@ -110,7 +124,7 @@ function computeStreak(posts) {
     const daySet = new Set(
         posts.map((p) => {
             const d = new Date(p.createdAt);
-            return `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         })
     );
 
@@ -119,7 +133,7 @@ function computeStreak(posts) {
     for (let i = 0; i <= 365; i++) {
         const d = new Date(today);
         d.setDate(today.getDate() - i);
-        const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         if (daySet.has(key)) {
             streak++;
         } else if (i > 0) {

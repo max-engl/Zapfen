@@ -21,6 +21,7 @@ class FeedPost {
   final String selfieUrl;
   final String? selfiePath;
   final bool likedByMe;
+  final bool drinkingNow;
   final String? myReaction;
   final List<PostReaction> reactions;
   final DateTime createdAt;
@@ -47,6 +48,7 @@ class FeedPost {
     required this.selfieUrl,
     this.selfiePath,
     this.likedByMe = false,
+    this.drinkingNow = false,
     this.myReaction,
     this.reactions = const [],
     required this.createdAt,
@@ -86,6 +88,7 @@ class FeedPost {
       selfieUrl: (json['selfieUrl'] ?? '') as String,
       selfiePath: json['selfiePath'] as String?,
       likedByMe: (json['likedByMe'] ?? false) as bool,
+      drinkingNow: (user['drinkingNow'] ?? false) as bool,
       myReaction: myReaction,
       reactions: rawReactions
           .map(
@@ -124,6 +127,7 @@ class FeedPost {
       selfieUrl: row['selfie_url'] as String,
       selfiePath: row['selfie_path'] as String?,
       likedByMe: (row['liked_by_me'] as int) == 1,
+      drinkingNow: (row['drinking_now'] as int) == 1,
       myReaction: myReaction,
       reactions: rawReactions
           .map(
@@ -157,6 +161,7 @@ class FeedPost {
     'selfie_url': selfieUrl,
     'selfie_path': selfiePath,
     'liked_by_me': likedByMe ? 1 : 0,
+    'drinking_now': drinkingNow ? 1 : 0,
     'my_reaction': myReaction,
     'reactions': jsonEncode(
       reactions.map((r) => {'emoji': r.emoji, 'count': r.count}).toList(),
@@ -195,6 +200,7 @@ class FeedPost {
     selfieUrl: selfieUrl,
     selfiePath: selfiePath,
     likedByMe: likedByMe ?? this.likedByMe,
+    drinkingNow: drinkingNow,
     myReaction: clearMyReaction ? null : (myReaction ?? this.myReaction),
     reactions: reactions ?? this.reactions,
     createdAt: createdAt,

@@ -19,10 +19,10 @@ class PostReaction {
   }
 
   PostReaction copyWith({int? count, bool? reactedByMe}) => PostReaction(
-        emoji: emoji,
-        count: count ?? this.count,
-        reactedByMe: reactedByMe ?? this.reactedByMe,
-      );
+    emoji: emoji,
+    count: count ?? this.count,
+    reactedByMe: reactedByMe ?? this.reactedByMe,
+  );
 }
 
-const List<String> kReactionEmojis = ['🍺', '🔥', '😂', '👏', '💀', '🤩', '😍', '🥂'];
+const List<String> kReactionEmojis = ['🍺', '🔥', '😍', '💀'];

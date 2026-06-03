@@ -286,16 +286,29 @@ class _CaptureScreenState extends State<CaptureScreen>
         _selfieBytes = selfieBytes;
         _stage = _Stage.review;
       });
-      await frontCtrl?.dispose();
+      await _disposeFrontAfterDetach(frontCtrl);
     } catch (_) {
-      await frontCtrl?.dispose();
       if (mounted) {
         setState(() {
           _selfieCountdown = null;
           _frontCtrl = null;
         });
       }
+      await _disposeFrontAfterDetach(frontCtrl);
     }
+  }
+
+  Future<void> _disposeFrontAfterDetach(CameraController? ctrl) async {
+    if (ctrl == null) return;
+    if (mounted) {
+      if (identical(_frontCtrl, ctrl)) {
+        setState(() => _frontCtrl = null);
+      }
+      await WidgetsBinding.instance.endOfFrame;
+    }
+    try {
+      await ctrl.dispose();
+    } catch (_) {}
   }
 
   Future<void> _upload() async {
@@ -956,13 +969,17 @@ class _CamFill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final previewSize = ctrl.value.previewSize;
+    if (!ctrl.value.isInitialized || previewSize == null) {
+      return const ColoredBox(color: Colors.black);
+    }
     return OverflowBox(
       alignment: Alignment.center,
       child: FittedBox(
         fit: BoxFit.cover,
         child: SizedBox(
-          width: ctrl.value.previewSize!.height,
-          height: ctrl.value.previewSize!.width,
+          width: previewSize.height,
+          height: previewSize.width,
           child: CameraPreview(ctrl),
         ),
       ),

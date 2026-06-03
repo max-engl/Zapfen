@@ -14,6 +14,7 @@ const authMiddleware = require("../middleware/authMiddleware");
 const { sendToUsers, sendToUser, saveNotification, saveNotifications } = require("../services/notificationService");
 
 const router = express.Router();
+const ALLOWED_REACTIONS = new Set(["🍺", "🔥", "😍", "💀"]);
 
 function getFileExtension(filename) {
     return filename.split(".").pop().toLowerCase();
@@ -185,7 +186,7 @@ router.post(
                 }),
             });
 
-            await post.populate("user", "username avatarUrl");
+            await post.populate("user", "username avatarUrl avatarColor avatarInitial");
 
             const [imageUrl, selfieUrl] = await Promise.all([
                 createSignedPostUrl(storagePath),
@@ -282,7 +283,7 @@ router.get("/", authMiddleware, async (req, res) => {
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
             .limit(limit + 1)
-            .populate("user", "username avatarUrl");
+            .populate("user", "username avatarUrl avatarColor avatarInitial");
 
         const hasMore = posts.length > limit;
         const pagePosts = hasMore ? posts.slice(0, limit) : posts;
@@ -297,7 +298,26 @@ router.get("/", authMiddleware, async (req, res) => {
             pagePosts.map((post) => formatPostWithUrls(post, likedSet, reactionDataMap))
         );
 
-        res.json({ posts: postsWithUrls, hasMore });
+        const activeSince = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        const activeUserIds = await Post.find({
+            user: { $in: [...friendIds, req.user._id] },
+            createdAt: { $gte: activeSince },
+        }).distinct("user");
+        const activeSet = new Set(activeUserIds.map(String));
+
+        res.json({
+            posts: postsWithUrls.map((post) => {
+                const user = post.user.toObject?.() ?? post.user;
+                return {
+                    ...post,
+                    user: {
+                        ...user,
+                        drinkingNow: activeSet.has((user._id ?? user.id).toString()),
+                    },
+                };
+            }),
+            hasMore,
+        });
     } catch (error) {
         res.status(500).json({ message: "Could not fetch feed", error: error.message });
     }
@@ -308,7 +328,7 @@ router.get("/me", authMiddleware, async (req, res) => {
     try {
         const posts = await Post.find({ user: req.user._id })
             .sort({ createdAt: -1 })
-            .populate("user", "username avatarUrl");
+            .populate("user", "username avatarUrl avatarColor avatarInitial");
 
         const postIds = posts.map((p) => p._id);
         const [likedSet, reactionDataMap] = await Promise.all([
@@ -350,7 +370,7 @@ router.get("/user/:userId", authMiddleware, async (req, res) => {
 
         const posts = await Post.find({ user: targetId })
             .sort({ createdAt: -1 })
-            .populate("user", "username avatarUrl");
+            .populate("user", "username avatarUrl avatarColor avatarInitial");
 
         const postIds = posts.map((p) => p._id);
         const [likedSet, reactionDataMap] = await Promise.all([
@@ -381,7 +401,7 @@ router.get("/map", authMiddleware, async (req, res) => {
         })
             .sort({ createdAt: -1 })
             .limit(200)
-            .populate("user", "username avatarUrl");
+            .populate("user", "username avatarUrl avatarColor avatarInitial");
 
         const postIds = posts.map((p) => p._id);
         const [likedSet, reactionDataMap] = await Promise.all([
@@ -429,6 +449,9 @@ router.post("/:id/reactions", authMiddleware, async (req, res) => {
     try {
         const { emoji } = req.body;
         if (!emoji) return res.status(400).json({ message: "emoji is required" });
+        if (!ALLOWED_REACTIONS.has(emoji)) {
+            return res.status(400).json({ message: "Unsupported reaction emoji" });
+        }
 
         const post = await Post.findById(req.params.id);
         if (!post) return res.status(404).json({ message: "Post not found" });
@@ -488,7 +511,7 @@ router.post("/:id/reactions", authMiddleware, async (req, res) => {
 // GET /posts/:id  —  single post (must be own or friend's)
 router.get("/:id", authMiddleware, async (req, res) => {
     try {
-        const post = await Post.findById(req.params.id).populate("user", "username avatarUrl");
+        const post = await Post.findById(req.params.id).populate("user", "username avatarUrl avatarColor avatarInitial");
 
         if (!post) {
             return res.status(404).json({ message: "Post not found" });

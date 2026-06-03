@@ -5,6 +5,8 @@ import 'package:fullscreen_image_viewer/fullscreen_image_viewer.dart'
 import 'package:provider/provider.dart';
 import '../core/app_cache_manager.dart';
 import '../theme.dart';
+import '../features/achievements/models/achievement.dart';
+import '../features/achievements/providers/achievement_provider.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/posts/models/feed_post.dart';
 import '../features/posts/providers/profile_posts_provider.dart';
@@ -52,6 +54,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ProfilePostsProvider>().load();
+      context.read<AchievementProvider>().load();
       _entranceCtrl.forward();
     });
   }
@@ -81,6 +84,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     final t = PintThemeProvider.of(context);
     final user = context.watch<AuthProvider>().user;
     final pp = context.watch<ProfilePostsProvider>();
+    final achievements = context.watch<AchievementProvider>();
     final grid = pp.heatmapGrid;
 
     final body = GestureDetector(
@@ -213,6 +217,9 @@ class _ProfileScreenState extends State<ProfileScreen>
               ],
             ),
           ),
+          const SizedBox(height: 18),
+
+          _AchievementStrip(provider: achievements, t: t),
           const SizedBox(height: 18),
 
           // ── Streak heatmap ──
@@ -450,6 +457,169 @@ class _PostThumb extends StatelessWidget {
             : Container(color: t.surfaceWeak),
       ),
     );
+  }
+}
+
+class _AchievementStrip extends StatelessWidget {
+  final AchievementProvider provider;
+  final PintTheme t;
+
+  const _AchievementStrip({required this.provider, required this.t});
+
+  @override
+  Widget build(BuildContext context) {
+    final earned = provider.achievements
+        .where((a) => a.earned)
+        .take(6)
+        .toList();
+    final preview = earned.isNotEmpty
+        ? earned
+        : provider.achievements.take(3).toList();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'BADGES',
+                style: TextStyle(
+                  color: t.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              const Spacer(),
+              if (provider.achievements.isNotEmpty)
+                Text(
+                  '${provider.earnedCount}/${provider.achievements.length}',
+                  style: TextStyle(color: t.textMuted, fontSize: 11),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (provider.loading && provider.achievements.isEmpty)
+            Row(
+              children: List.generate(
+                3,
+                (i) => Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(right: i == 2 ? 0 : 8),
+                    child: SizedBox(
+                      height: 82,
+                      child: ShimmerBox(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            )
+          else if (preview.isEmpty)
+            Text(
+              'Noch keine Badges.',
+              style: TextStyle(color: t.textMuted, fontSize: 13),
+            )
+          else
+            SizedBox(
+              height: 88,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: preview.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) =>
+                    _BadgePill(achievement: preview[i], t: t),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BadgePill extends StatelessWidget {
+  final Achievement achievement;
+  final PintTheme t;
+
+  const _BadgePill({required this.achievement, required this.t});
+
+  @override
+  Widget build(BuildContext context) {
+    final earned = achievement.earned;
+    return Container(
+      width: 164,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: earned ? t.goldFaint : t.surfaceWeaker,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: earned ? t.goldBorder : t.borderWeak),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: earned ? t.goldSoft : t.surfaceWeak,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Center(
+              child: Text(
+                _badgeEmoji(achievement.icon),
+                style: const TextStyle(fontSize: 18),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  achievement.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: earned ? t.goldText : t.text,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    height: 1.12,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  earned
+                      ? 'freigeschaltet'
+                      : '${achievement.have.clamp(0, achievement.goal)}/${achievement.goal}',
+                  style: TextStyle(
+                    color: t.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _badgeEmoji(String icon) {
+    return switch (icon) {
+      'globe' => '🌍',
+      'century' => '💯',
+      'streak' => '🔥',
+      'trophy' => '🏆',
+      'explorer' => '📍',
+      'magnet' => '🧲',
+      'crown' => '👑',
+      _ => '🍺',
+    };
   }
 }
 

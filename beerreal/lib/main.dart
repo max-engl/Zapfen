@@ -515,7 +515,13 @@ class _PintAppState extends State<PintApp> {
                     onPosted: (post) {
                       setState(() => _captureOpen = false);
                       context.read<FeedProvider>().prepend(post);
-                      context.read<ProfilePostsProvider>().prepend(post);
+                      final profilePosts = context.read<ProfilePostsProvider>();
+                      final previousStreak = profilePosts.streak;
+                      profilePosts.prepend(post);
+                      if (previousStreak < 5 && profilePosts.streak >= 5) {
+                        HapticFeedback.mediumImpact();
+                      }
+                      context.read<AchievementProvider>().refresh();
                       setState(() => _screen = PintScreen.feed);
                     },
                   )

@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fullscreen_image_viewer/fullscreen_image_viewer.dart'
     show FullscreenImageViewer;
 import 'package:provider/provider.dart';
@@ -823,7 +824,6 @@ class _ReactionBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = PintThemeProvider.of(context);
 
-    // Build a unified view: show all emojis that have reactions, plus an "add" button
     final Map<String, int> countMap = {
       for (final r in reactions) r.emoji: r.count,
     };
@@ -833,15 +833,16 @@ class _ReactionBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          // Existing reaction pills
-          ...countMap.entries.map((entry) {
-            final emoji = entry.key;
-            final count = entry.value;
+          ...kReactionEmojis.map((emoji) {
+            final count = countMap[emoji] ?? 0;
             final isMine = myReaction == emoji;
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: GestureDetector(
-                onTap: () => onReact(emoji),
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  onReact(emoji);
+                },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
                   padding: const EdgeInsets.symmetric(
@@ -859,60 +860,26 @@ class _ReactionBar extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(emoji, style: const TextStyle(fontSize: 16)),
-                      const SizedBox(width: 6),
-                      Text(
-                        '$count',
-                        style: TextStyle(
-                          color: isMine ? t.goldText : t.text,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
+                      if (count > 0) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          '$count',
+                          style: TextStyle(
+                            color: isMine ? t.goldText : t.text,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
               ),
             );
           }),
-
-          // "Add reaction" button
-          GestureDetector(
-            onTap: () => _showEmojiPicker(context),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-              decoration: BoxDecoration(
-                color: t.surfaceWeak,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: t.border),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.add_reaction_outlined,
-                    size: 16,
-                    color: t.textMuted,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Reagieren',
-                    style: TextStyle(
-                      color: t.textMuted,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );
-  }
-
-  void _showEmojiPicker(BuildContext context) {
-    showEmojiPickerSheet(context, onSelect: onReact);
   }
 }
 
@@ -951,6 +918,7 @@ void showEmojiPickerSheet(
               children: kReactionEmojis.map((emoji) {
                 return GestureDetector(
                   onTap: () {
+                    HapticFeedback.selectionClick();
                     Navigator.of(ctx).pop();
                     onSelect(emoji);
                   },
