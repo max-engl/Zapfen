@@ -17,6 +17,7 @@ CREATE TABLE posts (
   caption TEXT NOT NULL,
   drink_name TEXT NOT NULL,
   drink_emoji TEXT NOT NULL,
+  rating INTEGER,
   likes INTEGER NOT NULL,
   comments INTEGER NOT NULL,
   total_reactions INTEGER NOT NULL,
@@ -44,7 +45,7 @@ CREATE TABLE posts (
     final dir = await getDatabasesPath();
     return openDatabase(
       '$dir/pint_feed.db',
-      version: 4,
+      version: 5,
       onCreate: (db, _) => db.execute(_kCreateSql),
       onUpgrade: (db, oldVersion, newVersion) async {
         // Cache is non-critical — always rebuild to the correct schema.

@@ -9,7 +9,10 @@ class PostService {
 
   PostService(this._client);
 
-  Future<({List<FeedPost> posts, bool hasMore})> getFeed({int page = 1, int limit = 10}) async {
+  Future<({List<FeedPost> posts, bool hasMore})> getFeed({
+    int page = 1,
+    int limit = 10,
+  }) async {
     final response = await _client.dio.get(
       ApiConstants.feed,
       queryParameters: {'page': page, 'limit': limit},
@@ -17,7 +20,9 @@ class PostService {
     final list = response.data['posts'] as List<dynamic>;
     final hasMore = response.data['hasMore'] as bool? ?? false;
     return (
-      posts: list.map((e) => FeedPost.fromJson(e as Map<String, dynamic>)).toList(),
+      posts: list
+          .map((e) => FeedPost.fromJson(e as Map<String, dynamic>))
+          .toList(),
       hasMore: hasMore,
     );
   }
@@ -25,7 +30,9 @@ class PostService {
   Future<List<FeedPost>> getMyPosts() async {
     final response = await _client.dio.get(ApiConstants.myPosts);
     final list = response.data['posts'] as List<dynamic>;
-    return list.map((e) => FeedPost.fromJson(e as Map<String, dynamic>)).toList();
+    return list
+        .map((e) => FeedPost.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<FeedPost> getPostById(String postId) async {
@@ -36,7 +43,9 @@ class PostService {
   Future<List<FeedPost>> getUserPosts(String userId) async {
     final response = await _client.dio.get(ApiConstants.userPosts(userId));
     final list = response.data['posts'] as List<dynamic>;
-    return list.map((e) => FeedPost.fromJson(e as Map<String, dynamic>)).toList();
+    return list
+        .map((e) => FeedPost.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<FeedPost> uploadPost({
@@ -49,6 +58,7 @@ class PostService {
     double? lng,
     String? drinkName,
     String? drinkEmoji,
+    int? rating,
   }) async {
     final formData = FormData.fromMap({
       'image': MultipartFile.fromBytes(imageBytes, filename: filename),
@@ -58,15 +68,21 @@ class PostService {
       if (lng != null) 'lng': lng.toString(),
       if (drinkName != null && drinkName.isNotEmpty) 'drinkName': drinkName,
       if (drinkEmoji != null && drinkEmoji.isNotEmpty) 'drinkEmoji': drinkEmoji,
+      if (rating != null) 'rating': rating.toString(),
     });
-    final response = await _client.dio.post(ApiConstants.uploadPost, data: formData);
+    final response = await _client.dio.post(
+      ApiConstants.uploadPost,
+      data: formData,
+    );
     return FeedPost.fromJson(response.data['post'] as Map<String, dynamic>);
   }
 
   Future<List<FeedPost>> getMapPosts() async {
     final response = await _client.dio.get(ApiConstants.mapPosts);
     final list = response.data['posts'] as List<dynamic>;
-    return list.map((e) => FeedPost.fromJson(e as Map<String, dynamic>)).toList();
+    return list
+        .map((e) => FeedPost.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<({bool liked, int likes})> toggleLike(String postId) async {
@@ -84,10 +100,10 @@ class PostService {
     await _client.dio.delete(ApiConstants.deletePost(postId));
   }
 
-  Future<({String? myReaction, List<PostReaction> reactions, int totalReactions})> toggleReaction(
-    String postId,
-    String emoji,
-  ) async {
+  Future<
+    ({String? myReaction, List<PostReaction> reactions, int totalReactions})
+  >
+  toggleReaction(String postId, String emoji) async {
     final response = await _client.dio.post(
       ApiConstants.reactToPost(postId),
       data: {'emoji': emoji},
@@ -98,7 +114,9 @@ class PostService {
     return (
       myReaction: myReaction,
       reactions: rawReactions
-          .map((e) => PostReaction.fromJson(e as Map<String, dynamic>, myReaction))
+          .map(
+            (e) => PostReaction.fromJson(e as Map<String, dynamic>, myReaction),
+          )
           .toList(),
       totalReactions: (data['totalReactions'] as num?)?.toInt() ?? 0,
     );

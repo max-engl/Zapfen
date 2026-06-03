@@ -51,8 +51,40 @@ class _FriendsScreenState extends State<FriendsScreen> {
     return ListView(
       padding: const EdgeInsets.only(bottom: 100),
       children: [
-        // Search + Add row
-        if (fp.loading && fp.friends.isEmpty)
+        if (fp.requests.isNotEmpty) ...[
+          _SectionLabel(
+            label: 'Anfragen für dich',
+            right: '${fp.requests.length} ausstehend',
+            t: t,
+          ),
+          ...fp.requests.asMap().entries.map(
+            (e) => StaggerItem(
+              key: ValueKey(e.value.id),
+              index: e.key,
+              child: _RequestRow(
+                request: e.value,
+                t: t,
+                actionState: fp.actionFor(e.value.from.id),
+                onAccept: () async {
+                  final ok = await fp.acceptRequest(e.value.from.id);
+                  if (ok && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '@${e.value.from.username} ist jetzt in deinem Kreis.',
+                        ),
+                      ),
+                    );
+                  }
+                },
+                onDecline: () => fp.declineRequest(e.value.from.id),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+        ],
+
+        if (fp.loading && fp.friends.isEmpty && fp.requests.isEmpty)
           const _ShimmerFriendList()
         else if (fp.friends.isEmpty)
           Padding(
@@ -114,6 +146,168 @@ class _FriendsScreenState extends State<FriendsScreen> {
   }
 }
 
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  final String? right;
+  final PintTheme t;
+
+  const _SectionLabel({required this.label, this.right, required this.t});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
+      child: Row(
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: t.textMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.8,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Container(height: 1, color: t.border)),
+          if (right != null) ...[
+            const SizedBox(width: 8),
+            Text(right!, style: TextStyle(color: t.textMuted, fontSize: 12)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RequestRow extends StatelessWidget {
+  final ApiFriendRequest request;
+  final String? actionState;
+  final PintTheme t;
+  final VoidCallback onAccept;
+  final VoidCallback onDecline;
+
+  const _RequestRow({
+    required this.request,
+    required this.actionState,
+    required this.t,
+    required this.onAccept,
+    required this.onDecline,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accepted = actionState == 'accepted';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: t.surfaceWeaker,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: t.border),
+      ),
+      child: Row(
+        children: [
+          PintAvatar(
+            size: 46,
+            imageUrl: request.from.avatarUrl,
+            avatarColor: request.from.avatarColor,
+            initials: request.from.avatarInitial,
+            ring: true,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '@${request.from.username}',
+                  style: TextStyle(
+                    color: t.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.15,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'möchte deinem Kreis beitreten',
+                  style: TextStyle(color: t.textMuted, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          if (accepted)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: t.goldSoft,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: t.goldBorder),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check, size: 13, color: t.goldText),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Im Kreis',
+                    style: TextStyle(
+                      color: t.goldText,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: onDecline,
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: t.surfaceWeak,
+                      border: Border.all(color: t.border),
+                    ),
+                    child: Icon(Icons.close, size: 15, color: t.text),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: onAccept,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: t.gold,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      'Annehmen',
+                      style: TextStyle(
+                        color: t.goldInk,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.12,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _FriendRow extends StatelessWidget {
   final ApiFriend friend;
   final PintTheme t;
@@ -134,7 +328,13 @@ class _FriendRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            PintAvatar(size: 46, imageUrl: friend.avatarUrl, avatarColor: friend.avatarColor, initials: friend.avatarInitial, ring: false),
+            PintAvatar(
+              size: 46,
+              imageUrl: friend.avatarUrl,
+              avatarColor: friend.avatarColor,
+              initials: friend.avatarInitial,
+              ring: false,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

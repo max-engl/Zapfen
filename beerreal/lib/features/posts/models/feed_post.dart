@@ -11,6 +11,7 @@ class FeedPost {
   final String caption;
   final String drinkName;
   final String drinkEmoji;
+  final int? rating;
   final int likes;
   final int comments;
   final int totalReactions;
@@ -36,6 +37,7 @@ class FeedPost {
     required this.caption,
     this.drinkName = '',
     this.drinkEmoji = '',
+    this.rating,
     required this.likes,
     required this.comments,
     this.totalReactions = 0,
@@ -74,6 +76,7 @@ class FeedPost {
       caption: (json['caption'] ?? '') as String,
       drinkName: (drink['name'] as String?) ?? '',
       drinkEmoji: (drink['emoji'] as String?) ?? '',
+      rating: (json['rating'] as num?)?.toInt(),
       likes: (stats['likes'] ?? 0) as int,
       comments: (stats['comments'] ?? 0) as int,
       totalReactions: (stats['reactions'] ?? 0) as int,
@@ -111,6 +114,7 @@ class FeedPost {
       caption: row['caption'] as String,
       drinkName: row['drink_name'] as String,
       drinkEmoji: row['drink_emoji'] as String,
+      rating: row['rating'] as int?,
       likes: row['likes'] as int,
       comments: row['comments'] as int,
       totalReactions: row['total_reactions'] as int,
@@ -143,6 +147,7 @@ class FeedPost {
     'caption': caption,
     'drink_name': drinkName,
     'drink_emoji': drinkEmoji,
+    'rating': rating,
     'likes': likes,
     'comments': comments,
     'total_reactions': totalReactions,
@@ -180,6 +185,7 @@ class FeedPost {
     caption: caption,
     drinkName: drinkName,
     drinkEmoji: drinkEmoji,
+    rating: rating,
     likes: likes ?? this.likes,
     comments: comments ?? this.comments,
     totalReactions: totalReactions ?? this.totalReactions,

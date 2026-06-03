@@ -7,14 +7,12 @@ class PintBottomNav extends StatelessWidget {
   final PintScreen current;
   final ValueChanged<PintScreen> onSelect;
   final VoidCallback onCapture;
-  final bool posted;
 
   const PintBottomNav({
     super.key,
     required this.current,
     required this.onSelect,
     required this.onCapture,
-    required this.posted,
   });
 
   @override
@@ -43,7 +41,7 @@ class PintBottomNav extends StatelessWidget {
                 active: current == PintScreen.map,
                 onTap: () => onSelect(PintScreen.map),
               ),
-              _CaptureTab(onTap: onCapture, posted: posted),
+              _CaptureTab(onTap: onCapture),
               _Tab(
                 icon: Icons.people_outline,
                 label: 'Freunde',
@@ -146,9 +144,8 @@ class _TabState extends State<_Tab> with SingleTickerProviderStateMixin {
 
 class _CaptureTab extends StatefulWidget {
   final VoidCallback onTap;
-  final bool posted;
 
-  const _CaptureTab({required this.onTap, required this.posted});
+  const _CaptureTab({required this.onTap});
 
   @override
   State<_CaptureTab> createState() => _CaptureTabState();
@@ -198,19 +195,6 @@ class _CaptureTabState extends State<_CaptureTab>
                 clipBehavior: Clip.none,
                 children: [
                   Icon(Icons.camera_alt_outlined, size: 24, color: t.goldText),
-                  if (!widget.posted)
-                    Positioned(
-                      top: -2,
-                      right: -8,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFEF4444),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
                 ],
               ),
               const SizedBox(height: 3),

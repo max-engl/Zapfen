@@ -18,6 +18,7 @@ import '../features/posts/providers/profile_posts_provider.dart';
 import '../features/posts/services/comment_service.dart';
 import '../features/posts/services/post_service.dart';
 import '../widgets/avatar.dart';
+import '../widgets/report_post_sheet.dart';
 import '../widgets/shimmer_box.dart';
 
 // ── Main screen ───────────────────────────────────────────────────────────────
@@ -26,7 +27,11 @@ class PostDetailScreen extends StatelessWidget {
   final FeedPost post;
   final String heroTagPrefix;
 
-  const PostDetailScreen({super.key, required this.post, this.heroTagPrefix = ''});
+  const PostDetailScreen({
+    super.key,
+    required this.post,
+    this.heroTagPrefix = '',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -121,6 +126,9 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
         post: _post,
         t: t,
         onDelete: isOwner ? onDelete : null,
+        onReport: isOwner
+            ? null
+            : () => showReportPostReasonSheet(context, post: _post),
       ),
       body: Column(
         children: [
@@ -133,7 +141,10 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
                 SliverToBoxAdapter(
                   child: SizedBox(
                     height: 460,
-                    child: _ZoomablePhoto(post: _post, heroTagPrefix: widget.heroTagPrefix),
+                    child: _ZoomablePhoto(
+                      post: _post,
+                      heroTagPrefix: widget.heroTagPrefix,
+                    ),
                   ),
                 ),
 
@@ -178,7 +189,9 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
                                   ),
                                   builder: (_, snap) {
                                     final city = snap.data;
-                                    if (city == null) return const SizedBox.shrink();
+                                    if (city == null) {
+                                      return const SizedBox.shrink();
+                                    }
                                     return Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -203,6 +216,10 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
                                     );
                                   },
                                 ),
+                              ],
+                              if (_post.rating != null) ...[
+                                const SizedBox(width: 8),
+                                _DetailRating(rating: _post.rating!, t: t),
                               ],
                             ],
                           ),
@@ -449,14 +466,42 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
   }
 }
 
+class _DetailRating extends StatelessWidget {
+  final int rating;
+  final PintTheme t;
+
+  const _DetailRating({required this.rating, required this.t});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(5, (i) {
+        final filled = i < rating;
+        return Icon(
+          filled ? Icons.star_rounded : Icons.star_outline_rounded,
+          size: 13,
+          color: filled ? const Color(0xFFF6B733) : t.textFaint,
+        );
+      }),
+    );
+  }
+}
+
 // ── AppBar ────────────────────────────────────────────────────────────────────
 
 class _PostAppBar extends StatelessWidget implements PreferredSizeWidget {
   final FeedPost post;
   final PintTheme t;
   final VoidCallback? onDelete;
+  final VoidCallback? onReport;
 
-  const _PostAppBar({required this.post, required this.t, this.onDelete});
+  const _PostAppBar({
+    required this.post,
+    required this.t,
+    this.onDelete,
+    this.onReport,
+  });
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -481,7 +526,13 @@ class _PostAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       title: Row(
         children: [
-          PintAvatar(size: 34, imageUrl: post.avatarUrl, avatarColor: post.avatarColor, initials: post.avatarInitial, ring: true),
+          PintAvatar(
+            size: 34,
+            imageUrl: post.avatarUrl,
+            avatarColor: post.avatarColor,
+            initials: post.avatarInitial,
+            ring: true,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -508,38 +559,9 @@ class _PostAppBar extends StatelessWidget implements PreferredSizeWidget {
         ],
       ),
       actions: [
-        if (onDelete != null)
-          GestureDetector(
-            onTap: () => showModalBottomSheet<void>(
-              context: context,
-              builder: (ctx) => SafeArea(
-                child: ListTile(
-                  leading: const Icon(Icons.delete_outline, color: Colors.red),
-                  title: const Text(
-                    'Beitrag löschen',
-                    style: TextStyle(color: Colors.red),
-                  ),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    onDelete!();
-                  },
-                ),
-              ),
-            ),
-            child: Container(
-              margin: const EdgeInsets.only(right: 12),
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: t.surfaceWeak,
-                shape: BoxShape.circle,
-                border: Border.all(color: t.border),
-              ),
-              child: Icon(Icons.more_horiz, color: t.text, size: 20),
-            ),
-          )
-        else
-          Container(
+        GestureDetector(
+          onTap: () => _showOptionsSheet(context),
+          child: Container(
             margin: const EdgeInsets.only(right: 12),
             width: 38,
             height: 38,
@@ -550,11 +572,21 @@ class _PostAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
             child: Icon(Icons.more_horiz, color: t.text, size: 20),
           ),
+        ),
       ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
         child: Divider(height: 1, color: t.divider),
       ),
+    );
+  }
+
+  void _showOptionsSheet(BuildContext context) {
+    showPostOptionsSheet(
+      context,
+      post: post,
+      onDelete: onDelete,
+      onReport: onReport,
     );
   }
 }
@@ -695,66 +727,76 @@ class _ZoomablePhotoState extends State<_ZoomablePhoto> {
                       gestures: {
                         ImmediateMultiDragGestureRecognizer:
                             GestureRecognizerFactoryWithHandlers<
-                                ImmediateMultiDragGestureRecognizer>(
-                          () => ImmediateMultiDragGestureRecognizer(
-                            debugOwner: this,
-                          ),
-                          (instance) {
-                            instance.onStart = (Offset _) {
-                              setState(() => _dragging = true);
-                              return _DetailSelfieDrag(
-                                onMove: (delta) => setState(() {
-                                  _selfiePos = Offset(
-                                    (_selfiePos!.dx + delta.dx)
-                                        .clamp(0.0, size.width - _overlayW),
-                                    (_selfiePos!.dy + delta.dy)
-                                        .clamp(0.0, size.height - _overlayH),
+                              ImmediateMultiDragGestureRecognizer
+                            >(
+                              () => ImmediateMultiDragGestureRecognizer(
+                                debugOwner: this,
+                              ),
+                              (instance) {
+                                instance.onStart = (Offset _) {
+                                  setState(() => _dragging = true);
+                                  return _DetailSelfieDrag(
+                                    onMove: (delta) => setState(() {
+                                      _selfiePos = Offset(
+                                        (_selfiePos!.dx + delta.dx).clamp(
+                                          0.0,
+                                          size.width - _overlayW,
+                                        ),
+                                        (_selfiePos!.dy + delta.dy).clamp(
+                                          0.0,
+                                          size.height - _overlayH,
+                                        ),
+                                      );
+                                    }),
+                                    onEnd: (_) => setState(() {
+                                      _dragging = false;
+                                      _selfiePos = _snapToCorner(
+                                        _selfiePos!,
+                                        size,
+                                      );
+                                    }),
+                                    onCancel: () => setState(() {
+                                      _dragging = false;
+                                      _selfiePos = _snapToCorner(
+                                        _selfiePos!,
+                                        size,
+                                      );
+                                    }),
                                   );
-                                }),
-                                onEnd: (_) => setState(() {
-                                  _dragging = false;
-                                  _selfiePos =
-                                      _snapToCorner(_selfiePos!, size);
-                                }),
-                                onCancel: () => setState(() {
-                                  _dragging = false;
-                                  _selfiePos =
-                                      _snapToCorner(_selfiePos!, size);
-                                }),
-                              );
-                            };
-                          },
-                        ),
+                                };
+                              },
+                            ),
                       },
                       child: GestureDetector(
                         onTap: () => setState(() => _swapped = !_swapped),
                         child: Container(
-                        width: _overlayW,
-                        height: _overlayH,
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            width: 2,
+                          width: _overlayW,
+                          height: _overlayH,
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              width: 2,
+                            ),
+                            borderRadius: BorderRadius.circular(14),
                           ),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: overlayUrl.isNotEmpty
-                              ? CachedNetworkImage(
-                                  imageUrl: overlayUrl,
-                                  cacheKey: overlayKey,
-                                  cacheManager: AppCacheManager.instance,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (_, __, ___) =>
-                                      Container(color: const Color(0xFF1E3A2F)),
-                                )
-                              : Container(color: const Color(0xFF1E3A2F)),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: overlayUrl.isNotEmpty
+                                ? CachedNetworkImage(
+                                    imageUrl: overlayUrl,
+                                    cacheKey: overlayKey,
+                                    cacheManager: AppCacheManager.instance,
+                                    fit: BoxFit.cover,
+                                    errorWidget: (_, __, ___) => Container(
+                                      color: const Color(0xFF1E3A2F),
+                                    ),
+                                  )
+                                : Container(color: const Color(0xFF1E3A2F)),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
               ],
             );
           },
@@ -1027,7 +1069,12 @@ class _CommentRow extends StatelessWidget {
                 color: t.textFaint,
               ),
             ),
-          PintAvatar(size: 32, imageUrl: comment.avatarUrl, avatarColor: comment.avatarColor, initials: comment.avatarInitial),
+          PintAvatar(
+            size: 32,
+            imageUrl: comment.avatarUrl,
+            avatarColor: comment.avatarColor,
+            initials: comment.avatarInitial,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(

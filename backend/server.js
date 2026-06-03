@@ -1,6 +1,8 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const bcrypt = require("bcrypt");
+const path = require("path");
 require("dotenv").config();
 
 const os = require("os");
@@ -124,6 +126,9 @@ app.use("/notify", notificationRoutes);
 app.use("/notifications", appNotificationRoutes);
 app.use("/achievements", achievementRoutes);
 app.use("/reports", reportRouter);
+app.get("/admin", (req, res) => {
+    res.sendFile(path.join(__dirname, "../admin.html"));
+});
 app.use("/admin", adminRouter);
 
 const PORT = process.env.PORT || 3000;
@@ -164,6 +169,51 @@ async function migrateAvatarFields() {
     if (updated > 0) console.log(`Avatar migration: updated ${updated} users`);
 }
 
+async function syncAdminUser() {
+    const User = require("./models/User");
+    const { generateAvatarColor, getAvatarInitial } = require("./utils/avatarUtil");
+
+    const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+    const password = process.env.ADMIN_PASSWORD;
+    if (!email || !password) {
+        console.log("Admin sync skipped: ADMIN_EMAIL or ADMIN_PASSWORD missing");
+        return;
+    }
+
+    const rawUsername = process.env.ADMIN_USERNAME || email.split("@")[0] || "admin";
+    const username = rawUsername
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]/g, "")
+        .slice(0, 32);
+    const safeUsername = username.length >= 3 ? username : "admin";
+    const passwordHash = await bcrypt.hash(password, 12);
+    const existing = await User.findOne({ email });
+
+    if (existing) {
+        existing.role = "admin";
+        existing.passwordHash = passwordHash;
+        if (!existing.avatarColor) existing.avatarColor = generateAvatarColor(existing.username);
+        if (!existing.avatarInitial) existing.avatarInitial = getAvatarInitial(existing.username);
+        await existing.save();
+        console.log(`Admin user synced: ${email}`);
+        return;
+    }
+
+    const usernameTaken = await User.exists({ username: safeUsername });
+    const adminUsername = usernameTaken ? `admin${Date.now().toString().slice(-6)}` : safeUsername;
+
+    await User.create({
+        username: adminUsername,
+        email,
+        passwordHash,
+        role: "admin",
+        avatarColor: generateAvatarColor(adminUsername),
+        avatarInitial: getAvatarInitial(adminUsername),
+    });
+    console.log(`Admin user created: ${email}`);
+}
+
 function getLocalIPv4() {
     const interfaces = os.networkInterfaces();
 
@@ -185,6 +235,7 @@ async function startServer() {
 
         await syncDefaultDrinks();
         await migrateAvatarFields();
+        await syncAdminUser();
 
         const host = "0.0.0.0";
         const localIPv4 = getLocalIPv4();

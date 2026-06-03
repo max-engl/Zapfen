@@ -490,7 +490,6 @@ class _PintAppState extends State<PintApp> {
               current: _screen,
               onSelect: (s) => setState(() => _screen = s),
               onCapture: _openCapture,
-              posted: false,
             ),
           ),
           AnimatedSwitcher(

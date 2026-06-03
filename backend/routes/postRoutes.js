@@ -75,6 +75,7 @@ function formatPost(post, imageUrl, selfieUrl, likedByMe = false, myReaction = n
         user: post.user,
         caption: post.caption,
         drink: post.drink ?? {},
+        rating: post.rating ?? null,
         stats: post.stats,
         imageUrl,
         imagePath: post.storagePath,
@@ -112,7 +113,7 @@ router.post(
     ]),
     async (req, res) => {
         try {
-            const { caption, lat, lng, drinkName, drinkEmoji } = req.body;
+            const { caption, lat, lng, drinkName, drinkEmoji, rating } = req.body;
             const imageFile = req.files?.["image"]?.[0];
             const selfieFile = req.files?.["selfie"]?.[0];
 
@@ -160,12 +161,18 @@ router.post(
             const parsedLat = parseFloat(lat);
             const parsedLng = parseFloat(lng);
             const hasLocation = !isNaN(parsedLat) && !isNaN(parsedLng);
+            const parsedRating = Number.parseInt(rating, 10);
+            const hasRating = rating !== undefined && rating !== null && rating !== "";
+            if (hasRating && (!Number.isInteger(parsedRating) || parsedRating < 1 || parsedRating > 5)) {
+                return res.status(400).json({ message: "Rating must be between 1 and 5" });
+            }
 
             const post = await Post.create({
                 user: req.user._id,
                 caption: caption || "",
                 storagePath,
                 selfieStoragePath,
+                rating: hasRating ? parsedRating : null,
                 drink: {
                     name:  drinkName?.trim()  || "",
                     emoji: drinkEmoji?.trim() || "",

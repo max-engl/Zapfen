@@ -317,7 +317,6 @@ class _CaptureScreenState extends State<CaptureScreen>
         drinkName: _selectedDrink?.name,
         drinkEmoji: _selectedDrink?.emoji,
         rating: _rating,
-        tastingNote: null,
       );
       if (mounted) widget.onPosted(post);
     } catch (_) {

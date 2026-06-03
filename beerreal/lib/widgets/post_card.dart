@@ -7,6 +7,7 @@ import '../theme.dart';
 import '../features/posts/models/feed_post.dart';
 import '../screens/post_detail_screen.dart' show showEmojiPickerSheet;
 import 'avatar.dart';
+import 'report_post_sheet.dart';
 import 'shimmer_box.dart';
 
 // Keys of images that have been rendered at least once this session.
@@ -144,16 +145,31 @@ class _Header extends StatelessWidget {
                         ),
                     ],
                   ),
-                  if (post.drinkLabel.isNotEmpty) ...[
+                  if (post.drinkLabel.isNotEmpty || post.rating != null) ...[
                     const SizedBox(height: 2),
-                    Text(
-                      post.drinkLabel,
-                      style: TextStyle(
-                        color: t.goldText,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: -0.1,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (post.drinkLabel.isNotEmpty)
+                          Text(
+                            post.drinkLabel,
+                            style: TextStyle(
+                              color: t.goldText,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -0.1,
+                            ),
+                          ),
+                        if (post.drinkLabel.isNotEmpty &&
+                            post.rating != null) ...[
+                          Text(
+                            ' · ',
+                            style: TextStyle(color: t.textFaint, fontSize: 11),
+                          ),
+                        ],
+                        if (post.rating != null)
+                          _RatingStars(rating: post.rating!, size: 11),
+                      ],
                     ),
                   ],
                 ],
@@ -162,34 +178,16 @@ class _Header extends StatelessWidget {
           ),
         ),
         const Spacer(),
-        if (onDelete != null)
-          GestureDetector(
-            onTap: () => _showDeleteSheet(context),
-            child: Icon(Icons.more_horiz, color: t.textMuted, size: 20),
-          )
-        else
-          Icon(Icons.more_horiz, color: t.textMuted, size: 20),
+        GestureDetector(
+          onTap: () => _showOptionsSheet(context),
+          child: Icon(Icons.more_horiz, color: t.textMuted, size: 20),
+        ),
       ],
     );
   }
 
-  void _showDeleteSheet(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: ListTile(
-          leading: const Icon(Icons.delete_outline, color: Colors.red),
-          title: const Text(
-            'Beitrag löschen',
-            style: TextStyle(color: Colors.red),
-          ),
-          onTap: () {
-            Navigator.of(ctx).pop();
-            onDelete!();
-          },
-        ),
-      ),
-    );
+  void _showOptionsSheet(BuildContext context) {
+    showPostOptionsSheet(context, post: post, onDelete: onDelete);
   }
 }
 
@@ -427,6 +425,28 @@ class _Caption extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _RatingStars extends StatelessWidget {
+  final int rating;
+  final double size;
+
+  const _RatingStars({required this.rating, this.size = 12});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(5, (i) {
+        final filled = i < rating;
+        return Icon(
+          filled ? Icons.star_rounded : Icons.star_outline_rounded,
+          size: size,
+          color: filled ? const Color(0xFFF6B733) : const Color(0x4DFFFFFF),
+        );
+      }),
     );
   }
 }

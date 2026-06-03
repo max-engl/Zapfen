@@ -38,7 +38,12 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
 
   Future<void> _loadInviteLink() async {
     final link = await context.read<FriendProvider>().getInviteLink();
-    if (mounted) setState(() { _inviteLink = link; _inviteLoading = false; });
+    if (mounted) {
+      setState(() {
+        _inviteLink = link;
+        _inviteLoading = false;
+      });
+    }
   }
 
   @override
@@ -120,28 +125,6 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                         onChanged: (v) => _onQueryChanged(v, fp),
                       ),
 
-                      // Incoming requests
-                      if (fp.requests.isNotEmpty && _query.isEmpty) ...[
-                        _SectionLabel(
-                          label: 'Anfragen für dich',
-                          right: '${fp.requests.length} ausstehend',
-                          t: t,
-                        ),
-                        ...fp.requests.map((r) => _RequestRow(
-                              request: r,
-                              t: t,
-                              actionState: fp.actionFor(r.from.id),
-                              onAccept: () async {
-                                final ok = await fp.acceptRequest(r.from.id);
-                                if (ok && context.mounted) {
-                                  _showToast('Prost — @${r.from.username} ist jetzt in deinem Kreis!');
-                                }
-                              },
-                              onDecline: () => fp.declineRequest(r.from.id),
-                            )),
-                        const SizedBox(height: 18),
-                      ],
-
                       // Search results
                       if (_query.length >= 2) ...[
                         _SectionLabel(
@@ -155,13 +138,16 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                               3,
                               (_) => Padding(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 18, vertical: 10),
+                                  horizontal: 18,
+                                  vertical: 10,
+                                ),
                                 child: Row(
                                   children: [
                                     const SizedBox(
-                                        width: 40,
-                                        height: 40,
-                                        child: ShimmerBox.circle()),
+                                      width: 40,
+                                      height: 40,
+                                      child: ShimmerBox.circle(),
+                                    ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
@@ -171,8 +157,9 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                                           SizedBox(
                                             height: 12,
                                             child: ShimmerBox(
-                                                borderRadius:
-                                                    BorderRadius.circular(6)),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
                                           ),
                                           const SizedBox(height: 5),
                                           FractionallySizedBox(
@@ -180,8 +167,9 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                                             child: SizedBox(
                                               height: 10,
                                               child: ShimmerBox(
-                                                  borderRadius:
-                                                      BorderRadius.circular(5)),
+                                                borderRadius:
+                                                    BorderRadius.circular(5),
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -197,22 +185,29 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                             padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
                             child: Text(
                               'Keine Nutzer für "$_query" gefunden.',
-                              style: TextStyle(color: t.textMuted, fontSize: 13),
+                              style: TextStyle(
+                                color: t.textMuted,
+                                fontSize: 13,
+                              ),
                             ),
                           )
                         else
-                          ..._searchResults.map((u) => _SearchResultRow(
-                                user: u,
-                                t: t,
-                                actionState: fp.actionFor(u.id),
-                                isFriend: fp.friends.any((f) => f.id == u.id),
-                                onAdd: () async {
-                                  await fp.sendRequest(u.id);
-                                  if (context.mounted) {
-                                    _showToast('Anfrage an @${u.username} gesendet');
-                                  }
-                                },
-                              )),
+                          ..._searchResults.map(
+                            (u) => _SearchResultRow(
+                              user: u,
+                              t: t,
+                              actionState: fp.actionFor(u.id),
+                              isFriend: fp.friends.any((f) => f.id == u.id),
+                              onAdd: () async {
+                                await fp.sendRequest(u.id);
+                                if (context.mounted) {
+                                  _showToast(
+                                    'Anfrage an @${u.username} gesendet',
+                                  );
+                                }
+                              },
+                            ),
+                          ),
                       ],
                     ],
                   ),
@@ -246,16 +241,20 @@ class _Header extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
       child: Row(
         children: [
-          _IconBtn(t: t, onTap: onClose,
-              child: Icon(Icons.chevron_left, size: 20, color: t.text)),
+          _IconBtn(
+            t: t,
+            onTap: onClose,
+            child: Icon(Icons.chevron_left, size: 20, color: t.text),
+          ),
           const Spacer(),
           Text(
             'Zum Kreis hinzufügen',
             style: TextStyle(
-                color: t.text,
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-                letterSpacing: -0.32),
+              color: t.text,
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              letterSpacing: -0.32,
+            ),
           ),
           const Spacer(),
           SizedBox(width: 36, height: 36),
@@ -318,7 +317,9 @@ class _YourCodeCardState extends State<_YourCodeCard> {
   Future<void> _share() async {
     if (widget.inviteLink == null) return;
     final box = _shareKey.currentContext?.findRenderObject() as RenderBox?;
-    final origin = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+    final origin = box != null
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
     await Share.share(
       widget.inviteLink!,
       subject: 'Zapfen Einladung',
@@ -340,26 +341,30 @@ class _YourCodeCardState extends State<_YourCodeCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Icon(Icons.bolt, size: 10, color: t.goldText),
-            const SizedBox(width: 6),
-            Text(
-              'dein Einladungslink',
-              style: TextStyle(
+          Row(
+            children: [
+              Icon(Icons.bolt, size: 10, color: t.goldText),
+              const SizedBox(width: 6),
+              Text(
+                'dein Einladungslink',
+                style: TextStyle(
                   color: t.goldText,
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  letterSpacing: 1.4),
-            ),
-          ]),
+                  letterSpacing: 1.4,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 6),
           Text(
             '@${widget.username}',
             style: TextStyle(
-                color: t.text,
-                fontWeight: FontWeight.w800,
-                fontSize: 20,
-                letterSpacing: -0.4),
+              color: t.text,
+              fontWeight: FontWeight.w800,
+              fontSize: 20,
+              letterSpacing: -0.4,
+            ),
           ),
           const SizedBox(height: 12),
           // Link preview pill
@@ -379,61 +384,76 @@ class _YourCodeCardState extends State<_YourCodeCard> {
                     widget.inviteLink!,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                        color: t.textMuted,
-                        fontSize: 12,
-                        fontFamily: 'monospace'),
+                      color: t.textMuted,
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                    ),
                   ),
           ),
           const SizedBox(height: 12),
-          Row(children: [
-            Expanded(
-              child: GestureDetector(
-                key: _shareKey,
-                onTap: widget.inviteLink != null ? _share : null,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 13),
-                  decoration: BoxDecoration(
-                    color: widget.inviteLink != null ? t.gold : t.surfaceWeak,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.ios_share, size: 15,
-                          color: widget.inviteLink != null ? t.goldInk : t.textMuted),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Link teilen',
-                        style: TextStyle(
-                            color: widget.inviteLink != null ? t.goldInk : t.textMuted,
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  key: _shareKey,
+                  onTap: widget.inviteLink != null ? _share : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    decoration: BoxDecoration(
+                      color: widget.inviteLink != null ? t.gold : t.surfaceWeak,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.ios_share,
+                          size: 15,
+                          color: widget.inviteLink != null
+                              ? t.goldInk
+                              : t.textMuted,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Link teilen',
+                          style: TextStyle(
+                            color: widget.inviteLink != null
+                                ? t.goldInk
+                                : t.textMuted,
                             fontSize: 14,
-                            fontWeight: FontWeight.w700),
-                      ),
-                    ],
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
-            GestureDetector(
-              onTap: widget.inviteLink != null ? widget.onCopy : null,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-                decoration: BoxDecoration(
-                  color: widget.copied ? t.goldSoft : t.surfaceWeak,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                      color: widget.copied ? t.goldBorder : t.border),
-                ),
-                child: Icon(
-                  widget.copied ? Icons.check : Icons.copy_outlined,
-                  size: 16,
-                  color: widget.copied ? t.goldText : t.textMuted,
+              const SizedBox(width: 10),
+              GestureDetector(
+                onTap: widget.inviteLink != null ? widget.onCopy : null,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 13,
+                  ),
+                  decoration: BoxDecoration(
+                    color: widget.copied ? t.goldSoft : t.surfaceWeak,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: widget.copied ? t.goldBorder : t.border,
+                    ),
+                  ),
+                  child: Icon(
+                    widget.copied ? Icons.check : Icons.copy_outlined,
+                    size: 16,
+                    color: widget.copied ? t.goldText : t.textMuted,
+                  ),
                 ),
               ),
-            ),
-          ]),
+            ],
+          ),
         ],
       ),
     );
@@ -506,123 +526,21 @@ class _SectionLabel extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
       child: Row(
         children: [
-          Text(label.toUpperCase(),
-              style: TextStyle(
-                  color: t.textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.8)),
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: t.textMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.8,
+            ),
+          ),
           const SizedBox(width: 8),
           Expanded(child: Container(height: 1, color: t.border)),
           if (right != null) ...[
             const SizedBox(width: 8),
             Text(right!, style: TextStyle(color: t.textMuted, fontSize: 12)),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Incoming request row ──────────────────────────────────────────────────
-
-class _RequestRow extends StatelessWidget {
-  final ApiFriendRequest request;
-  final String? actionState;
-  final PintTheme t;
-  final VoidCallback onAccept;
-  final VoidCallback onDecline;
-  const _RequestRow({
-    required this.request,
-    required this.actionState,
-    required this.t,
-    required this.onAccept,
-    required this.onDecline,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final accepted = actionState == 'accepted';
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: t.surfaceWeaker,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: t.border),
-      ),
-      child: Row(
-        children: [
-          PintAvatar(size: 46, imageUrl: request.from.avatarUrl, avatarColor: request.from.avatarColor, initials: request.from.avatarInitial, ring: true),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('@${request.from.username}',
-                    style: TextStyle(
-                        color: t.text,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: -0.15)),
-                const SizedBox(height: 2),
-                Text('möchte deinem Kreis beitreten',
-                    style: TextStyle(color: t.textMuted, fontSize: 12)),
-              ],
-            ),
-          ),
-          if (accepted)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: t.goldSoft,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: t.goldBorder),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.check, size: 13, color: t.goldText),
-                const SizedBox(width: 4),
-                Text('Im Kreis',
-                    style: TextStyle(
-                        color: t.goldText,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700)),
-              ]),
-            )
-          else
-            Row(children: [
-              GestureDetector(
-                onTap: onDecline,
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: t.surfaceWeak,
-                    border: Border.all(color: t.border),
-                  ),
-                  child: Icon(Icons.close, size: 15, color: t.text),
-                ),
-              ),
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: onAccept,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: t.gold,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text('Annehmen',
-                      style: TextStyle(
-                          color: t.goldInk,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.12)),
-                ),
-              ),
-            ]),
         ],
       ),
     );
@@ -650,19 +568,28 @@ class _SearchResultRow extends StatelessWidget {
     final requested = actionState == 'requested' || isFriend;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-      decoration:
-          BoxDecoration(border: Border(bottom: BorderSide(color: t.divider))),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: t.divider)),
+      ),
       child: Row(
         children: [
-          PintAvatar(size: 44, imageUrl: user.avatarUrl, avatarColor: user.avatarColor, initials: user.avatarInitial),
+          PintAvatar(
+            size: 44,
+            imageUrl: user.avatarUrl,
+            avatarColor: user.avatarColor,
+            initials: user.avatarInitial,
+          ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text('@${user.username}',
-                style: TextStyle(
-                    color: t.text,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.15)),
+            child: Text(
+              '@${user.username}',
+              style: TextStyle(
+                color: t.text,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.15,
+              ),
+            ),
           ),
           const SizedBox(width: 10),
           GestureDetector(
@@ -672,8 +599,7 @@ class _SearchResultRow extends StatelessWidget {
               decoration: BoxDecoration(
                 color: requested ? t.surfaceWeak : t.goldSoft,
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                    color: requested ? t.border : t.goldBorder),
+                border: Border.all(color: requested ? t.border : t.goldBorder),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -681,20 +607,26 @@ class _SearchResultRow extends StatelessWidget {
                     ? [
                         Icon(Icons.check, size: 13, color: t.textMuted),
                         const SizedBox(width: 4),
-                        Text(isFriend ? 'Befreundet' : 'Angefragt',
-                            style: TextStyle(
-                                color: t.textMuted,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700)),
+                        Text(
+                          isFriend ? 'Befreundet' : 'Angefragt',
+                          style: TextStyle(
+                            color: t.textMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ]
                     : [
                         Icon(Icons.add, size: 13, color: t.goldText),
                         const SizedBox(width: 4),
-                        Text('Hinzufügen',
-                            style: TextStyle(
-                                color: t.goldText,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700)),
+                        Text(
+                          'Hinzufügen',
+                          style: TextStyle(
+                            color: t.goldText,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ],
               ),
             ),
@@ -722,9 +654,10 @@ class _Toast extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           boxShadow: const [
             BoxShadow(
-                color: Color(0x59000000),
-                blurRadius: 28,
-                offset: Offset(0, 14))
+              color: Color(0x59000000),
+              blurRadius: 28,
+              offset: Offset(0, 14),
+            ),
           ],
         ),
         child: Row(
@@ -732,12 +665,15 @@ class _Toast extends StatelessWidget {
           children: [
             Icon(Icons.check, size: 15, color: t.goldInk),
             const SizedBox(width: 6),
-            Text(msg,
-                style: TextStyle(
-                    color: t.goldInk,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.13)),
+            Text(
+              msg,
+              style: TextStyle(
+                color: t.goldInk,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.13,
+              ),
+            ),
           ],
         ),
       ),

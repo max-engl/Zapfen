@@ -141,9 +141,56 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     PaintingBinding.instance.imageCache.evict(NetworkImage(url));
   }
 
+  Future<ImageSource?> _chooseAvatarSource() {
+    final t = PintThemeProvider.of(context);
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: t.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: t.border,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              _AvatarSourceTile(
+                t: t,
+                icon: Icons.photo_camera_rounded,
+                title: 'Kamera',
+                subtitle: 'Neues Profilbild aufnehmen',
+                onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+              ),
+              const SizedBox(height: 8),
+              _AvatarSourceTile(
+                t: t,
+                icon: Icons.photo_library_rounded,
+                title: 'Galerie',
+                subtitle: 'Bild aus deiner Galerie wählen',
+                onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _pickAvatar() async {
+    final source = await _chooseAvatarSource();
+    if (source == null || !mounted) return;
     final picked = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
+      source: source,
       imageQuality: 85,
     );
     if (picked == null || !mounted) return;
@@ -218,7 +265,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
     } on DioException catch (e) {
       final data = e.response?.data;
-      final msg = (data is Map ? data['message'] as String? : null) ??
+      final msg =
+          (data is Map ? data['message'] as String? : null) ??
           'Etwas ist schiefgelaufen.';
       _showToast(msg);
     } finally {
@@ -239,9 +287,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     final t = PintThemeProvider.of(context);
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: t.isDark
-          ? SystemUiOverlayStyle.light
-          : SystemUiOverlayStyle.dark,
+      value: t.isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       child: Scaffold(
         backgroundColor: t.bg,
         body: SafeArea(
@@ -249,7 +295,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             children: [
               Column(
                 children: [
-                  _Header(t: t, canSave: _canSave, saving: _saving, onSave: _save),
+                  _Header(
+                    t: t,
+                    canSave: _canSave,
+                    saving: _saving,
+                    onSave: _save,
+                  ),
                   Expanded(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.only(bottom: 32),
@@ -266,10 +317,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             onUpload: _pickAvatar,
                             onRemove: _removeAvatar,
                           ),
-                          _SectionHeading(
-                            t: t,
-                            title: 'Benutzername',
-                          ),
+                          _SectionHeading(t: t, title: 'Benutzername'),
                           _Card(
                             t: t,
                             child: _FieldShell(
@@ -281,74 +329,91 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               last: true,
                               child: Row(
                                 children: [
-                                  Text('@',
-                                      style: TextStyle(
-                                          color: t.textMuted,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600)),
+                                  Text(
+                                    '@',
+                                    style: TextStyle(
+                                      color: t.textMuted,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: TextField(
                                       focusNode: _usernameFocus,
-                                      controller: TextEditingController.fromValue(
-                                        TextEditingValue(
-                                          text: _username,
-                                          selection: TextSelection.collapsed(
-                                              offset: _username.length),
-                                        ),
-                                      ),
+                                      controller:
+                                          TextEditingController.fromValue(
+                                            TextEditingValue(
+                                              text: _username,
+                                              selection:
+                                                  TextSelection.collapsed(
+                                                    offset: _username.length,
+                                                  ),
+                                            ),
+                                          ),
                                       onChanged: (v) {
                                         final clean = v
                                             .toLowerCase()
                                             .replaceAll(
-                                                RegExp(r'[^a-z0-9_]'), '')
+                                              RegExp(r'[^a-z0-9_]'),
+                                              '',
+                                            )
                                             .substring(
-                                                0,
-                                                v
-                                                            .toLowerCase()
-                                                            .replaceAll(
-                                                                RegExp(
-                                                                    r'[^a-z0-9_]'),
-                                                                '')
-                                                            .length >
-                                                        16
-                                                    ? 16
-                                                    : v
+                                              0,
+                                              v
+                                                          .toLowerCase()
+                                                          .replaceAll(
+                                                            RegExp(
+                                                              r'[^a-z0-9_]',
+                                                            ),
+                                                            '',
+                                                          )
+                                                          .length >
+                                                      16
+                                                  ? 16
+                                                  : v
                                                         .toLowerCase()
                                                         .replaceAll(
-                                                            RegExp(
-                                                                r'[^a-z0-9_]'),
-                                                            '')
-                                                        .length);
+                                                          RegExp(r'[^a-z0-9_]'),
+                                                          '',
+                                                        )
+                                                        .length,
+                                            );
                                         setState(() => _username = clean);
                                       },
                                       keyboardType: TextInputType.text,
                                       textInputAction: TextInputAction.next,
                                       inputFormatters: [
                                         FilteringTextInputFormatter.allow(
-                                            RegExp(r'[a-z0-9_]')),
+                                          RegExp(r'[a-z0-9_]'),
+                                        ),
                                         LengthLimitingTextInputFormatter(16),
                                       ],
                                       style: TextStyle(
-                                          color: t.text,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                          letterSpacing: -0.3),
+                                        color: t.text,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: -0.3,
+                                      ),
                                       decoration: InputDecoration(
                                         isDense: true,
                                         contentPadding: EdgeInsets.zero,
                                         border: InputBorder.none,
                                         hintText: 'handle',
                                         hintStyle: TextStyle(
-                                            color: t.textFaint,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w500),
+                                          color: t.textFaint,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                       ),
                                     ),
                                   ),
                                   if (_usernameOk)
-                                    Icon(Icons.check_rounded,
-                                        size: 18, color: t.goldText),
+                                    Icon(
+                                      Icons.check_rounded,
+                                      size: 18,
+                                      color: t.goldText,
+                                    ),
                                 ],
                               ),
                             ),
@@ -356,7 +421,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           _SectionHeading(
                             t: t,
                             title: 'Passwort',
-                            hint: 'Leer lassen, um das aktuelle Passwort beizubehalten.',
+                            hint:
+                                'Leer lassen, um das aktuelle Passwort beizubehalten.',
                           ),
                           _Card(
                             t: t,
@@ -375,7 +441,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                     onChanged: (v) =>
                                         setState(() => _currentPw = v),
                                     onToggle: () => setState(
-                                        () => _showCurrentPw = !_showCurrentPw),
+                                      () => _showCurrentPw = !_showCurrentPw,
+                                    ),
                                   ),
                                 ),
                                 _FieldShell(
@@ -399,12 +466,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                         onChanged: (v) =>
                                             setState(() => _newPw = v),
                                         onToggle: () => setState(
-                                            () => _showNewPw = !_showNewPw),
+                                          () => _showNewPw = !_showNewPw,
+                                        ),
                                       ),
                                       if (_newPw.isNotEmpty &&
                                           _newPwError == null)
-                                        _StrengthMeter(
-                                            t: t, pw: _newPw),
+                                        _StrengthMeter(t: t, pw: _newPw),
                                     ],
                                   ),
                                 ),
@@ -423,10 +490,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                     onChanged: (v) =>
                                         setState(() => _confirmPw = v),
                                     onToggle: null,
-                                    trailing: _confirmPw.isNotEmpty &&
+                                    trailing:
+                                        _confirmPw.isNotEmpty &&
                                             _confirmError == null
-                                        ? Icon(Icons.check_rounded,
-                                            size: 16, color: t.goldText)
+                                        ? Icon(
+                                            Icons.check_rounded,
+                                            size: 16,
+                                            color: t.goldText,
+                                          )
                                         : null,
                                   ),
                                 ),
@@ -435,8 +506,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                           const SizedBox(height: 24),
                           Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 22),
+                            padding: const EdgeInsets.symmetric(horizontal: 22),
                             child: _SaveButton(
                               t: t,
                               canSave: _canSave,
@@ -498,8 +568,7 @@ class _Header extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: const BoxDecoration(shape: BoxShape.circle),
-              child: Icon(Icons.chevron_left_rounded,
-                  size: 26, color: t.text),
+              child: Icon(Icons.chevron_left_rounded, size: 26, color: t.text),
             ),
           ),
           Expanded(
@@ -507,10 +576,11 @@ class _Header extends StatelessWidget {
               child: Text(
                 'Profil bearbeiten',
                 style: TextStyle(
-                    color: t.text,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3),
+                  color: t.text,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
+                ),
               ),
             ),
           ),
@@ -522,19 +592,18 @@ class _Header extends StatelessWidget {
               decoration: BoxDecoration(
                 color: canSave ? t.gold : t.surfaceWeak,
                 borderRadius: BorderRadius.circular(999),
-                border: canSave
-                    ? null
-                    : Border.all(color: t.border),
+                border: canSave ? null : Border.all(color: t.border),
               ),
               child: saving
                   ? PintDots(color: t.goldInk, dotSize: 4, spacing: 3)
                   : Text(
                       'Speichern',
                       style: TextStyle(
-                          color: canSave ? t.goldInk : t.textFaint,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.2),
+                        color: canSave ? t.goldInk : t.textFaint,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                      ),
                     ),
             ),
           ),
@@ -545,6 +614,74 @@ class _Header extends StatelessWidget {
 }
 
 // ── Avatar block ──────────────────────────────────────────────────────────────
+
+class _AvatarSourceTile extends StatelessWidget {
+  final PintTheme t;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _AvatarSourceTile({
+    required this.t,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: t.surfaceWeak,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: t.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: t.goldSoft,
+                shape: BoxShape.circle,
+                border: Border.all(color: t.goldBorder),
+              ),
+              child: Icon(icon, size: 18, color: t.goldText),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: t.text,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.15,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(color: t.textMuted, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, size: 18, color: t.textMuted),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _AvatarBlock extends StatelessWidget {
   final PintTheme t;
@@ -588,9 +725,10 @@ class _AvatarBlock extends StatelessWidget {
                   border: Border.all(color: t.gold, width: 3),
                   boxShadow: const [
                     BoxShadow(
-                        color: Color(0x47000000),
-                        blurRadius: 28,
-                        offset: Offset(0, 14)),
+                      color: Color(0x47000000),
+                      blurRadius: 28,
+                      offset: Offset(0, 14),
+                    ),
                   ],
                 ),
                 child: ClipOval(child: _avatarWidget()),
@@ -608,8 +746,11 @@ class _AvatarBlock extends StatelessWidget {
                       shape: BoxShape.circle,
                       border: Border.all(color: t.bg, width: 2),
                     ),
-                    child: Icon(Icons.photo_camera_rounded,
-                        size: 16, color: t.goldInk),
+                    child: Icon(
+                      Icons.photo_camera_rounded,
+                      size: 16,
+                      color: t.goldInk,
+                    ),
                   ),
                 ),
               ),
@@ -620,26 +761,36 @@ class _AvatarBlock extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Profilbild',
-                    style: TextStyle(
-                        color: t.text,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.4)),
+                Text(
+                  'Profilbild',
+                  style: TextStyle(
+                    color: t.text,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.4,
+                  ),
+                ),
                 const SizedBox(height: 3),
                 Text(
                   'Ein echtes Selfie kommt bei deinem Kreis besser an.',
                   style: TextStyle(
-                      color: t.textMuted, fontSize: 12, height: 1.4),
+                    color: t.textMuted,
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
                 ),
                 const SizedBox(height: 12),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     GestureDetector(
                       onTap: onUpload,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: t.gold,
                           borderRadius: BorderRadius.circular(999),
@@ -647,27 +798,32 @@ class _AvatarBlock extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.upload_rounded,
-                                size: 12, color: t.goldInk),
+                            Icon(
+                              Icons.upload_rounded,
+                              size: 12,
+                              color: t.goldInk,
+                            ),
                             const SizedBox(width: 5),
                             Text(
                               hasPhoto ? 'Ersetzen' : 'Hochladen',
                               style: TextStyle(
-                                  color: t.goldInk,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700),
+                                color: t.goldInk,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ],
                         ),
                       ),
                     ),
                     if (hasPhoto) ...[
-                      const SizedBox(width: 8),
                       GestureDetector(
                         onTap: onRemove,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             color: t.surfaceWeak,
                             borderRadius: BorderRadius.circular(999),
@@ -676,15 +832,19 @@ class _AvatarBlock extends StatelessWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.delete_outline_rounded,
-                                  size: 12, color: t.textMuted),
+                              Icon(
+                                Icons.delete_outline_rounded,
+                                size: 12,
+                                color: t.textMuted,
+                              ),
                               const SizedBox(width: 5),
                               Text(
                                 'Entfernen',
                                 style: TextStyle(
-                                    color: t.text,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600),
+                                  color: t.text,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ],
                           ),
@@ -703,8 +863,7 @@ class _AvatarBlock extends StatelessWidget {
 
   Widget _avatarWidget() {
     if (pendingFile != null) {
-      return Image.file(pendingFile!, fit: BoxFit.cover,
-          width: 92, height: 92);
+      return Image.file(pendingFile!, fit: BoxFit.cover, width: 92, height: 92);
     }
     if (avatarUrl != null) {
       return CachedNetworkImage(
@@ -720,18 +879,18 @@ class _AvatarBlock extends StatelessWidget {
   }
 
   Widget _initials() {
-    final letter =
-        username.isNotEmpty ? username[0].toUpperCase() : '?';
+    final letter = username.isNotEmpty ? username[0].toUpperCase() : '?';
     return Container(
       color: t.gold,
       child: Center(
         child: Text(
           letter,
           style: TextStyle(
-              color: t.goldInk,
-              fontSize: 40,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.03),
+            color: t.goldInk,
+            fontSize: 40,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.03,
+          ),
         ),
       ),
     );
@@ -757,15 +916,15 @@ class _SectionHeading extends StatelessWidget {
           Text(
             title.toUpperCase(),
             style: TextStyle(
-                color: t.textMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 2.2),
+              color: t.textMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 2.2,
+            ),
           ),
           if (hint != null) ...[
             const SizedBox(height: 4),
-            Text(hint!,
-                style: TextStyle(color: t.textFaint, fontSize: 12)),
+            Text(hint!, style: TextStyle(color: t.textFaint, fontSize: 12)),
           ],
         ],
       ),
@@ -823,9 +982,7 @@ class _FieldShell extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        border: last
-            ? null
-            : Border(bottom: BorderSide(color: t.divider)),
+        border: last ? null : Border(bottom: BorderSide(color: t.divider)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -835,10 +992,11 @@ class _FieldShell extends StatelessWidget {
               Text(
                 label.toUpperCase(),
                 style: TextStyle(
-                    color: t.textMuted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 2.0),
+                  color: t.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 2.0,
+                ),
               ),
               const Spacer(),
               if (showOk)
@@ -850,9 +1008,10 @@ class _FieldShell extends StatelessWidget {
                     Text(
                       'gespeichert',
                       style: TextStyle(
-                          color: t.goldText,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600),
+                        color: t.goldText,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
@@ -865,9 +1024,8 @@ class _FieldShell extends StatelessWidget {
               color: t.surfaceWeak,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                  color: hasError
-                      ? const Color(0xFFC2511E)
-                      : t.border),
+                color: hasError ? const Color(0xFFC2511E) : t.border,
+              ),
             ),
             child: child,
           ),
@@ -876,19 +1034,21 @@ class _FieldShell extends StatelessWidget {
             Row(
               children: [
                 if (hasError) ...[
-                  const Icon(Icons.error_outline_rounded,
-                      size: 12, color: Color(0xFFC2511E)),
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    size: 12,
+                    color: Color(0xFFC2511E),
+                  ),
                   const SizedBox(width: 5),
                 ],
                 Flexible(
                   child: Text(
                     error ?? hint ?? '',
                     style: TextStyle(
-                        color: hasError
-                            ? const Color(0xFFC2511E)
-                            : t.textMuted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600),
+                      color: hasError ? const Color(0xFFC2511E) : t.textMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -939,20 +1099,22 @@ class _PwRow extends StatelessWidget {
             onChanged: onChanged,
             textInputAction: textInputAction,
             style: TextStyle(
-                color: t.text,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -0.3),
+              color: t.text,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.3,
+            ),
             decoration: InputDecoration(
               isDense: true,
               contentPadding: EdgeInsets.zero,
               border: InputBorder.none,
               hintText: hint,
               hintStyle: TextStyle(
-                  color: t.textFaint,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w400,
-                  letterSpacing: 0),
+                color: t.textFaint,
+                fontSize: 15,
+                fontWeight: FontWeight.w400,
+                letterSpacing: 0,
+              ),
             ),
           ),
         ),
@@ -987,8 +1149,7 @@ class _StrengthMeter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = _strength(pw);
-    final barColor =
-        s < 2 ? const Color(0xFFC2511E) : t.goldText;
+    final barColor = s < 2 ? const Color(0xFFC2511E) : t.goldText;
     return Padding(
       padding: const EdgeInsets.only(top: 8),
       child: Column(
@@ -1014,9 +1175,10 @@ class _StrengthMeter extends StatelessWidget {
             TextSpan(
               text: 'Passwort-Stärke: ',
               style: TextStyle(
-                  color: t.textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600),
+                color: t.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
               children: [
                 TextSpan(
                   text: pw.isNotEmpty ? _strengthLabels[s] : '—',
@@ -1056,8 +1218,7 @@ class _SaveButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: canSave ? t.gold : t.surfaceWeak,
           borderRadius: BorderRadius.circular(16),
-          border:
-              canSave ? null : Border.all(color: t.border),
+          border: canSave ? null : Border.all(color: t.border),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1069,16 +1230,20 @@ class _SaveButton extends StatelessWidget {
                 spacing: 4,
               )
             else
-              Icon(Icons.check_rounded,
-                  size: 17, color: canSave ? t.goldInk : t.textFaint),
+              Icon(
+                Icons.check_rounded,
+                size: 17,
+                color: canSave ? t.goldInk : t.textFaint,
+              ),
             const SizedBox(width: 8),
             Text(
               'Änderungen speichern',
               style: TextStyle(
-                  color: canSave ? t.goldInk : t.textFaint,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.2),
+                color: canSave ? t.goldInk : t.textFaint,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.2,
+              ),
             ),
           ],
         ),
@@ -1100,16 +1265,16 @@ class _Toast extends StatelessWidget {
     return IgnorePointer(
       child: Center(
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
             color: t.gold,
             borderRadius: BorderRadius.circular(999),
             boxShadow: const [
               BoxShadow(
-                  color: Color(0x59000000),
-                  blurRadius: 28,
-                  offset: Offset(0, 14)),
+                color: Color(0x59000000),
+                blurRadius: 28,
+                offset: Offset(0, 14),
+              ),
             ],
           ),
           child: Row(
@@ -1121,10 +1286,11 @@ class _Toast extends StatelessWidget {
                 child: Text(
                   msg,
                   style: TextStyle(
-                      color: t.goldInk,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.2),
+                    color: t.goldInk,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                  ),
                 ),
               ),
             ],

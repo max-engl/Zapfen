@@ -40,6 +40,13 @@ const postSchema = new mongoose.Schema(
             emoji: { type: String, default: "" },
         },
 
+        rating: {
+            type: Number,
+            min: 1,
+            max: 5,
+            default: null,
+        },
+
         stats: {
             likes: {
                 type: Number,
