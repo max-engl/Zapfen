@@ -1,4 +1,5 @@
 const express = require("express");
+const crypto = require("crypto");
 
 const Friend = require("../models/Friend");
 const User = require("../models/User");
@@ -173,6 +174,94 @@ router.get("/requests", authMiddleware, async (req, res) => {
         res.json({ requests: incoming });
     } catch (error) {
         res.status(500).json({ message: "Could not fetch requests", error: error.message });
+    }
+});
+
+// GET /friends/invite  —  get (or lazily create) the caller's invite token
+router.get("/invite", authMiddleware, async (req, res) => {
+    try {
+        let user = req.user;
+        if (!user.inviteToken) {
+            user = await User.findByIdAndUpdate(
+                user._id,
+                { inviteToken: crypto.randomUUID() },
+                { new: true }
+            );
+        }
+        res.json({
+            token: user.inviteToken,
+            // HTTP URL so the camera app can scan it and open Safari → custom scheme
+            link: `http://${req.headers.host}/invite/${user.inviteToken}`,
+        });
+    } catch (error) {
+        res.status(500).json({ message: "Could not get invite token", error: error.message });
+    }
+});
+
+// GET /friends/invite/:token  —  public: resolve a token to user info
+router.get("/invite/:token", async (req, res) => {
+    try {
+        const user = await User.findOne({ inviteToken: req.params.token });
+        if (!user) return res.status(404).json({ message: "Invite link not found" });
+        res.json({
+            userId: user._id,
+            username: user.username,
+            avatarUrl: user.avatarUrl ?? null,
+            avatarColor: user.avatarColor,
+            avatarInitial: user.avatarInitial,
+        });
+    } catch (error) {
+        res.status(500).json({ message: "Could not resolve invite", error: error.message });
+    }
+});
+
+// POST /friends/invite/:token/accept  —  send a friend request to the token's owner
+router.post("/invite/:token/accept", authMiddleware, async (req, res) => {
+    try {
+        const inviter = await User.findOne({ inviteToken: req.params.token });
+        if (!inviter) return res.status(404).json({ message: "Invite link not found" });
+
+        const recipientId = inviter._id.toString();
+        const requesterId = req.user._id.toString();
+
+        if (recipientId === requesterId) {
+            return res.status(400).json({ message: "Cannot send a friend request to yourself" });
+        }
+
+        const existing = await Friend.findOne({
+            $or: [
+                { requester: requesterId, recipient: recipientId },
+                { requester: recipientId, recipient: requesterId },
+            ],
+        });
+
+        if (existing) {
+            const msg = existing.status === "accepted" ? "You are already friends" : "Friend request already exists";
+            return res.status(409).json({ message: msg });
+        }
+
+        const friendship = await Friend.create({ requester: requesterId, recipient: recipientId });
+
+        res.status(201).json({
+            message: "Friend request sent",
+            friendship: { id: friendship._id, recipient: recipientId, status: friendship.status },
+        });
+
+        sendToUser(recipientId, {
+            title: `@${req.user.username}`,
+            body: "möchte mit dir befreundet sein",
+            data: { type: "friend_request" },
+        }).catch(() => {});
+        saveNotification(recipientId, {
+            type: "request",
+            actorId: req.user._id,
+            actorUsername: req.user.username,
+            actorAvatarUrl: req.user.avatarUrl ?? null,
+            actorAvatarColor: req.user.avatarColor ?? null,
+            actorAvatarInitial: req.user.avatarInitial ?? null,
+        }).catch(() => {});
+    } catch (error) {
+        res.status(500).json({ message: "Could not accept invite", error: error.message });
     }
 });
 

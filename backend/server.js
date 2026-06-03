@@ -11,6 +11,7 @@ const friendRoutes = require("./routes/friendRoutes");
 const drinkRoutes = require("./routes/drinkRoutes");
 const { postRouter: commentPostRoutes, commentRouter } = require("./routes/commentRoutes");
 const leaderboardRoutes = require("./routes/leaderboardRoutes");
+const statsRoutes = require("./routes/statsRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const appNotificationRoutes = require("./routes/appNotificationRoutes");
 
@@ -60,9 +61,52 @@ app.use((req, res, next) => {
 });
 
 app.get("/", (req, res) => {
-    res.json({
-        message: "API is running",
-    });
+    res.json({ message: "API is running" });
+});
+
+// Public HTML invite landing page — scanned by the camera app, redirects to the custom scheme
+app.get("/invite/:token", async (req, res) => {
+    const User = require("./models/User");
+    const token = req.params.token;
+    try {
+        const user = await User.findOne({ inviteToken: token });
+        if (!user) {
+            return res.status(404).send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Zapfen</title></head><body style="font-family:-apple-system,sans-serif;background:#0F0F0F;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;text-align:center"><p>Einladungslink ungültig oder abgelaufen.</p></body></html>`);
+        }
+
+        const deepLink = `zapfen://invite/${encodeURIComponent(token)}`;
+        const username = user.username.replace(/[<>"'&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;", "&": "&amp;" }[c]));
+
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.send(`<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Zapfen – Einladung von @${username}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0F0F0F;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+    .card{background:#1A1A1A;border:1px solid #2A2A2A;border-radius:24px;padding:40px 28px;max-width:360px;width:100%;text-align:center}
+    .beer{font-size:52px;margin-bottom:16px}
+    h1{font-size:22px;font-weight:800;letter-spacing:-.4px;margin-bottom:10px}
+    p{color:#888;font-size:14px;line-height:1.55;margin-bottom:28px}
+    a.btn{display:block;background:#F6B733;color:#1A1000;text-decoration:none;border-radius:14px;padding:15px;font-size:16px;font-weight:700;letter-spacing:-.2px}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="beer">🍺</div>
+    <h1>Du wurdest eingeladen!</h1>
+    <p>@${username} lädt dich ein, seinem Kreis auf Zapfen beizutreten.</p>
+    <a class="btn" href="${deepLink}">Zapfen öffnen</a>
+  </div>
+  <script>window.location.href="${deepLink}";</script>
+</body>
+</html>`);
+    } catch (e) {
+        res.status(500).send("Internal server error");
+    }
 });
 
 app.use("/auth", authRoutes);
@@ -73,6 +117,7 @@ app.use("/users", userRoutes);
 app.use("/friends", friendRoutes);
 app.use("/drinks", drinkRoutes(DEFAULT_DRINKS));
 app.use("/leaderboard", leaderboardRoutes);
+app.use("/stats", statsRoutes);
 app.use("/notify", notificationRoutes);
 app.use("/notifications", appNotificationRoutes);
 

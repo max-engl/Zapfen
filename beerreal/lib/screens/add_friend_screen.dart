@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../theme.dart';
 import '../features/friends/models/api_friend.dart';
 import '../features/friends/providers/friend_provider.dart';
 import '../widgets/avatar.dart';
-import '../widgets/brand_mark.dart';
 import '../widgets/shimmer_box.dart';
 import '../features/auth/providers/auth_provider.dart';
 
@@ -24,13 +24,21 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
   String _toast = '';
   List<UserSearchResult> _searchResults = [];
   bool _searching = false;
+  String? _inviteLink;
+  bool _inviteLoading = true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<FriendProvider>().load();
+      _loadInviteLink();
     });
+  }
+
+  Future<void> _loadInviteLink() async {
+    final link = await context.read<FriendProvider>().getInviteLink();
+    if (mounted) setState(() { _inviteLink = link; _inviteLoading = false; });
   }
 
   @override
@@ -46,8 +54,9 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
     });
   }
 
-  void _copy(String username) {
-    Clipboard.setData(ClipboardData(text: 'zapfen.app/u/$username'));
+  void _copy() {
+    if (_inviteLink == null) return;
+    Clipboard.setData(ClipboardData(text: _inviteLink!));
     setState(() => _copied = true);
     _showToast('Link kopiert');
     Future.delayed(const Duration(milliseconds: 1800), () {
@@ -100,8 +109,10 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                         _YourCodeCard(
                           t: t,
                           username: me.username,
+                          inviteLink: _inviteLink,
+                          inviteLoading: _inviteLoading,
                           copied: _copied,
-                          onCopy: () => _copy(me.username),
+                          onCopy: _copy,
                         ),
                       // Search field
                       _SearchField(
@@ -280,19 +291,44 @@ class _IconBtn extends StatelessWidget {
 
 // ─── Your code card ────────────────────────────────────────────────────────
 
-class _YourCodeCard extends StatelessWidget {
+class _YourCodeCard extends StatefulWidget {
   final PintTheme t;
   final String username;
+  final String? inviteLink;
+  final bool inviteLoading;
   final bool copied;
   final VoidCallback onCopy;
-  const _YourCodeCard(
-      {required this.t,
-      required this.username,
-      required this.copied,
-      required this.onCopy});
+
+  const _YourCodeCard({
+    required this.t,
+    required this.username,
+    required this.inviteLink,
+    required this.inviteLoading,
+    required this.copied,
+    required this.onCopy,
+  });
+
+  @override
+  State<_YourCodeCard> createState() => _YourCodeCardState();
+}
+
+class _YourCodeCardState extends State<_YourCodeCard> {
+  final _shareKey = GlobalKey();
+
+  Future<void> _share() async {
+    if (widget.inviteLink == null) return;
+    final box = _shareKey.currentContext?.findRenderObject() as RenderBox?;
+    final origin = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+    await Share.share(
+      widget.inviteLink!,
+      subject: 'Zapfen Einladung',
+      sharePositionOrigin: origin,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final t = widget.t;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 18),
       padding: const EdgeInsets.all(18),
@@ -301,172 +337,107 @@ class _YourCodeCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: t.goldBorder),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.18),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8)),
-                BoxShadow(color: t.goldBorder, spreadRadius: 1),
-              ],
+          Row(children: [
+            Icon(Icons.bolt, size: 10, color: t.goldText),
+            const SizedBox(width: 6),
+            Text(
+              'dein Einladungslink',
+              style: TextStyle(
+                  color: t.goldText,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.4),
             ),
-            child: SizedBox(
-              width: 72,
-              height: 72,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  CustomPaint(
-                      size: const Size(72, 72),
-                      painter: _QRPainter(seed: username)),
-                  Container(
-                    width: 18,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(4),
-                      boxShadow: const [
-                        BoxShadow(color: Colors.white, spreadRadius: 2)
-                      ],
-                    ),
-                    child: Center(child: BrandMark(size: 15)),
-                  ),
-                ],
-              ),
-            ),
+          ]),
+          const SizedBox(height: 6),
+          Text(
+            '@${widget.username}',
+            style: TextStyle(
+                color: t.text,
+                fontWeight: FontWeight.w800,
+                fontSize: 20,
+                letterSpacing: -0.4),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Icon(Icons.bolt, size: 10, color: t.goldText),
-                  const SizedBox(width: 6),
-                  Text('dein Handle',
-                      style: TextStyle(
-                          color: t.goldText,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.4)),
-                ]),
-                const SizedBox(height: 4),
-                Text('@$username',
+          const SizedBox(height: 12),
+          // Link preview pill
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: t.surfaceWeak,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: t.border),
+            ),
+            child: widget.inviteLoading || widget.inviteLink == null
+                ? SizedBox(
+                    height: 14,
+                    child: ShimmerBox(borderRadius: BorderRadius.circular(6)),
+                  )
+                : Text(
+                    widget.inviteLink!,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                        color: t.text,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 20,
-                        letterSpacing: -0.4)),
-                const SizedBox(height: 8),
-                GestureDetector(
-                  onTap: onCopy,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: copied ? t.goldSoft : t.surfaceWeak,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: copied ? t.goldBorder : t.border),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: copied
-                          ? [
-                              Icon(Icons.check, size: 13, color: t.goldText),
-                              const SizedBox(width: 4),
-                              Text('Kopiert',
-                                  style: TextStyle(
-                                      color: t.goldText,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600)),
-                            ]
-                          : [
-                              Icon(Icons.ios_share, size: 13, color: t.text),
-                              const SizedBox(width: 4),
-                              Text('Link teilen',
-                                  style: TextStyle(
-                                      color: t.text,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600)),
-                            ],
-                    ),
+                        color: t.textMuted,
+                        fontSize: 12,
+                        fontFamily: 'monospace'),
+                  ),
+          ),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(
+              child: GestureDetector(
+                key: _shareKey,
+                onTap: widget.inviteLink != null ? _share : null,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  decoration: BoxDecoration(
+                    color: widget.inviteLink != null ? t.gold : t.surfaceWeak,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.ios_share, size: 15,
+                          color: widget.inviteLink != null ? t.goldInk : t.textMuted),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Link teilen',
+                        style: TextStyle(
+                            color: widget.inviteLink != null ? t.goldInk : t.textMuted,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: widget.inviteLink != null ? widget.onCopy : null,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                decoration: BoxDecoration(
+                  color: widget.copied ? t.goldSoft : t.surfaceWeak,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                      color: widget.copied ? t.goldBorder : t.border),
+                ),
+                child: Icon(
+                  widget.copied ? Icons.check : Icons.copy_outlined,
+                  size: 16,
+                  color: widget.copied ? t.goldText : t.textMuted,
+                ),
+              ),
+            ),
+          ]),
         ],
       ),
     );
   }
-}
-
-class _QRPainter extends CustomPainter {
-  final String seed;
-  static const _n = 21;
-
-  const _QRPainter({required this.seed});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final cw = size.width / _n;
-    final ch = size.height / _n;
-    final paint = Paint()..color = const Color(0xFF0A0A0A);
-    final cells = _buildCells();
-    for (var r = 0; r < _n; r++) {
-      for (var c = 0; c < _n; c++) {
-        if (_isOn(r, c, cells)) {
-          canvas.drawRect(Rect.fromLTWH(c * cw, r * ch, cw, ch), paint);
-        }
-      }
-    }
-  }
-
-  List<bool> _buildCells() {
-    var h = 2166136261;
-    for (var i = 0; i < seed.length; i++) {
-      h = ((h ^ seed.codeUnitAt(i)) * 16777619) & 0xFFFFFFFF;
-    }
-    final cells = <bool>[];
-    for (var i = 0; i < _n * _n; i++) {
-      h = (h * 1103515245 + 12345) & 0xFFFFFFFF;
-      cells.add((h & 7) > 2);
-    }
-    return cells;
-  }
-
-  bool _isFinder(int r, int c) {
-    bool inBox(int R, int C) => r >= R && r < R + 7 && c >= C && c < C + 7;
-    return inBox(0, 0) || inBox(0, _n - 7) || inBox(_n - 7, 0);
-  }
-
-  bool _finderOn(int r, int c) {
-    bool within(int R, int C) {
-      final rr = r - R;
-      final cc = c - C;
-      if (rr == 0 || rr == 6 || cc == 0 || cc == 6) return true;
-      if (rr >= 2 && rr <= 4 && cc >= 2 && cc <= 4) return true;
-      return false;
-    }
-    if (r < 7 && c < 7) return within(0, 0);
-    if (r < 7 && c >= _n - 7) return within(0, _n - 7);
-    if (r >= _n - 7 && c < 7) return within(_n - 7, 0);
-    return false;
-  }
-
-  bool _isOn(int r, int c, List<bool> cells) =>
-      _isFinder(r, c) ? _finderOn(r, c) : cells[r * _n + c];
-
-  @override
-  bool shouldRepaint(_QRPainter old) => old.seed != seed;
 }
 
 // ─── Search field ──────────────────────────────────────────────────────────

@@ -11,6 +11,7 @@ import '../features/posts/providers/profile_posts_provider.dart';
 import '../features/profile/services/profile_service.dart';
 import '../widgets/avatar.dart';
 import '../widgets/shimmer_box.dart';
+import '../widgets/stagger_item.dart';
 import 'edit_profile_screen.dart';
 import 'post_detail_screen.dart';
 
@@ -30,21 +31,49 @@ List<FeedPost> _postsForCell(List<FeedPost> posts, int? selectedCell) {
 }
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final bool standaloneRoute;
+  const ProfileScreen({super.key, this.standaloneRoute = false});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with TickerProviderStateMixin {
   int? _selectedCell;
+  late AnimationController _entranceCtrl;
 
   @override
   void initState() {
     super.initState();
+    _entranceCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ProfilePostsProvider>().load();
+      _entranceCtrl.forward();
     });
+  }
+
+  @override
+  void dispose() {
+    _entranceCtrl.dispose();
+    super.dispose();
+  }
+
+  Animation<double> _statAnim(int index) {
+    const stagger = 0.15;
+    const animSpan = 0.55;
+    final start = stagger * index;
+    return CurvedAnimation(
+      parent: _entranceCtrl,
+      curve: Interval(
+        start,
+        (start + animSpan).clamp(0.0, 1.0),
+        curve: Curves.easeOutCubic,
+      ),
+    );
   }
 
   @override
@@ -54,7 +83,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final pp = context.watch<ProfilePostsProvider>();
     final grid = pp.heatmapGrid;
 
-    return GestureDetector(
+    final body = GestureDetector(
       onTap: () => setState(() => _selectedCell = null),
       behavior: HitTestBehavior.translucent,
       child: ListView(
@@ -152,11 +181,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 18),
             child: Row(
               children: [
-                _StatTile(value: pp.streak, label: 'Serie', t: t, gold: true),
+                Expanded(
+                  child: _AnimatedTile(
+                    animation: _statAnim(0),
+                    child: _StatTile(value: pp.streak, label: 'Serie', t: t, gold: true),
+                  ),
+                ),
                 const SizedBox(width: 10),
-                _StatTile(value: pp.totalPints, label: 'Biere', t: t),
+                Expanded(
+                  child: _AnimatedTile(
+                    animation: _statAnim(1),
+                    child: _StatTile(value: pp.totalPints, label: 'Biere', t: t),
+                  ),
+                ),
                 const SizedBox(width: 10),
-                _StatTile(value: pp.spots, label: 'Orte', t: t),
+                Expanded(
+                  child: _AnimatedTile(
+                    animation: _statAnim(2),
+                    child: _StatTile(value: pp.spots, label: 'Orte', t: t),
+                  ),
+                ),
               ],
             ),
           ),
@@ -313,19 +357,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         crossAxisCount: 3,
                         mainAxisSpacing: 6,
                         crossAxisSpacing: 6,
-                        children: displayedPosts
-                            .map(
-                              (p) => _PostThumb(
-                                post: p,
-                                t: t,
-                                onTap: () => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => PostDetailScreen(post: p),
-                                  ),
+                        children: List.generate(displayedPosts.length, (i) {
+                          final p = displayedPosts[i];
+                          final diag = (i ~/ 3) + (i % 3);
+                          return DiagonalStaggerItem(
+                            key: ValueKey('${p.id}_$_selectedCell'),
+                            diagonalIndex: diag,
+                            child: _PostThumb(
+                              post: p,
+                              t: t,
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => PostDetailScreen(post: p),
                                 ),
                               ),
-                            )
-                            .toList(),
+                            ),
+                          );
+                        }),
                       ),
                   ],
                 );
@@ -333,6 +381,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ],
+      ),
+    );
+
+    if (widget.standaloneRoute) {
+      return Scaffold(
+        backgroundColor: t.bg,
+        body: SafeArea(child: body),
+      );
+    }
+    return body;
+  }
+}
+
+// ── Entrance animation wrapper ────────────────────────────────────────────
+
+class _AnimatedTile extends StatelessWidget {
+  final Animation<double> animation;
+  final Widget child;
+  const _AnimatedTile({required this.animation, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: animation,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(-0.25, -0.25),
+          end: Offset.zero,
+        ).animate(animation),
+        child: child,
       ),
     );
   }
@@ -368,7 +446,7 @@ class _PostThumb extends StatelessWidget {
 
 // ── Heatmap grid ──────────────────────────────────────────────────────────
 
-class _HeatmapGrid extends StatelessWidget {
+class _HeatmapGrid extends StatefulWidget {
   final List<int> grid;
   final PintTheme t;
   final int? selectedCell;
@@ -382,36 +460,91 @@ class _HeatmapGrid extends StatelessWidget {
   });
 
   @override
+  State<_HeatmapGrid> createState() => _HeatmapGridState();
+}
+
+class _HeatmapGridState extends State<_HeatmapGrid>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  // 12 cols, 7 rows → max diagonal = 11 + 6 = 17
+  static const _cols = 12;
+  static const _rows = 7;
+  static const _maxDiag = _cols - 1 + _rows - 1; // 17
+  static const _cellAnimMs = 280;
+  static const _staggerMs = 22;
+  static const _totalMs = _cellAnimMs + _staggerMs * _maxDiag; // ~654ms
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: _totalMs),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Animation<double> _cellAnim(int col, int row) {
+    final diag = col + row;
+    final start = (_staggerMs * diag) / _totalMs;
+    final end = (_staggerMs * diag + _cellAnimMs) / _totalMs;
+    return CurvedAnimation(
+      parent: _ctrl,
+      curve: Interval(start, end.clamp(0.0, 1.0), curve: Curves.easeOutCubic),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: t.surfaceWeaker,
+        color: widget.t.surfaceWeaker,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: t.borderWeak),
+        border: Border.all(color: widget.t.borderWeak),
       ),
       child: Row(
-        children: List.generate(12, (col) {
+        children: List.generate(_cols, (col) {
           return Expanded(
             child: Column(
-              children: List.generate(7, (row) {
-                final index = col * 7 + row;
-                final v = grid[index];
-                final isSelected = selectedCell == index;
+              children: List.generate(_rows, (row) {
+                final index = col * _rows + row;
+                final v = widget.grid[index];
+                final isSelected = widget.selectedCell == index;
+                final anim = _cellAnim(col, row);
                 return GestureDetector(
-                  onTap: () => onCellTap(index),
+                  onTap: () => widget.onCellTap(index),
                   child: AspectRatio(
                     aspectRatio: 1,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 120),
-                      margin: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? (t.isDark
-                                  ? const Color(0xFF6B7280)
-                                  : const Color(0xFF9CA3AF))
-                            : t.streakCell[v.clamp(0, t.streakCell.length - 1)],
-                        borderRadius: BorderRadius.circular(3),
+                    child: AnimatedBuilder(
+                      animation: anim,
+                      builder: (_, child) => Opacity(
+                        opacity: anim.value,
+                        child: Transform.translate(
+                          offset: Offset(
+                            -6 * (1 - anim.value),
+                            -6 * (1 - anim.value),
+                          ),
+                          child: child,
+                        ),
+                      ),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 120),
+                        margin: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? (widget.t.isDark
+                                    ? const Color(0xFF6B7280)
+                                    : const Color(0xFF9CA3AF))
+                              : widget.t.streakCell[v.clamp(0, widget.t.streakCell.length - 1)],
+                          borderRadius: BorderRadius.circular(3),
+                        ),
                       ),
                     ),
                   ),
@@ -536,38 +669,36 @@ class _StatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
-        decoration: BoxDecoration(
-          color: gold ? t.goldFaint : t.surfaceWeaker,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: gold ? t.goldBorder : t.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '$value',
-              style: TextStyle(
-                color: gold ? t.goldText : t.text,
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.8,
-              ),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+      decoration: BoxDecoration(
+        color: gold ? t.goldFaint : t.surfaceWeaker,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: gold ? t.goldBorder : t.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$value',
+            style: TextStyle(
+              color: gold ? t.goldText : t.text,
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.8,
             ),
-            const SizedBox(height: 2),
-            Text(
-              label.toUpperCase(),
-              style: TextStyle(
-                color: t.textMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.8,
-              ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: t.textMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

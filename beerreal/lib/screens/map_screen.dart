@@ -408,44 +408,48 @@ class _PostPin extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(6, 4, 10, 4),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: borderColor, width: 2),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.sports_bar_outlined,
-                  size: 11,
-                  color: selected ? t.goldInk : t.gold,
-                ),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    post.username,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: fg,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+      child: AnimatedOpacity(
+        opacity: selected ? 1.0 : 0.45,
+        duration: const Duration(milliseconds: 200),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(6, 4, 10, 4),
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: borderColor, width: 2),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.sports_bar_outlined,
+                    size: 11,
+                    color: selected ? t.goldInk : t.gold,
+                  ),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      post.username,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: fg,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          CustomPaint(
-            size: const Size(10, 7),
-            painter: _Arrow(color: arrowColor),
-          ),
-        ],
+            CustomPaint(
+              size: const Size(10, 7),
+              painter: _Arrow(color: arrowColor),
+            ),
+          ],
+        ),
       ),
     );
   }

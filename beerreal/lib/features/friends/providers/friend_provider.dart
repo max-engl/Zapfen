@@ -83,6 +83,7 @@ class FriendProvider extends ChangeNotifier {
       _db.saveFriends(_friends);
       _db.saveRequests(_requests);
       notifyListeners();
+      load(); // sync with server so the friends list is up to date
       return true;
     } catch (_) {
       return false;
@@ -119,6 +120,35 @@ class FriendProvider extends ChangeNotifier {
       return await _friendService.searchUsers(query);
     } catch (_) {
       return [];
+    }
+  }
+
+  Future<String?> getInviteLink() async {
+    try {
+      return await _friendService.getInviteLink();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> resolveInviteToken(String token) async {
+    try {
+      return await _friendService.resolveInviteToken(token);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<bool> acceptInviteToken(String token) async {
+    try {
+      await _friendService.acceptInviteToken(token);
+      return true;
+    } on DioException catch (e) {
+      // 409 = already friends or request already exists — treat as success
+      if (e.response?.statusCode == 409) return true;
+      return false;
+    } catch (_) {
+      return false;
     }
   }
 

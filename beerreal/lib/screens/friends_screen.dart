@@ -5,6 +5,7 @@ import '../features/friends/models/api_friend.dart';
 import '../features/friends/providers/friend_provider.dart';
 import '../widgets/avatar.dart';
 import '../widgets/shimmer_box.dart';
+import '../widgets/stagger_item.dart';
 import 'add_friend_screen.dart';
 import 'friend_profile_screen.dart';
 
@@ -76,7 +77,13 @@ class _FriendsScreenState extends State<FriendsScreen> {
               ),
             ),
           ),
-          ...fp.friends.map((f) => _FriendRow(friend: f, t: t, fp: fp)),
+          ...fp.friends.asMap().entries.map(
+            (e) => StaggerItem(
+              key: ValueKey(e.value.id),
+              index: e.key,
+              child: _FriendRow(friend: e.value, t: t, fp: fp),
+            ),
+          ),
         ],
 
         Padding(

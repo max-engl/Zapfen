@@ -10,6 +10,7 @@ import '../features/posts/providers/feed_provider.dart';
 import '../widgets/avatar.dart';
 import '../widgets/post_card.dart';
 import '../widgets/shimmer_box.dart';
+import '../widgets/stagger_item.dart';
 import 'post_detail_screen.dart';
 
 DateTime _cellIndexToDay(int cellIndex) {
@@ -300,20 +301,22 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                             crossAxisCount: 3,
                             mainAxisSpacing: 6,
                             crossAxisSpacing: 6,
-                            children: displayedPosts
-                                .map(
-                                  (p) => _PostThumb(
-                                    post: p,
-                                    t: t,
-                                    onTap: () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            PostDetailScreen(post: p),
-                                      ),
+                            children: List.generate(displayedPosts.length, (i) {
+                              final p = displayedPosts[i];
+                              return DiagonalStaggerItem(
+                                key: ValueKey('${p.id}_$_selectedCell'),
+                                diagonalIndex: (i ~/ 3) + (i % 3),
+                                child: _PostThumb(
+                                  post: p,
+                                  t: t,
+                                  onTap: () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => PostDetailScreen(post: p),
                                     ),
                                   ),
-                                )
-                                .toList(),
+                                ),
+                              );
+                            }),
                           ),
                       ],
                     );
@@ -336,21 +339,20 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
                     ),
                   ),
                 ),
-                ..._posts.map(
-                  (p) => PostCard(
-                    key: ValueKey(p.id),
-                    post: p,
-                    onReact: (emoji) => feed.toggleReaction(p.id, emoji),
-                    onTap: () {
-                      debugPrint(
-                        '[FriendFeed] tapped post ${p.id} by ${p.username}',
-                      );
-                      Navigator.of(context).push(
+                ..._posts.asMap().entries.map(
+                  (e) => StaggerItem(
+                    key: ValueKey(e.value.id),
+                    index: e.key,
+                    child: PostCard(
+                      post: e.value,
+                      heroTagPrefix: 'fp_',
+                      onReact: (emoji) => feed.toggleReaction(e.value.id, emoji),
+                      onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => PostDetailScreen(post: p),
+                          builder: (_) => PostDetailScreen(post: e.value, heroTagPrefix: 'fp_'),
                         ),
-                      );
-                    },
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -392,7 +394,7 @@ class _PostThumb extends StatelessWidget {
 
 // ── Heatmap grid ──────────────────────────────────────────────────────────
 
-class _HeatmapGrid extends StatelessWidget {
+class _HeatmapGrid extends StatefulWidget {
   final List<int> grid;
   final PintTheme t;
   final int? selectedCell;
@@ -406,36 +408,90 @@ class _HeatmapGrid extends StatelessWidget {
   });
 
   @override
+  State<_HeatmapGrid> createState() => _HeatmapGridState();
+}
+
+class _HeatmapGridState extends State<_HeatmapGrid>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  static const _cols = 12;
+  static const _rows = 7;
+  static const _maxDiag = _cols - 1 + _rows - 1;
+  static const _cellAnimMs = 280;
+  static const _staggerMs = 22;
+  static const _totalMs = _cellAnimMs + _staggerMs * _maxDiag;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: _totalMs),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Animation<double> _cellAnim(int col, int row) {
+    final diag = col + row;
+    final start = (_staggerMs * diag) / _totalMs;
+    final end = (_staggerMs * diag + _cellAnimMs) / _totalMs;
+    return CurvedAnimation(
+      parent: _ctrl,
+      curve: Interval(start, end.clamp(0.0, 1.0), curve: Curves.easeOutCubic),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: t.surfaceWeaker,
+        color: widget.t.surfaceWeaker,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: t.borderWeak),
+        border: Border.all(color: widget.t.borderWeak),
       ),
       child: Row(
-        children: List.generate(12, (col) {
+        children: List.generate(_cols, (col) {
           return Expanded(
             child: Column(
-              children: List.generate(7, (row) {
-                final index = col * 7 + row;
-                final v = grid[index];
-                final isSelected = selectedCell == index;
+              children: List.generate(_rows, (row) {
+                final index = col * _rows + row;
+                final v = widget.grid[index];
+                final isSelected = widget.selectedCell == index;
+                final anim = _cellAnim(col, row);
                 return GestureDetector(
-                  onTap: () => onCellTap(index),
+                  onTap: () => widget.onCellTap(index),
                   child: AspectRatio(
                     aspectRatio: 1,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 120),
-                      margin: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? (t.isDark
-                                  ? const Color(0xFF6B7280)
-                                  : const Color(0xFF9CA3AF))
-                            : t.streakCell[v.clamp(0, t.streakCell.length - 1)],
-                        borderRadius: BorderRadius.circular(3),
+                    child: AnimatedBuilder(
+                      animation: anim,
+                      builder: (_, child) => Opacity(
+                        opacity: anim.value,
+                        child: Transform.translate(
+                          offset: Offset(
+                            -6 * (1 - anim.value),
+                            -6 * (1 - anim.value),
+                          ),
+                          child: child,
+                        ),
+                      ),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 120),
+                        margin: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? (widget.t.isDark
+                                    ? const Color(0xFF6B7280)
+                                    : const Color(0xFF9CA3AF))
+                              : widget.t.streakCell[v.clamp(0, widget.t.streakCell.length - 1)],
+                          borderRadius: BorderRadius.circular(3),
+                        ),
                       ),
                     ),
                   ),

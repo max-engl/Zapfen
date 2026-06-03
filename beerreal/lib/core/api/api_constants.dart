@@ -1,5 +1,5 @@
 class ApiConstants {
-  static const String host = '80.158.76.30';
+  static const String host = '10.170.54.9';
   static String get baseUrl => 'http://$host:3000';
 
   // Auth
@@ -24,6 +24,9 @@ class ApiConstants {
   static String sendFriendRequest(String userId) => '/friends/request/$userId';
   static String acceptFriendRequest(String userId) => '/friends/accept/$userId';
   static String removeFriend(String userId) => '/friends/$userId';
+  static const String myInvite = '/friends/invite';
+  static String resolveInvite(String token) => '/friends/invite/$token';
+  static String acceptInvite(String token) => '/friends/invite/$token/accept';
 
   // Users / Profile
   static const String updateAvatar = '/users/me/avatar';
@@ -47,6 +50,9 @@ class ApiConstants {
   // Leaderboard
   static const String leaderboardFriends = '/leaderboard/friends';
   static const String leaderboardGlobal = '/leaderboard/global';
+
+  // Stats
+  static const String stats = '/stats';
 
   // Notifications
   static const String notifications = '/notifications';

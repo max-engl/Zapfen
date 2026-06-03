@@ -10,6 +10,7 @@ import '../features/posts/providers/feed_provider.dart';
 import '../widgets/pint_loading.dart';
 import '../widgets/post_card.dart';
 import '../widgets/shimmer_box.dart';
+import '../widgets/stagger_item.dart';
 import 'friend_profile_screen.dart';
 import 'post_detail_screen.dart';
 import 'profile_screen.dart';
@@ -234,33 +235,38 @@ class _FeedScreenState extends State<FeedScreen> {
           }
 
           final p = feed.posts[postIndex];
-          return PostCard(
+          return StaggerItem(
             key: ValueKey(p.id),
-            post: p,
-            onReact: (emoji) => feed.toggleReaction(p.id, emoji),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => PostDetailScreen(post: p)),
-            ),
-            onDelete: p.userId == currentUserId
-                ? () => feed.deletePost(p.id)
-                : null,
-            onProfileTap: p.userId == currentUserId
-                ? () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                  )
-                : () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => FriendProfileScreen(
-                        friend: ApiFriend(
-                          id: p.userId,
-                          username: p.username,
-                          avatarUrl: p.avatarUrl,
-                          avatarColor: p.avatarColor,
-                          avatarInitial: p.avatarInitial,
+            index: postIndex,
+            child: PostCard(
+              post: p,
+              onReact: (emoji) => feed.toggleReaction(p.id, emoji),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => PostDetailScreen(post: p)),
+              ),
+              onDelete: p.userId == currentUserId
+                  ? () => feed.deletePost(p.id)
+                  : null,
+              onProfileTap: p.userId == currentUserId
+                  ? () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ProfileScreen(standaloneRoute: true),
+                      ),
+                    )
+                  : () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => FriendProfileScreen(
+                          friend: ApiFriend(
+                            id: p.userId,
+                            username: p.username,
+                            avatarUrl: p.avatarUrl,
+                            avatarColor: p.avatarColor,
+                            avatarInitial: p.avatarInitial,
+                          ),
                         ),
                       ),
                     ),
-                  ),
+            ),
           );
         },
       ),

@@ -50,6 +50,7 @@ class _CaptureScreenState extends State<CaptureScreen>
   String _locationHint = 'Standort wird ermittelt';
   DrinkModel? _selectedDrink;
   late final AnimationController _flashAnim;
+  FlashMode _flashMode = FlashMode.off;
 
   @override
   void initState() {
@@ -264,6 +265,14 @@ class _CaptureScreenState extends State<CaptureScreen>
     }
   }
 
+  Future<void> _toggleFlash() async {
+    final ctrl = _rearCtrl;
+    if (ctrl == null || !ctrl.value.isInitialized) return;
+    final next = _flashMode == FlashMode.off ? FlashMode.torch : FlashMode.off;
+    await ctrl.setFlashMode(next);
+    if (mounted) setState(() => _flashMode = next);
+  }
+
   void _openDrinkPicker() {
     if (widget.drinkProvider.defaults.isEmpty) {
       widget.drinkProvider.load();
@@ -341,7 +350,8 @@ class _CaptureScreenState extends State<CaptureScreen>
           t: t,
           label: 'JETZT ZAPFEN',
           sub: 'Prompt schließt in 84 Min',
-          onClose: widget.onClose),
+          onClose: widget.onClose,
+          flashMode: _flashMode),
       Expanded(
         child: Center(
           child: _initError != null
@@ -363,7 +373,9 @@ class _CaptureScreenState extends State<CaptureScreen>
           t: t,
           label: 'JETZT ZAPFEN',
           sub: 'Prompt schließt in 84 Min',
-          onClose: widget.onClose),
+          onClose: widget.onClose,
+          flashMode: _flashMode,
+          onFlashToggle: _toggleFlash),
       const SizedBox(height: 12),
       Expanded(
         child: Padding(
@@ -476,25 +488,6 @@ class _CaptureScreenState extends State<CaptureScreen>
             selfieBytes: _selfieBytes,
             t: t,
             ringPulse: true,
-          ),
-        ),
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
-        child: Center(
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0x14FFFFFF),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: const Color(0x14FFFFFF)),
-            ),
-            child: const Text('2 Neuaufnahmen übrig',
-                style: TextStyle(
-                    color: Color(0xD9FFFFFF),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600)),
           ),
         ),
       ),
@@ -711,15 +704,21 @@ class _CamTopBar extends StatelessWidget {
   final String label;
   final String? sub;
   final VoidCallback onClose;
+  final FlashMode flashMode;
+  final VoidCallback? onFlashToggle;
 
-  const _CamTopBar(
-      {required this.t,
-      required this.label,
-      this.sub,
-      required this.onClose});
+  const _CamTopBar({
+    required this.t,
+    required this.label,
+    this.sub,
+    required this.onClose,
+    this.flashMode = FlashMode.off,
+    this.onFlashToggle,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final torchOn = flashMode == FlashMode.torch;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18),
       child: Row(children: [
@@ -748,9 +747,12 @@ class _CamTopBar extends StatelessWidget {
         ]),
         const Spacer(),
         _CircleBtn(
-          onTap: () {},
-          child: const Icon(Icons.flash_on_rounded,
-              color: Colors.white, size: 18),
+          onTap: onFlashToggle,
+          child: Icon(
+            torchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+            color: torchOn ? const Color(0xFFFFD60A) : Colors.white,
+            size: 18,
+          ),
         ),
       ]),
     );

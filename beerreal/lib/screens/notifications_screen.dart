@@ -11,6 +11,7 @@ import '../features/posts/services/post_service.dart';
 import '../theme.dart';
 import '../widgets/avatar.dart';
 import '../widgets/shimmer_box.dart';
+import '../widgets/stagger_item.dart';
 import 'friend_profile_screen.dart';
 import 'post_detail_screen.dart';
 
@@ -27,8 +28,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<NotificationProvider>().load();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final provider = context.read<NotificationProvider>();
+      await provider.load();
+      if (mounted) provider.markAllRead();
     });
   }
 
@@ -235,6 +238,7 @@ class _Body extends StatelessWidget {
       grouped.putIfAbsent(n.group, () => []).add(n);
     }
 
+    var notifIdx = 0;
     return ListView(
       padding: const EdgeInsets.only(bottom: 32),
       children: [
@@ -242,7 +246,11 @@ class _Body extends StatelessWidget {
           if (grouped.containsKey(g)) ...[
             _GroupHeader(label: g),
             for (final n in grouped[g]!)
-              _NotifRow(notification: n, onGoToFriends: onGoToFriends),
+              StaggerItem(
+                key: ValueKey(n.id),
+                index: notifIdx++,
+                child: _NotifRow(notification: n, onGoToFriends: onGoToFriends),
+              ),
           ],
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),

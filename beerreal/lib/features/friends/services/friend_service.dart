@@ -40,4 +40,18 @@ class FriendService {
     final list = response.data['users'] as List<dynamic>;
     return list.map((e) => UserSearchResult.fromJson(e as Map<String, dynamic>)).toList();
   }
+
+  Future<String> getInviteLink() async {
+    final response = await _client.dio.get(ApiConstants.myInvite);
+    return response.data['link'] as String;
+  }
+
+  Future<Map<String, dynamic>> resolveInviteToken(String token) async {
+    final response = await _client.dio.get(ApiConstants.resolveInvite(token));
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<void> acceptInviteToken(String token) async {
+    await _client.dio.post(ApiConstants.acceptInvite(token));
+  }
 }

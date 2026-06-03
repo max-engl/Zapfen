@@ -6,6 +6,8 @@ import '../features/leaderboard/providers/leaderboard_provider.dart';
 import '../widgets/avatar.dart';
 import '../widgets/img_placeholder.dart';
 import '../widgets/shimmer_box.dart';
+import '../widgets/stagger_item.dart';
+import 'stats_screen.dart';
 
 class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
@@ -69,7 +71,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         bottom: false,
         child: Column(
           children: [
-            _LBHeader(onBack: () => Navigator.of(context).pop()),
+            _LBHeader(
+              onBack: () => Navigator.of(context).pop(),
+              onStats: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const StatsScreen()),
+              ),
+            ),
             Expanded(
               child: Stack(
                 children: [
@@ -107,10 +114,13 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                                   _Podium(top3: top3, metric: _metric),
                                 _SectionLabel(t: t),
                                 ...rest.asMap().entries.map(
-                                  (e) => _RankRow(
-                                    entry: e.value,
-                                    rank: e.key + 4,
-                                    metric: _metric,
+                                  (e) => StaggerItem(
+                                    index: e.key,
+                                    child: _RankRow(
+                                      entry: e.value,
+                                      rank: e.key + 4,
+                                      metric: _metric,
+                                    ),
                                   ),
                                 ),
                                 _SeasonNote(t: t),
@@ -140,7 +150,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
 class _LBHeader extends StatelessWidget {
   final VoidCallback onBack;
-  const _LBHeader({required this.onBack});
+  final VoidCallback? onStats;
+  const _LBHeader({required this.onBack, this.onStats});
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +191,19 @@ class _LBHeader extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 36),
+          GestureDetector(
+            onTap: onStats,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: t.surfaceWeak,
+                border: Border.all(color: t.border),
+              ),
+              child: Icon(Icons.bar_chart_rounded, size: 18, color: t.goldText),
+            ),
+          ),
         ],
       ),
     );
@@ -445,8 +468,26 @@ class _PodiumColumn extends StatelessWidget {
     final t = PintThemeProvider.of(context);
     final isFirst = slot.rank == 1;
     final ringColor = isFirst ? t.gold : t.selfieOutline;
+    // Visual order left→right: rank2=0, rank1=1, rank3=2
+    final staggerIndex = slot.rank == 2 ? 0 : slot.rank == 1 ? 1 : 2;
+    const animMs = 420;
+    const staggerMs = 90;
+    const totalMs = animMs + staggerMs * 2;
+    final start = (staggerMs * staggerIndex) / totalMs;
+    final end = (staggerMs * staggerIndex + animMs) / totalMs;
 
-    return Column(
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: totalMs),
+      tween: Tween(begin: 0.0, end: 1.0),
+      curve: Interval(start, end.clamp(0.0, 1.0), curve: Curves.easeOutCubic),
+      builder: (_, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(-16 * (1 - value), -16 * (1 - value)),
+          child: child,
+        ),
+      ),
+      child: Column(
       children: [
         // Crown for 1st
         SizedBox(
@@ -543,6 +584,7 @@ class _PodiumColumn extends StatelessWidget {
           ),
         ),
       ],
+      ),
     );
   }
 }

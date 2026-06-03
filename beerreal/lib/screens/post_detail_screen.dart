@@ -1,10 +1,12 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:fullscreen_image_viewer/fullscreen_image_viewer.dart'
     show FullscreenImageViewer;
 import 'package:provider/provider.dart';
 import 'package:sliver_tools/sliver_tools.dart';
 import '../core/app_cache_manager.dart';
+import '../core/geocoding_service.dart';
 import '../theme.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/posts/models/comment.dart';
@@ -22,22 +24,24 @@ import '../widgets/shimmer_box.dart';
 
 class PostDetailScreen extends StatelessWidget {
   final FeedPost post;
+  final String heroTagPrefix;
 
-  const PostDetailScreen({super.key, required this.post});
+  const PostDetailScreen({super.key, required this.post, this.heroTagPrefix = ''});
 
   @override
   Widget build(BuildContext context) {
     final commentService = context.read<CommentService>();
     return ChangeNotifierProvider(
       create: (_) => CommentProvider(commentService, postId: post.id)..load(),
-      child: _PostDetailBody(post: post),
+      child: _PostDetailBody(post: post, heroTagPrefix: heroTagPrefix),
     );
   }
 }
 
 class _PostDetailBody extends StatefulWidget {
   final FeedPost post;
-  const _PostDetailBody({required this.post});
+  final String heroTagPrefix;
+  const _PostDetailBody({required this.post, this.heroTagPrefix = ''});
 
   @override
   State<_PostDetailBody> createState() => _PostDetailBodyState();
@@ -129,7 +133,7 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
                 SliverToBoxAdapter(
                   child: SizedBox(
                     height: 460,
-                    child: _ZoomablePhoto(post: _post),
+                    child: _ZoomablePhoto(post: _post, heroTagPrefix: widget.heroTagPrefix),
                   ),
                 ),
 
@@ -165,24 +169,41 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Icon(
-                                Icons.place_outlined,
-                                size: 12,
-                                color: t.textMuted,
-                              ),
-                              const SizedBox(width: 2),
-                              Flexible(
-                                child: Text(
-                                  '${_post.username}\'s spot',
-                                  style: TextStyle(
-                                    color: t.textMuted,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
+                              if (_post.lat != null && _post.lng != null) ...[
+                                const SizedBox(width: 8),
+                                FutureBuilder<String?>(
+                                  future: GeocodingService.cityName(
+                                    _post.lat!,
+                                    _post.lng!,
                                   ),
-                                  overflow: TextOverflow.ellipsis,
+                                  builder: (_, snap) {
+                                    final city = snap.data;
+                                    if (city == null) return const SizedBox.shrink();
+                                    return Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.place_outlined,
+                                          size: 12,
+                                          color: t.textMuted,
+                                        ),
+                                        const SizedBox(width: 2),
+                                        Flexible(
+                                          child: Text(
+                                            city,
+                                            style: TextStyle(
+                                              color: t.textMuted,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 ),
-                              ),
+                              ],
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -542,7 +563,8 @@ class _PostAppBar extends StatelessWidget implements PreferredSizeWidget {
 
 class _ZoomablePhoto extends StatefulWidget {
   final FeedPost post;
-  const _ZoomablePhoto({required this.post});
+  final String heroTagPrefix;
+  const _ZoomablePhoto({required this.post, this.heroTagPrefix = ''});
 
   @override
   State<_ZoomablePhoto> createState() => _ZoomablePhotoState();
@@ -550,6 +572,22 @@ class _ZoomablePhoto extends StatefulWidget {
 
 class _ZoomablePhotoState extends State<_ZoomablePhoto> {
   bool _swapped = false;
+
+  static const _overlayW = 88.0;
+  static const _overlayH = 116.0;
+  static const _pad = 14.0;
+
+  Offset? _selfiePos;
+  bool _dragging = false;
+
+  Offset _snapToCorner(Offset pos, Size size) {
+    final cx = pos.dx + _overlayW / 2;
+    final cy = pos.dy + _overlayH / 2;
+    return Offset(
+      cx < size.width / 2 ? _pad : size.width - _overlayW - _pad,
+      cy < size.height / 2 ? _pad : size.height - _overlayH - _pad,
+    );
+  }
 
   void _openFullscreen(BuildContext context, String imageUrl, String cacheKey) {
     FullscreenImageViewer.open(
@@ -584,94 +622,142 @@ class _ZoomablePhotoState extends State<_ZoomablePhoto> {
       },
       child: Container(
         color: Colors.black,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Hero(
-              tag: 'post_image_${post.id}',
-              child: mainUrl.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: mainUrl,
-                      cacheKey: mainKey,
-                      cacheManager: AppCacheManager.instance,
-                      fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) =>
-                          Container(color: Colors.black),
-                    )
-                  : Container(color: const Color(0xFF1A1A1A)),
-            ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final size = Size(constraints.maxWidth, constraints.maxHeight);
+            _selfiePos ??= Offset(size.width - _overlayW - _pad, _pad);
 
-            Positioned(
-              bottom: 14,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    color: Colors.black.withValues(alpha: 0.55),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.open_in_full_rounded,
-                          size: 12,
-                          color: Colors.white70,
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          'Tippen zum Vollbild',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                Hero(
+                  tag: '${widget.heroTagPrefix}post_image_${post.id}',
+                  child: mainUrl.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: mainUrl,
+                          cacheKey: mainKey,
+                          cacheManager: AppCacheManager.instance,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) =>
+                              Container(color: Colors.black),
+                        )
+                      : Container(color: const Color(0xFF1A1A1A)),
                 ),
-              ),
-            ),
 
-            if (hasSelfie)
-              Positioned(
-                top: 14,
-                right: 14,
-                child: GestureDetector(
-                  onTap: () => setState(() => _swapped = !_swapped),
-                  child: Container(
-                    width: 88,
-                    height: 116,
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        width: 2,
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+                Positioned(
+                  bottom: 14,
+                  left: 0,
+                  right: 0,
+                  child: Center(
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: overlayUrl.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: overlayUrl,
-                              cacheKey: overlayKey,
-                              cacheManager: AppCacheManager.instance,
-                              fit: BoxFit.cover,
-                              errorWidget: (_, __, ___) =>
-                                  Container(color: const Color(0xFF1E3A2F)),
-                            )
-                          : Container(color: const Color(0xFF1E3A2F)),
+                      borderRadius: BorderRadius.circular(999),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        color: Colors.black.withValues(alpha: 0.55),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.open_in_full_rounded,
+                              size: 12,
+                              color: Colors.white70,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              'Tippen zum Vollbild',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.85),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+
+                if (hasSelfie)
+                  AnimatedPositioned(
+                    duration: _dragging
+                        ? Duration.zero
+                        : const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    left: _selfiePos!.dx,
+                    top: _selfiePos!.dy,
+                    child: RawGestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      gestures: {
+                        ImmediateMultiDragGestureRecognizer:
+                            GestureRecognizerFactoryWithHandlers<
+                                ImmediateMultiDragGestureRecognizer>(
+                          () => ImmediateMultiDragGestureRecognizer(
+                            debugOwner: this,
+                          ),
+                          (instance) {
+                            instance.onStart = (Offset _) {
+                              setState(() => _dragging = true);
+                              return _DetailSelfieDrag(
+                                onMove: (delta) => setState(() {
+                                  _selfiePos = Offset(
+                                    (_selfiePos!.dx + delta.dx)
+                                        .clamp(0.0, size.width - _overlayW),
+                                    (_selfiePos!.dy + delta.dy)
+                                        .clamp(0.0, size.height - _overlayH),
+                                  );
+                                }),
+                                onEnd: (_) => setState(() {
+                                  _dragging = false;
+                                  _selfiePos =
+                                      _snapToCorner(_selfiePos!, size);
+                                }),
+                                onCancel: () => setState(() {
+                                  _dragging = false;
+                                  _selfiePos =
+                                      _snapToCorner(_selfiePos!, size);
+                                }),
+                              );
+                            };
+                          },
+                        ),
+                      },
+                      child: GestureDetector(
+                        onTap: () => setState(() => _swapped = !_swapped),
+                        child: Container(
+                        width: _overlayW,
+                        height: _overlayH,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: overlayUrl.isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: overlayUrl,
+                                  cacheKey: overlayKey,
+                                  cacheManager: AppCacheManager.instance,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (_, __, ___) =>
+                                      Container(color: const Color(0xFF1E3A2F)),
+                                )
+                              : Container(color: const Color(0xFF1E3A2F)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -1205,4 +1291,25 @@ class _ComposerState extends State<_Composer> {
       ],
     );
   }
+}
+
+class _DetailSelfieDrag extends Drag {
+  _DetailSelfieDrag({
+    required this.onMove,
+    required this.onEnd,
+    required this.onCancel,
+  });
+
+  final void Function(Offset delta) onMove;
+  final void Function(DragEndDetails details) onEnd;
+  final VoidCallback onCancel;
+
+  @override
+  void update(DragUpdateDetails details) => onMove(details.delta);
+
+  @override
+  void end(DragEndDetails details) => onEnd(details);
+
+  @override
+  void cancel() => onCancel();
 }

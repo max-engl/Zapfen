@@ -45,6 +45,12 @@ const userSchema = new mongoose.Schema(
             type: String,
             default: null,
         },
+        inviteToken: {
+            type: String,
+            default: null,
+            unique: true,
+            sparse: true,
+        },
     },
     { timestamps: true }
 );

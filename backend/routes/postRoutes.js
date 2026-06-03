@@ -7,6 +7,7 @@ const Like = require("../models/Like");
 const PostReaction = require("../models/PostReaction");
 const Comment = require("../models/Comment");
 const CommentReaction = require("../models/CommentReaction");
+const AppNotification = require("../models/AppNotification");
 const supabase = require("../config/supabase");
 const upload = require("../middleware/uploadMiddleware");
 const authMiddleware = require("../middleware/authMiddleware");
@@ -195,8 +196,9 @@ router.post(
             const actorAvatarColor = req.user.avatarColor ?? null;
             const actorAvatarInitial = req.user.avatarInitial ?? null;
             const postId = post._id.toString();
-            getFriendIds(req.user._id).then((friendIds) => {
+            getFriendIds(req.user._id).then(async (friendIds) => {
                 if (!friendIds.length) return;
+
                 sendToUsers(friendIds, {
                     title: `@${actorUsername} 🍺`,
                     body: "hat gerade gezapft!",
@@ -212,6 +214,48 @@ router.post(
                     postId: post._id,
                     postThumbPath: storagePath,
                 });
+
+                // If 4+ friends have posted today, nudge the ones who haven't yet
+                const todayStart = new Date();
+                todayStart.setUTCHours(0, 0, 0, 0);
+
+                const friendsWhoPostedToday = await Post.find({
+                    user: { $in: friendIds },
+                    createdAt: { $gte: todayStart },
+                }).distinct("user");
+
+                if (friendsWhoPostedToday.length >= 4) {
+                    const postedSet = new Set(friendsWhoPostedToday.map(String));
+                    const unpostedFriendIds = friendIds.filter((id) => !postedSet.has(id.toString()));
+
+                    if (unpostedFriendIds.length > 0) {
+                        const alreadyNotified = await AppNotification.find({
+                            recipient: { $in: unpostedFriendIds },
+                            type: "group_active",
+                            createdAt: { $gte: todayStart },
+                        }).distinct("recipient");
+
+                        const alreadyNotifiedSet = new Set(alreadyNotified.map(String));
+                        const toNotify = unpostedFriendIds.filter((id) => !alreadyNotifiedSet.has(id.toString()));
+
+                        if (toNotify.length > 0) {
+                            sendToUsers(toNotify, {
+                                title: "🍺 Deine Crew zapft!",
+                                body: `${friendsWhoPostedToday.length} deiner Freunde haben heute schon gezapft!`,
+                                data: { type: "group_active" },
+                            });
+                            saveNotifications(toNotify, {
+                                type: "group_active",
+                                actorId: req.user._id,
+                                actorUsername,
+                                actorAvatarUrl,
+                                actorAvatarColor,
+                                actorAvatarInitial,
+                                mutualCount: friendsWhoPostedToday.length,
+                            });
+                        }
+                    }
+                }
             }).catch(() => {});
         } catch (error) {
             res.status(500).json({ message: "Post upload failed", error: error.message });
