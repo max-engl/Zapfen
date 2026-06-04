@@ -2,11 +2,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../core/app_cache_manager.dart';
 import '../core/geocoding_service.dart';
 import '../theme.dart';
 import '../features/posts/models/feed_post.dart';
 import '../features/posts/models/post_reaction.dart';
+import '../features/posts/services/post_service.dart';
 import 'avatar.dart';
 import 'report_post_sheet.dart';
 import 'shimmer_box.dart';
@@ -547,53 +549,374 @@ class _QuickReactions extends StatelessWidget {
     required this.t,
   });
 
+  void _showReactors(BuildContext context) {
+    // Capture PostService from the widget tree before entering the modal route.
+    final svc = context.read<PostService>();
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _ReactorsSheet(
+        postId: post.id,
+        reactions: post.reactions,
+        postService: svc,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final counts = {for (final r in post.reactions) r.emoji: r.count};
     return Row(
       mainAxisSize: MainAxisSize.min,
-      children: kReactionEmojis.map((emoji) {
-        final selected = post.myReaction == emoji;
-        final count = counts[emoji] ?? 0;
-        return Padding(
-          padding: const EdgeInsets.only(right: 6),
-          child: GestureDetector(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              onReact(emoji);
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              constraints: const BoxConstraints(minWidth: 38, minHeight: 34),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-              decoration: BoxDecoration(
-                color: selected ? t.goldSoft : t.surfaceWeak,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: selected ? t.goldBorderStrong : t.border,
+      children: [
+        // Emoji reaction pills — tapping reacts/unreacts
+        ...kReactionEmojis.map((emoji) {
+          final selected = post.myReaction == emoji;
+          final count = counts[emoji] ?? 0;
+          return Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onReact(emoji);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                constraints: const BoxConstraints(minWidth: 38, minHeight: 34),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                decoration: BoxDecoration(
+                  color: selected ? t.goldSoft : t.surfaceWeak,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: selected ? t.goldBorderStrong : t.border,
+                  ),
                 ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(emoji, style: const TextStyle(fontSize: 14)),
+                    if (count > 0) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        '$count',
+                        style: TextStyle(
+                          color: selected ? t.goldText : t.textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+        // "See who reacted" chip — only visible when reactions exist
+        if (post.totalReactions > 0)
+          GestureDetector(
+            onTap: () => _showReactors(context),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 34),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: t.surfaceWeak,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: t.border),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(emoji, style: const TextStyle(fontSize: 14)),
-                  if (count > 0) ...[
-                    const SizedBox(width: 4),
-                    Text(
-                      '$count',
-                      style: TextStyle(
-                        color: selected ? t.goldText : t.textMuted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
+                  Icon(Icons.people_outline, size: 14, color: t.textMuted),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${post.totalReactions}',
+                    style: TextStyle(
+                      color: t.textMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),
           ),
-        );
-      }).toList(),
+      ],
+    );
+  }
+}
+
+// ── Who reacted sheet ─────────────────────────────────────────────────────────
+
+class _ReactorsSheet extends StatefulWidget {
+  final String postId;
+  final List<PostReaction> reactions;
+  final PostService postService;
+
+  const _ReactorsSheet({
+    required this.postId,
+    required this.reactions,
+    required this.postService,
+  });
+
+  @override
+  State<_ReactorsSheet> createState() => _ReactorsSheetState();
+}
+
+class _ReactorsSheetState extends State<_ReactorsSheet> {
+  List<ReactionActor>? _actors;
+  // null = "Alle" (show everyone), non-null = filter by that emoji
+  String? _selectedEmoji;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+  }
+
+  Future<void> _fetch() async {
+    try {
+      final actors = await widget.postService.getPostReactions(widget.postId);
+      if (mounted) setState(() => _actors = actors);
+    } catch (_) {
+      if (mounted) setState(() => _actors = []);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = PintThemeProvider.of(context);
+
+    final activeEmojis = kReactionEmojis
+        .where((e) => widget.reactions.any((r) => r.emoji == e && r.count > 0))
+        .toList();
+
+    final filtered = _selectedEmoji == null
+        ? _actors
+        : _actors?.where((a) => a.emoji == _selectedEmoji).toList();
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 28),
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: t.border),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Container(
+            width: 36,
+            height: 4,
+            margin: const EdgeInsets.only(top: 12, bottom: 4),
+            decoration: BoxDecoration(
+              color: t.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // Title row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+            child: Row(
+              children: [
+                Text(
+                  'Reaktionen',
+                  style: TextStyle(
+                    color: t.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (_actors != null && _actors!.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: t.goldSoft,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: t.goldBorder),
+                    ),
+                    child: Text(
+                      '${_actors!.length}',
+                      style: TextStyle(
+                        color: t.goldText,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // Emoji filter tabs — only when multiple emoji types have reactions
+          if (activeEmojis.length > 1)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    // "Alle" tab
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedEmoji = null),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 140),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _selectedEmoji == null
+                                ? t.goldSoft
+                                : t.surfaceWeak,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: _selectedEmoji == null
+                                  ? t.goldBorderStrong
+                                  : t.border,
+                            ),
+                          ),
+                          child: Text(
+                            'Alle',
+                            style: TextStyle(
+                              color: _selectedEmoji == null
+                                  ? t.goldText
+                                  : t.textMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Individual emoji tabs
+                    ...activeEmojis.map((emoji) {
+                      final sel = emoji == _selectedEmoji;
+                      final count = widget.reactions
+                          .firstWhere((r) => r.emoji == emoji)
+                          .count;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: GestureDetector(
+                          onTap: () =>
+                              setState(() => _selectedEmoji = emoji),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 140),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: sel ? t.goldSoft : t.surfaceWeak,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: sel ? t.goldBorderStrong : t.border,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  emoji,
+                                  style: const TextStyle(fontSize: 15),
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  '$count',
+                                  style: TextStyle(
+                                    color: sel ? t.goldText : t.textMuted,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ),
+
+          Divider(height: 1, color: t.border),
+
+          // User list
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 320),
+            child: _actors == null
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 32),
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: t.gold,
+                      ),
+                    ),
+                  )
+                : (filtered?.isEmpty ?? true)
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 28),
+                    child: Text(
+                      'Noch keine Reaktionen.',
+                      style: TextStyle(color: t.textMuted, fontSize: 14),
+                    ),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: filtered!.length,
+                    itemBuilder: (_, i) {
+                      final a = filtered[i];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          children: [
+                            PintAvatar(
+                              size: 38,
+                              imageUrl: a.avatarUrl,
+                              avatarColor: a.avatarColor,
+                              initials: a.avatarInitial,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                '@${a.username}',
+                                style: TextStyle(
+                                  color: t.text,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              a.emoji,
+                              style: const TextStyle(fontSize: 18),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

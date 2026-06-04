@@ -50,6 +50,9 @@ import 'screens/profile_screen.dart';
 import 'screens/leaderboard_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/stats_screen.dart';
+import 'screens/post_detail_screen.dart';
+import 'screens/friend_profile_screen.dart';
+import 'features/friends/models/api_friend.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -136,7 +139,7 @@ Future<void> _main() async {
           create: (_) => FeedProvider(postService, FeedDatabase.instance),
         ),
         ChangeNotifierProvider<ProfilePostsProvider>(
-          create: (_) => ProfilePostsProvider(postService),
+          create: (_) => ProfilePostsProvider(postService, FeedDatabase.instance),
         ),
         ChangeNotifierProvider<FriendProvider>(
           create: (_) => FriendProvider(friendService, FriendDatabase.instance),
@@ -290,6 +293,7 @@ class _PintRootState extends State<PintRoot> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         debugPrint('[startup] auth OK — starting cache preload');
         context.read<FriendProvider>().preloadFromCache();
+        context.read<ProfilePostsProvider>().preloadFromCache();
         context.read<FeedProvider>().preloadFromCache().then((_) {
           debugPrint('[startup] _feedPreloaded = true');
           if (mounted) setState(() => _feedPreloaded = true);
@@ -386,26 +390,66 @@ class _PintAppState extends State<PintApp> {
     });
   }
 
-  Future<void> _setupNotificationTapHandlers() async {
+  void _setupNotificationTapHandlers() {
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       _handleNotificationTap(message.data);
     });
 
-    final initial = await FirebaseMessaging.instance.getInitialMessage();
-    if (initial != null) {
-      _handleNotificationTap(initial.data);
-    }
+    FirebaseMessaging.instance.getInitialMessage().then((initial) {
+      if (initial != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _handleNotificationTap(initial.data);
+        });
+      }
+    });
   }
 
   void _handleNotificationTap(Map<String, dynamic> data) {
     final type = data['type'] as String?;
     switch (type) {
       case 'post':
+        final postId = data['postId'] as String?;
         setState(() => _screen = PintScreen.feed);
+        if (postId != null) _openPostById(postId);
       case 'friend_request':
+        setState(() => _screen = PintScreen.friends);
       case 'friend_accepted':
         setState(() => _screen = PintScreen.friends);
+        _openFriendProfile(data);
+      case 'group_active':
+        setState(() => _screen = PintScreen.feed);
     }
+  }
+
+  Future<void> _openPostById(String postId) async {
+    try {
+      final post = await context.read<PostService>().getPostById(postId);
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)),
+      );
+    } catch (_) {}
+  }
+
+  void _openFriendProfile(Map<String, dynamic> data) {
+    final actorId = data['actorId'] as String?;
+    final actorUsername = data['actorUsername'] as String?;
+    if (actorId == null || actorUsername == null) return;
+
+    final friend = ApiFriend(
+      id: actorId,
+      username: actorUsername,
+      avatarUrl: data['actorAvatarUrl'] as String?,
+      avatarColor: data['actorAvatarColor'] as String?,
+      avatarInitial: data['actorAvatarInitial'] as String?,
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => FriendProfileScreen(friend: friend)),
+      );
+    });
   }
 
   void _openCapture() => setState(() => _captureOpen = true);
@@ -491,6 +535,7 @@ class _PintAppState extends State<PintApp> {
               current: _screen,
               onSelect: (s) => setState(() => _screen = s),
               onCapture: _openCapture,
+              pendingRequests: context.watch<FriendProvider>().requests.length,
             ),
           ),
           AnimatedSwitcher(

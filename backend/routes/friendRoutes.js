@@ -56,7 +56,14 @@ router.post("/request/:userId", authMiddleware, async (req, res) => {
         sendToUser(recipientId, {
             title: `@${req.user.username}`,
             body: "möchte mit dir befreundet sein",
-            data: { type: "friend_request" },
+            data: {
+                type: "friend_request",
+                actorId: req.user._id.toString(),
+                actorUsername: req.user.username,
+                ...(req.user.avatarUrl && { actorAvatarUrl: req.user.avatarUrl }),
+                ...(req.user.avatarColor && { actorAvatarColor: req.user.avatarColor }),
+                ...(req.user.avatarInitial && { actorAvatarInitial: req.user.avatarInitial }),
+            },
         }).catch(() => {});
         saveNotification(recipientId, {
             type: 'request',
@@ -95,7 +102,14 @@ router.post("/accept/:userId", authMiddleware, async (req, res) => {
         sendToUser(requesterId, {
             title: `@${req.user.username}`,
             body: "hat deine Freundschaftsanfrage angenommen",
-            data: { type: "friend_accepted" },
+            data: {
+                type: "friend_accepted",
+                actorId: req.user._id.toString(),
+                actorUsername: req.user.username,
+                ...(req.user.avatarUrl && { actorAvatarUrl: req.user.avatarUrl }),
+                ...(req.user.avatarColor && { actorAvatarColor: req.user.avatarColor }),
+                ...(req.user.avatarInitial && { actorAvatarInitial: req.user.avatarInitial }),
+            },
         }).catch(() => {});
         saveNotification(requesterId, {
             type: 'accepted',
@@ -250,7 +264,14 @@ router.post("/invite/:token/accept", authMiddleware, async (req, res) => {
         sendToUser(recipientId, {
             title: `@${req.user.username}`,
             body: "möchte mit dir befreundet sein",
-            data: { type: "friend_request" },
+            data: {
+                type: "friend_request",
+                actorId: req.user._id.toString(),
+                actorUsername: req.user.username,
+                ...(req.user.avatarUrl && { actorAvatarUrl: req.user.avatarUrl }),
+                ...(req.user.avatarColor && { actorAvatarColor: req.user.avatarColor }),
+                ...(req.user.avatarInitial && { actorAvatarInitial: req.user.avatarInitial }),
+            },
         }).catch(() => {});
         saveNotification(recipientId, {
             type: "request",

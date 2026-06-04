@@ -1,5 +1,5 @@
 class ApiConstants {
-  static const String host = '80.158.76.30';
+  static const String host = '192.168.2.228';
   static String get baseUrl => 'http://$host:3000';
 
   // Auth
@@ -61,6 +61,8 @@ class ApiConstants {
   static const String achievementsMe = '/achievements/me';
   static const String achievementLocationTargets =
       '/achievements/location-targets';
+  static String achievementsForUser(String userId) =>
+      '/achievements/user/$userId';
 
   // Notifications
   static const String notifications = '/notifications';

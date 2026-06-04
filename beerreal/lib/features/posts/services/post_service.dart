@@ -100,6 +100,14 @@ class PostService {
     await _client.dio.delete(ApiConstants.deletePost(postId));
   }
 
+  Future<List<ReactionActor>> getPostReactions(String postId) async {
+    final response = await _client.dio.get(ApiConstants.reactToPost(postId));
+    final list = response.data as List<dynamic>;
+    return list
+        .map((e) => ReactionActor.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<
     ({String? myReaction, List<PostReaction> reactions, int totalReactions})
   >

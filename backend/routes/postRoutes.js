@@ -444,6 +444,42 @@ router.post("/:id/like", authMiddleware, async (req, res) => {
     }
 });
 
+// GET /posts/:id/reactions  —  list who reacted and with which emoji
+router.get("/:id/reactions", authMiddleware, async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id).select("user");
+        if (!post) return res.status(404).json({ message: "Post not found" });
+
+        const viewerId = req.user._id.toString();
+        const ownerId = post.user.toString();
+
+        if (viewerId !== ownerId) {
+            const friendship = await Friend.findOne({
+                $or: [
+                    { requester: viewerId, recipient: ownerId, status: "accepted" },
+                    { requester: ownerId, recipient: viewerId, status: "accepted" },
+                ],
+            });
+            if (!friendship) return res.status(403).json({ message: "Access denied" });
+        }
+
+        const reactions = await PostReaction.find({ post: post._id })
+            .populate("user", "username avatarUrl avatarColor avatarInitial")
+            .sort({ createdAt: 1 });
+
+        res.json(reactions.map((r) => ({
+            emoji: r.emoji,
+            userId: r.user._id,
+            username: r.user.username,
+            avatarUrl: r.user.avatarUrl ?? null,
+            avatarColor: r.user.avatarColor ?? null,
+            avatarInitial: r.user.avatarInitial ?? null,
+        })));
+    } catch (error) {
+        res.status(500).json({ message: "Could not fetch reactions", error: error.message });
+    }
+});
+
 // POST /posts/:id/reactions  —  toggle emoji reaction
 router.post("/:id/reactions", authMiddleware, async (req, res) => {
     try {

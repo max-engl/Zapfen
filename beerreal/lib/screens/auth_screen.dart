@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../theme.dart';
 import '../widgets/brand_mark.dart';
 import '../widgets/img_placeholder.dart';
+import '../widgets/pint_dialogs.dart';
 import '../widgets/pint_loading.dart';
 import '../features/auth/providers/auth_provider.dart';
 
@@ -789,12 +790,10 @@ class _HandleStepState extends State<_HandleStep> {
     if (!mounted) return;
     if (!ok) {
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            context.read<AuthProvider>().errorMessage ?? 'Registrierung fehlgeschlagen.',
-          ),
-        ),
+      showPintSnackBar(
+        context,
+        context.read<AuthProvider>().errorMessage ?? 'Registrierung fehlgeschlagen.',
+        isError: true,
       );
     }
   }

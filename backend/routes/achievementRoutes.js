@@ -392,4 +392,48 @@ function buildStatusLabel(achievement, earnedDate) {
     return "Erhalten";
 }
 
+// GET /achievements/user/:userId  — achievements for a friend's profile
+router.get("/user/:userId", authMiddleware, async (req, res) => {
+    try {
+        res.set("Cache-Control", "no-store");
+        const targetId = req.params.userId;
+
+        const posts = await Post.find({ user: targetId })
+            .select("createdAt location stats")
+            .sort({ createdAt: -1 })
+            .lean();
+
+        const results = ACHIEVEMENTS.map((a) => {
+            const progress = a.getProgress(posts);
+            const achievement = {
+                id: a.id,
+                icon: a.icon,
+                name: a.name,
+                blurb: a.blurb,
+                earned: progress.earned,
+                have: progress.have || 0,
+                goal: progress.goal || 1,
+            };
+            achievement.statusLabel = buildStatusLabel(achievement, progress.date);
+            if (progress.earned && progress.date) {
+                achievement.earnedDate = progress.date;
+            }
+            return achievement;
+        });
+
+        res.json({ achievements: results });
+    } catch (error) {
+        res.status(500).json({
+            message: "Erfolge konnten nicht geladen werden.",
+            error: error.message,
+        });
+    }
+});
+
+// Debug catch-all — logs any path the achievement router sees but doesn't handle
+router.use((req, res, next) => {
+    console.log(`[achievements] unmatched: ${req.method} ${req.path}`);
+    next();
+});
+
 module.exports = router;

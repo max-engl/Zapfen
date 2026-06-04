@@ -4,6 +4,7 @@ import '../theme.dart';
 import '../features/friends/models/api_friend.dart';
 import '../features/friends/providers/friend_provider.dart';
 import '../widgets/avatar.dart';
+import '../widgets/pint_dialogs.dart';
 import '../widgets/shimmer_box.dart';
 import '../widgets/stagger_item.dart';
 import 'add_friend_screen.dart';
@@ -68,12 +69,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 onAccept: () async {
                   final ok = await fp.acceptRequest(e.value.from.id);
                   if (ok && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          '@${e.value.from.username} ist jetzt in deinem Kreis.',
-                        ),
-                      ),
+                    showPintSnackBar(
+                      context,
+                      '@${e.value.from.username} ist jetzt in deinem Kreis.',
                     );
                   }
                 },
@@ -359,37 +357,14 @@ class _FriendRow extends StatelessWidget {
             ),
             GestureDetector(
               onTap: () async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    backgroundColor: t.surface,
-                    title: Text(
-                      'Freund entfernen?',
-                      style: TextStyle(color: t.text),
-                    ),
-                    content: Text(
-                      '@${friend.username} aus deinem Kreis entfernen?',
-                      style: TextStyle(color: t.textMuted),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: Text(
-                          'Abbrechen',
-                          style: TextStyle(color: t.textMuted),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        child: Text(
-                          'Entfernen',
-                          style: TextStyle(color: Colors.red),
-                        ),
-                      ),
-                    ],
-                  ),
+                final confirmed = await showPintConfirmDialog(
+                  context,
+                  title: 'Freund entfernen?',
+                  message: '@${friend.username} aus deinem Kreis entfernen?',
+                  confirmLabel: 'Entfernen',
+                  destructive: true,
                 );
-                if (confirmed == true && context.mounted) {
+                if (confirmed && context.mounted) {
                   fp.removeFriend(friend.id);
                 }
               },

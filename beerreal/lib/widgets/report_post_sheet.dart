@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../features/posts/models/feed_post.dart';
 import '../features/reports/services/report_service.dart';
 import '../theme.dart';
+import 'pint_dialogs.dart';
 
 Future<void> showPostOptionsSheet(
   BuildContext context, {
@@ -114,7 +115,7 @@ class _ReportPostReasonSheetState extends State<_ReportPostReasonSheet> {
     Navigator.of(context).pop();
   }
 
-  Future<void> _submit(PintTheme t) async {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate() || _submitting) return;
     setState(() => _submitting = true);
     try {
@@ -124,13 +125,7 @@ class _ReportPostReasonSheetState extends State<_ReportPostReasonSheet> {
       );
       if (!mounted) return;
       _close();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Meldung abgeschickt'),
-          backgroundColor: t.surface,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showPintSnackBar(context, 'Meldung abgeschickt');
     } catch (error) {
       final message = error is DioException
           ? (error.response?.data is Map
@@ -139,12 +134,10 @@ class _ReportPostReasonSheetState extends State<_ReportPostReasonSheet> {
           : null;
       if (!mounted) return;
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: t.surface,
-          behavior: SnackBarBehavior.floating,
-          content: Text(message ?? 'Meldung konnte nicht gesendet werden'),
-        ),
+      showPintSnackBar(
+        context,
+        message ?? 'Meldung konnte nicht gesendet werden',
+        isError: true,
       );
     }
   }
@@ -270,7 +263,7 @@ class _ReportPostReasonSheetState extends State<_ReportPostReasonSheet> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: FilledButton(
-                        onPressed: _submitting ? null : () => _submit(t),
+                        onPressed: _submitting ? null : _submit,
                         style: FilledButton.styleFrom(
                           backgroundColor: t.gold,
                           foregroundColor: t.goldInk,

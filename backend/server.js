@@ -49,6 +49,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Debug: log every incoming request
+app.use((req, res, next) => {
+  console.log(`[REQ] ${req.method} ${req.path}`);
+  next();
+});
+
 // Cache middleware: set cache headers for GET requests
 app.use((req, res, next) => {
   if (req.method === "GET") {

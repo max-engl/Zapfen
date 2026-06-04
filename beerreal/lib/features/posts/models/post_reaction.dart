@@ -26,3 +26,30 @@ class PostReaction {
 }
 
 const List<String> kReactionEmojis = ['🍺', '🔥', '😍', '💀'];
+
+class ReactionActor {
+  final String emoji;
+  final String userId;
+  final String username;
+  final String? avatarUrl;
+  final String? avatarColor;
+  final String? avatarInitial;
+
+  const ReactionActor({
+    required this.emoji,
+    required this.userId,
+    required this.username,
+    this.avatarUrl,
+    this.avatarColor,
+    this.avatarInitial,
+  });
+
+  factory ReactionActor.fromJson(Map<String, dynamic> json) => ReactionActor(
+    emoji: json['emoji'] as String,
+    userId: json['userId'] as String,
+    username: json['username'] as String,
+    avatarUrl: json['avatarUrl'] as String?,
+    avatarColor: json['avatarColor'] as String?,
+    avatarInitial: json['avatarInitial'] as String?,
+  );
+}

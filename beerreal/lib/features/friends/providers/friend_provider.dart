@@ -45,23 +45,39 @@ class FriendProvider extends ChangeNotifier {
       notifyListeners();
     }
 
+    bool dirty = false;
     try {
       final results = await Future.wait([
         _friendService.getFriends(),
         _friendService.getFriendRequests(),
       ]);
-      _friends = results[0] as List<ApiFriend>;
-      _requests = results[1] as List<ApiFriendRequest>;
+      final newFriends = results[0] as List<ApiFriend>;
+      final newRequests = results[1] as List<ApiFriendRequest>;
 
-      _db.saveFriends(_friends);
-      _db.saveRequests(_requests);
+      final freshFriendIds = newFriends.map((f) => f.id).toSet();
+      final currentFriendIds = _friends.map((f) => f.id).toSet();
+      final freshRequestIds = newRequests.map((r) => r.id).toSet();
+      final currentRequestIds = _requests.map((r) => r.id).toSet();
+      dirty = !setEquals(freshFriendIds, currentFriendIds) ||
+              !setEquals(freshRequestIds, currentRequestIds);
+
+      if (dirty) {
+        _friends = newFriends;
+        _requests = newRequests;
+        _db.saveFriends(_friends);
+        _db.saveRequests(_requests);
+      }
     } on DioException catch (e) {
       _error = _extractError(e);
+      dirty = true;
     } catch (_) {
       _error = 'Could not load friends.';
+      dirty = true;
     } finally {
-      _loading = false;
-      notifyListeners();
+      if (_loading || dirty) {
+        _loading = false;
+        notifyListeners();
+      }
     }
   }
 

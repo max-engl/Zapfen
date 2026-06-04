@@ -5,10 +5,13 @@ import 'package:fullscreen_image_viewer/fullscreen_image_viewer.dart'
 import 'package:provider/provider.dart';
 import '../core/app_cache_manager.dart';
 import '../theme.dart';
+import '../features/achievements/models/achievement.dart';
+import '../features/achievements/services/achievement_service.dart';
 import '../features/friends/models/api_friend.dart';
 import '../features/posts/models/feed_post.dart';
 import '../features/posts/services/post_service.dart';
 import '../features/posts/providers/feed_provider.dart';
+import '../widgets/achievement_strip.dart';
 import '../widgets/avatar.dart';
 import '../widgets/post_card.dart';
 import '../widgets/shimmer_box.dart';
@@ -39,16 +42,73 @@ class FriendProfileScreen extends StatefulWidget {
   State<FriendProfileScreen> createState() => _FriendProfileScreenState();
 }
 
-class _FriendProfileScreenState extends State<FriendProfileScreen> {
+class _FriendProfileScreenState extends State<FriendProfileScreen>
+    with TickerProviderStateMixin {
   List<FeedPost> _posts = [];
   bool _loading = true;
+  List<Achievement> _achievements = [];
+  bool _achievementsLoading = true;
   int? _selectedCell;
+  late AnimationController _entranceCtrl;
 
   @override
   void initState() {
     super.initState();
+    _entranceCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 650),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _entranceCtrl.forward());
     _loadPosts();
+    _loadAchievements();
   }
+
+  @override
+  void dispose() {
+    _entranceCtrl.dispose();
+    super.dispose();
+  }
+
+  Animation<double> _statAnim(int index) {
+    const stagger = 0.15;
+    const animSpan = 0.55;
+    final start = stagger * index;
+    return CurvedAnimation(
+      parent: _entranceCtrl,
+      curve: Interval(
+        start,
+        (start + animSpan).clamp(0.0, 1.0),
+        curve: Curves.easeOutCubic,
+      ),
+    );
+  }
+
+  int get _streak {
+    if (_posts.isEmpty) return 0;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final days = _posts
+        .map((p) => DateTime(p.createdAt.year, p.createdAt.month, p.createdAt.day))
+        .toSet()
+        .toList()
+      ..sort((a, b) => b.compareTo(a));
+    if (today.difference(days.first).inDays > 1) return 0;
+    int count = 1;
+    for (int i = 1; i < days.length; i++) {
+      if (days[i - 1].difference(days[i]).inDays == 1) {
+        count++;
+      } else {
+        break;
+      }
+    }
+    return count;
+  }
+
+  int get _spots => _posts
+      .where((p) => p.lat != null && p.lng != null)
+      .map((p) => '${(p.lat! * 100).round()},${(p.lng! * 100).round()}')
+      .toSet()
+      .length;
 
   Future<void> _loadPosts() async {
     try {
@@ -59,6 +119,19 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
     } catch (_) {
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadAchievements() async {
+    try {
+      final achievements = await context
+          .read<AchievementService>()
+          .fetchForUser(widget.friend.id);
+      if (mounted) setState(() => _achievements = achievements);
+    } catch (e) {
+      debugPrint('[FriendProfile] achievements error: $e');
+    } finally {
+      if (mounted) setState(() => _achievementsLoading = false);
     }
   }
 
@@ -146,14 +219,54 @@ class _FriendProfileScreenState extends State<FriendProfileScreen> {
               ),
               const SizedBox(height: 18),
 
-              // ── Stats ──
+              // ── Stats row ──
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 18),
                 child: Row(
                   children: [
-                    _StatTile(value: _posts.length, label: 'Biere', t: t),
+                    Expanded(
+                      child: _AnimatedTile(
+                        animation: _statAnim(0),
+                        child: _StatTile(
+                          value: _streak,
+                          label: 'Serie',
+                          t: t,
+                          gold: true,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _AnimatedTile(
+                        animation: _statAnim(1),
+                        child: _StatTile(
+                          value: _posts.length,
+                          label: 'Biere',
+                          t: t,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _AnimatedTile(
+                        animation: _statAnim(2),
+                        child: _StatTile(
+                          value: _spots,
+                          label: 'Orte',
+                          t: t,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 18),
+
+              // ── Achievements ──
+              AchievementStrip(
+                achievements: _achievements,
+                loading: _achievementsLoading,
+                t: t,
               ),
               const SizedBox(height: 18),
 
@@ -615,49 +728,75 @@ class _DayTooltip extends StatelessWidget {
   }
 }
 
+// ── Entrance animation wrapper ────────────────────────────────────────────
+
+class _AnimatedTile extends StatelessWidget {
+  final Animation<double> animation;
+  final Widget child;
+  const _AnimatedTile({required this.animation, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: animation,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(-0.25, -0.25),
+          end: Offset.zero,
+        ).animate(animation),
+        child: child,
+      ),
+    );
+  }
+}
+
 // ── Stat tile ─────────────────────────────────────────────────────────────
 
 class _StatTile extends StatelessWidget {
   final int value;
   final String label;
   final PintTheme t;
+  final bool gold;
 
-  const _StatTile({required this.value, required this.label, required this.t});
+  const _StatTile({
+    required this.value,
+    required this.label,
+    required this.t,
+    this.gold = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
-        decoration: BoxDecoration(
-          color: t.surfaceWeaker,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: t.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '$value',
-              style: TextStyle(
-                color: t.text,
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.8,
-              ),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+      decoration: BoxDecoration(
+        color: gold ? t.goldFaint : t.surfaceWeaker,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: gold ? t.goldBorder : t.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$value',
+            style: TextStyle(
+              color: gold ? t.goldText : t.text,
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.8,
             ),
-            const SizedBox(height: 2),
-            Text(
-              label.toUpperCase(),
-              style: TextStyle(
-                color: t.textMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.8,
-              ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: t.textMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

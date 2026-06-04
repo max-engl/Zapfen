@@ -5,8 +5,7 @@ class FeedDatabase {
   static final instance = FeedDatabase._();
   FeedDatabase._();
 
-  static const _kCreateSql = '''
-CREATE TABLE posts (
+  static const _kPostSchema = '''
   id TEXT PRIMARY KEY,
   sort_order INTEGER NOT NULL,
   user_id TEXT NOT NULL,
@@ -33,8 +32,10 @@ CREATE TABLE posts (
   created_at TEXT NOT NULL,
   lat REAL,
   lng REAL
-)
 ''';
+
+  static const _kCreateSql = 'CREATE TABLE posts ($_kPostSchema)';
+  static const _kCreateProfileSql = 'CREATE TABLE profile_posts ($_kPostSchema)';
 
   Database? _db;
 
@@ -46,12 +47,17 @@ CREATE TABLE posts (
     final dir = await getDatabasesPath();
     return openDatabase(
       '$dir/pint_feed.db',
-      version: 6,
-      onCreate: (db, _) => db.execute(_kCreateSql),
+      version: 7,
+      onCreate: (db, _) async {
+        await db.execute(_kCreateSql);
+        await db.execute(_kCreateProfileSql);
+      },
       onUpgrade: (db, oldVersion, newVersion) async {
         // Cache is non-critical — always rebuild to the correct schema.
         await db.execute('DROP TABLE IF EXISTS posts');
+        await db.execute('DROP TABLE IF EXISTS profile_posts');
         await db.execute(_kCreateSql);
+        await db.execute(_kCreateProfileSql);
       },
     );
   }
@@ -84,6 +90,32 @@ CREATE TABLE posts (
     } catch (_) {
       // Silently ignore write failures — network will refresh on next load.
     }
+  }
+
+  Future<List<FeedPost>> loadProfilePosts() async {
+    try {
+      final db = await _database;
+      final rows = await db.query('profile_posts', orderBy: 'sort_order ASC');
+      return rows.map((r) => FeedPost.fromSqliteRow(r)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> saveProfilePosts(List<FeedPost> posts) async {
+    try {
+      final db = await _database;
+      final batch = db.batch();
+      batch.delete('profile_posts');
+      for (var i = 0; i < posts.length; i++) {
+        batch.insert(
+          'profile_posts',
+          posts[i].toSqliteRow(i),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
+    } catch (_) {}
   }
 
   Future<void> clear() async {

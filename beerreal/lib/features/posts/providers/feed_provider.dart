@@ -70,21 +70,31 @@ class FeedProvider extends ChangeNotifier {
       }
     }
 
+    bool dirty = false;
     try {
       final result = await _postService.getFeed(page: 1, limit: _pageSize);
-      _posts = result.posts;
+      final freshIds = result.posts.map((p) => p.id).join(',');
+      final currentIds = _posts.map((p) => p.id).join(',');
+      dirty = freshIds != currentIds || result.hasMore != _hasMore;
+
+      if (dirty) {
+        _posts = result.posts;
+        _feedDb.savePosts(_posts);
+        _prefetchImages(_posts);
+      }
       _hasMore = result.hasMore;
       _page = 1;
-
-      _feedDb.savePosts(_posts);
-      _prefetchImages(_posts);
     } on DioException catch (e) {
       _error = _extractError(e);
+      dirty = true;
     } catch (e) {
       _error = 'Could not load feed.';
+      dirty = true;
     } finally {
-      _loading = false;
-      notifyListeners();
+      if (_loading || dirty) {
+        _loading = false;
+        notifyListeners();
+      }
     }
   }
 

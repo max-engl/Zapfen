@@ -7,12 +7,14 @@ class PintBottomNav extends StatelessWidget {
   final PintScreen current;
   final ValueChanged<PintScreen> onSelect;
   final VoidCallback onCapture;
+  final int pendingRequests;
 
   const PintBottomNav({
     super.key,
     required this.current,
     required this.onSelect,
     required this.onCapture,
+    this.pendingRequests = 0,
   });
 
   @override
@@ -47,6 +49,7 @@ class PintBottomNav extends StatelessWidget {
                 label: 'Freunde',
                 active: current == PintScreen.friends,
                 onTap: () => onSelect(PintScreen.friends),
+                badge: pendingRequests > 0,
               ),
               _Tab(
                 icon: Icons.person_outline,
@@ -69,12 +72,14 @@ class _Tab extends StatefulWidget {
   final String label;
   final bool active;
   final VoidCallback onTap;
+  final bool badge;
 
   const _Tab({
     required this.icon,
     required this.label,
     required this.active,
     required this.onTap,
+    this.badge = false,
   });
 
   @override
@@ -121,7 +126,26 @@ class _TabState extends State<_Tab> with SingleTickerProviderStateMixin {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(widget.icon, size: 24, color: color),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(widget.icon, size: 24, color: color),
+                  if (widget.badge)
+                    Positioned(
+                      right: -3,
+                      top: -2,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: t.gold,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: t.bg, width: 1.5),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
               const SizedBox(height: 3),
               Text(
                 widget.label,
