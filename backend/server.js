@@ -49,27 +49,25 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Debug: log every incoming request
+// Cache middleware: set cache headers for GET requests (only on successful responses)
 app.use((req, res, next) => {
-  console.log(`[REQ] ${req.method} ${req.path}`);
-  next();
-});
-
-// Cache middleware: set cache headers for GET requests
-app.use((req, res, next) => {
-  if (req.method === "GET") {
-    // Cache feed and posts for 1 hour (3600 seconds)
-    if (req.path.includes("/posts")) {
-      res.set("Cache-Control", "public, max-age=3600");
-    }
-    // Default cache for other GET requests
-    else {
-      res.set("Cache-Control", "public, max-age=1800");
-    }
-  } else {
-    // Don't cache POST/PUT/DELETE
+  if (req.method !== "GET") {
     res.set("Cache-Control", "no-cache, no-store, must-revalidate");
+    return next();
   }
+  const origJson = res.json.bind(res);
+  res.json = function (data) {
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      if (req.path.includes("/posts")) {
+        res.set("Cache-Control", "public, max-age=3600");
+      } else {
+        res.set("Cache-Control", "public, max-age=1800");
+      }
+    } else {
+      res.set("Cache-Control", "no-store");
+    }
+    return origJson(data);
+  };
   next();
 });
 

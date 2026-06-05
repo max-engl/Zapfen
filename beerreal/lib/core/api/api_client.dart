@@ -18,8 +18,7 @@ class ApiClient {
           connectTimeout: const Duration(seconds: 10),
           receiveTimeout: const Duration(seconds: 15),
           headers: {
-            // Enable aggressive caching
-            'Cache-Control': 'max-age=3600',
+            'Cache-Control': 'no-cache',
           },
         ),
       ) {

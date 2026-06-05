@@ -430,10 +430,4 @@ router.get("/user/:userId", authMiddleware, async (req, res) => {
     }
 });
 
-// Debug catch-all — logs any path the achievement router sees but doesn't handle
-router.use((req, res, next) => {
-    console.log(`[achievements] unmatched: ${req.method} ${req.path}`);
-    next();
-});
-
 module.exports = router;

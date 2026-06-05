@@ -41,10 +41,9 @@ class AuthService {
     final token = await _tokenStorage.getAccessToken();
     if (token == null) return null;
     try {
+      print("TOKEN: " + token);
       final response = await _client.dio.get(ApiConstants.me);
-      return AppUser.fromJson(
-        response.data['user'] as Map<String, dynamic>,
-      );
+      return AppUser.fromJson(response.data['user'] as Map<String, dynamic>);
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
         await _tokenStorage.clear();
