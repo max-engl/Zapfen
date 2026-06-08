@@ -48,9 +48,12 @@ reportRouter.post("/posts/:postId", authMiddleware, async (req, res) => {
 const adminRouter = express.Router();
 adminRouter.use(authMiddleware, adminMiddleware);
 
-// GET /admin/stats — overview: total users, total posts, all users list
+// GET /admin/stats — overview: total users, total posts, paginated users list
 adminRouter.get("/stats", async (req, res) => {
     try {
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+
         const [totalUsers, totalPosts, pendingReports, users] = await Promise.all([
             User.countDocuments(),
             Post.countDocuments(),
@@ -58,6 +61,8 @@ adminRouter.get("/stats", async (req, res) => {
             User.find()
                 .select("username email role avatarColor avatarInitial createdAt")
                 .sort({ createdAt: -1 })
+                .skip((page - 1) * limit)
+                .limit(limit)
                 .lean(),
         ]);
 
@@ -73,7 +78,7 @@ adminRouter.get("/stats", async (req, res) => {
             postCount: postCountMap[u._id.toString()] || 0,
         }));
 
-        res.json({ totalUsers, totalPosts, pendingReports, users: usersWithCounts });
+        res.json({ totalUsers, totalPosts, pendingReports, users: usersWithCounts, page, limit });
     } catch (error) {
         res.status(500).json({ message: "Could not load stats", error: error.message });
     }

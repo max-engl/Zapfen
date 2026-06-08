@@ -17,10 +17,22 @@ import '../widgets/stagger_item.dart';
 import 'edit_profile_screen.dart';
 import 'post_detail_screen.dart';
 
+// Total cells shown in the activity heatmap (12 weeks × 7 days)
+const int _kHeatmapCells = 84;
+
+int _drinkLevel(int count) {
+  if (count <= 0) return 0;
+  if (count == 1) return 1;
+  if (count <= 3) return 2;
+  if (count <= 6) return 3;
+  if (count <= 9) return 4;
+  return 5;
+}
+
 DateTime _cellIndexToDay(int cellIndex) {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
-  return today.subtract(Duration(days: 83 - cellIndex));
+  return today.subtract(Duration(days: (_kHeatmapCells - 1) - cellIndex));
 }
 
 List<FeedPost> _postsForCell(List<FeedPost> posts, int? selectedCell) {
@@ -249,7 +261,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       style: TextStyle(color: t.textMuted, fontSize: 11),
                     ),
                     ...List.generate(
-                      4,
+                      6,
                       (i) => Container(
                         width: 10,
                         height: 10,
@@ -562,10 +574,7 @@ class _HeatmapGridState extends State<_HeatmapGrid>
                               ? (widget.t.isDark
                                     ? const Color(0xFF6B7280)
                                     : const Color(0xFF9CA3AF))
-                              : widget.t.streakCell[v.clamp(
-                                  0,
-                                  widget.t.streakCell.length - 1,
-                                )],
+                              : widget.t.streakCell[_drinkLevel(v)],
                           borderRadius: BorderRadius.circular(3),
                         ),
                       ),

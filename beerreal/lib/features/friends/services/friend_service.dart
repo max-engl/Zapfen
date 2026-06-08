@@ -54,4 +54,12 @@ class FriendService {
   Future<void> acceptInviteToken(String token) async {
     await _client.dio.post(ApiConstants.acceptInvite(token));
   }
+
+  Future<List<FriendRecommendation>> getRecommendations() async {
+    final response = await _client.dio.get(ApiConstants.friendRecommendations);
+    final list = response.data['recommendations'] as List<dynamic>;
+    return list
+        .map((e) => FriendRecommendation.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
 }

@@ -5,6 +5,7 @@ const Friend = require("../models/Friend");
 const User = require("../models/User");
 const authMiddleware = require("../middleware/authMiddleware");
 const { sendToUser, saveNotification } = require("../services/notificationService");
+const { getRecommendations } = require("../utils/friends");
 
 const router = express.Router();
 
@@ -191,6 +192,42 @@ router.get("/requests", authMiddleware, async (req, res) => {
     }
 });
 
+// GET /friends/recommendations  —  mutual-friend-based suggestions
+router.get("/recommendations", authMiddleware, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+        const ranked = await getRecommendations(req.user._id, limit);
+
+        if (ranked.length === 0) {
+            return res.json({ recommendations: [] });
+        }
+
+        const ids = ranked.map(([id]) => id);
+        const users = await User.find({ _id: { $in: ids } }).select(
+            "username avatarUrl avatarColor avatarInitial"
+        );
+
+        const userMap = Object.fromEntries(users.map((u) => [u._id.toString(), u]));
+        const recommendations = ranked
+            .filter(([id]) => userMap[id])
+            .map(([id, mutual]) => {
+                const u = userMap[id];
+                return {
+                    id: u._id,
+                    username: u.username,
+                    avatarUrl: u.avatarUrl ?? null,
+                    avatarColor: u.avatarColor ?? null,
+                    avatarInitial: u.avatarInitial ?? null,
+                    mutualCount: mutual,
+                };
+            });
+
+        res.json({ recommendations });
+    } catch (error) {
+        res.status(500).json({ message: "Could not fetch recommendations", error: error.message });
+    }
+});
+
 // GET /friends/invite  —  get (or lazily create) the caller's invite token
 router.get("/invite", authMiddleware, async (req, res) => {
     try {
@@ -202,10 +239,10 @@ router.get("/invite", authMiddleware, async (req, res) => {
                 { new: true }
             );
         }
+        const baseUrl = process.env.BASE_URL || "http://localhost:3000";
         res.json({
             token: user.inviteToken,
-            // HTTP URL so the camera app can scan it and open Safari → custom scheme
-            link: `http://${req.headers.host}/invite/${user.inviteToken}`,
+            link: `${baseUrl}/invite/${user.inviteToken}`,
         });
     } catch (error) {
         res.status(500).json({ message: "Could not get invite token", error: error.message });

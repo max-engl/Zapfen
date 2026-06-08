@@ -314,12 +314,15 @@ class AchievementBadgeMedal extends StatelessWidget {
             ),
             if (!earned) ...[
               const SizedBox(height: 3),
-              Text(
-                '${achievement.have.clamp(0, goal)}/$goal',
-                style: TextStyle(
-                  color: locked ? t.textFaint : t.goldText,
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w800,
+              SizedBox(
+                height: 14,
+                child: Text(
+                  '${achievement.have.clamp(0, goal)}/$goal',
+                  style: TextStyle(
+                    color: locked ? t.textFaint : t.goldText,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ],

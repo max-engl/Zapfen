@@ -116,6 +116,10 @@ class AuthProvider extends ChangeNotifier {
     if (data is Map) {
       return data['message'] as String? ?? 'Request failed.';
     }
+    if (e.response == null) {
+      debugPrint('[auth] connection error type=${e.type} msg=${e.message}');
+      return 'Keine Verbindung zum Server. Bitte überprüfe deine Internetverbindung.';
+    }
     return 'Request failed.';
   }
 }

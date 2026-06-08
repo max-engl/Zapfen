@@ -53,7 +53,17 @@ class _FeedScreenState extends State<FeedScreen> {
   }
 
   void _precacheIncoming(List<FeedPost> posts) {
-    for (final post in posts) {
+    // Only precache a window of posts around the current scroll position to
+    // prevent unbounded memory growth as the user scrolls through a long feed.
+    const windowSize = 10;
+    final currentIndex = _scrollController.hasClients
+        ? (_scrollController.position.pixels / 600).floor()
+        : 0;
+    final lo = (currentIndex - 2).clamp(0, posts.length);
+    final hi = (currentIndex + windowSize).clamp(0, posts.length);
+
+    for (int i = lo; i < hi; i++) {
+      final post = posts[i];
       if (!_precachedIds.add(post.id)) continue;
       if (post.imageUrl.isNotEmpty) {
         precacheImage(
@@ -63,6 +73,7 @@ class _FeedScreenState extends State<FeedScreen> {
             cacheManager: AppCacheManager.instance,
           ),
           context,
+          onError: (_, __) {},
         );
       }
       if (post.selfieUrl.isNotEmpty) {
@@ -73,8 +84,14 @@ class _FeedScreenState extends State<FeedScreen> {
             cacheManager: AppCacheManager.instance,
           ),
           context,
+          onError: (_, __) {},
         );
       }
+    }
+
+    // Evict stale IDs so the set doesn't grow unboundedly across feed refreshes
+    if (_precachedIds.length > 60) {
+      _precachedIds.clear();
     }
   }
 
@@ -228,6 +245,32 @@ class _FeedScreenState extends State<FeedScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Center(
                   child: PintDots(color: t.gold, dotSize: 6, spacing: 5),
+                ),
+              );
+            }
+            if (feed.loadMoreFailed) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                child: GestureDetector(
+                  onTap: () => feed.retryLoadMore(),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: t.surfaceWeak,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: t.border),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Laden fehlgeschlagen – tippe zum Wiederholen',
+                        style: TextStyle(
+                          color: t.textMuted,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               );
             }

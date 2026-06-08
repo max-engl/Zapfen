@@ -12,6 +12,7 @@ const supabase = require("../config/supabase");
 const upload = require("../middleware/uploadMiddleware");
 const authMiddleware = require("../middleware/authMiddleware");
 const { sendToUsers, sendToUser, saveNotification, saveNotifications } = require("../services/notificationService");
+const { getFriendIds } = require("../utils/friends");
 
 const router = express.Router();
 const ALLOWED_REACTIONS = new Set(["🍺", "🔥", "😍", "💀"]);
@@ -30,17 +31,6 @@ async function createSignedPostUrl(storagePath) {
     }
 
     return data.signedUrl;
-}
-
-async function getFriendIds(userId) {
-    const friendships = await Friend.find({
-        $or: [{ requester: userId }, { recipient: userId }],
-        status: "accepted",
-    }).select("requester recipient");
-
-    return friendships.map((f) =>
-        f.requester.toString() === userId.toString() ? f.recipient : f.requester
-    );
 }
 
 async function getLikedSet(userId, postIds) {
@@ -162,6 +152,9 @@ router.post(
             const parsedLat = parseFloat(lat);
             const parsedLng = parseFloat(lng);
             const hasLocation = !isNaN(parsedLat) && !isNaN(parsedLng);
+            if (hasLocation && (parsedLat < -90 || parsedLat > 90 || parsedLng < -180 || parsedLng > 180)) {
+                return res.status(400).json({ message: "Invalid coordinates: lat must be -90..90, lng must be -180..180" });
+            }
             const parsedRating = Number.parseInt(rating, 10);
             const hasRating = rating !== undefined && rating !== null && rating !== "";
             if (hasRating && (!Number.isInteger(parsedRating) || parsedRating < 1 || parsedRating > 5)) {
@@ -264,7 +257,7 @@ router.post(
                         }
                     }
                 }
-            }).catch(() => {});
+            }).catch((err) => console.error("Post fan-out failed:", err.message));
         } catch (error) {
             res.status(500).json({ message: "Post upload failed", error: error.message });
         }
@@ -422,23 +415,31 @@ router.get("/map", authMiddleware, async (req, res) => {
 // POST /posts/:id/like  —  toggle like/unlike
 router.post("/:id/like", authMiddleware, async (req, res) => {
     try {
-        const post = await Post.findById(req.params.id);
+        const post = await Post.findById(req.params.id).select("_id stats.likes");
         if (!post) return res.status(404).json({ message: "Post not found" });
 
         const existing = await Like.findOne({ user: req.user._id, post: post._id });
         let liked;
+        let updated;
         if (existing) {
             await existing.deleteOne();
-            post.stats.likes = Math.max(0, post.stats.likes - 1);
+            updated = await Post.findByIdAndUpdate(
+                post._id,
+                { $inc: { "stats.likes": -1 } },
+                { new: true, select: "stats.likes" }
+            );
             liked = false;
         } else {
             await Like.create({ user: req.user._id, post: post._id });
-            post.stats.likes += 1;
+            updated = await Post.findByIdAndUpdate(
+                post._id,
+                { $inc: { "stats.likes": 1 } },
+                { new: true, select: "stats.likes" }
+            );
             liked = true;
         }
-        await post.save();
 
-        res.json({ liked, likes: post.stats.likes });
+        res.json({ liked, likes: Math.max(0, updated.stats.likes) });
     } catch (error) {
         res.status(500).json({ message: "Could not toggle like", error: error.message });
     }
@@ -499,7 +500,7 @@ router.post("/:id/reactions", authMiddleware, async (req, res) => {
             const oldEmoji = existing.emoji;
             if (oldEmoji === emoji) {
                 await existing.deleteOne();
-                post.stats.reactions = Math.max(0, (post.stats.reactions || 0) - 1);
+                await Post.findByIdAndUpdate(post._id, { $inc: { "stats.reactions": -1 } });
             } else {
                 existing.emoji = emoji;
                 await existing.save();
@@ -507,10 +508,10 @@ router.post("/:id/reactions", authMiddleware, async (req, res) => {
             }
         } else {
             await PostReaction.create({ post: post._id, user: req.user._id, emoji });
-            post.stats.reactions = (post.stats.reactions || 0) + 1;
+            await Post.findByIdAndUpdate(post._id, { $inc: { "stats.reactions": 1 } });
             myReaction = emoji;
         }
-        await post.save();
+        const updatedPost = await Post.findById(post._id).select("stats.reactions user");
 
         const allReactions = await PostReaction.find({ post: post._id });
         const counts = {};
@@ -519,23 +520,23 @@ router.post("/:id/reactions", authMiddleware, async (req, res) => {
         }
         const reactions = Object.entries(counts).map(([e, count]) => ({ emoji: e, count }));
 
-        res.json({ myReaction, reactions, totalReactions: post.stats.reactions || 0 });
+        res.json({ myReaction, reactions, totalReactions: Math.max(0, updatedPost.stats.reactions || 0) });
 
         // Notify post owner when a reaction is added or changed (not removed), never self
-        if (myReaction !== null && post.user.toString() !== req.user._id.toString()) {
-            sendToUser(post.user, {
+        if (myReaction !== null && updatedPost.user.toString() !== req.user._id.toString()) {
+            sendToUser(updatedPost.user, {
                 title: `@${req.user.username} ${myReaction}`,
                 body: "hat auf deinen Beitrag reagiert",
-                data: { type: "post", postId: post._id.toString() },
+                data: { type: "post", postId: updatedPost._id.toString() },
             }).catch(() => {});
-            saveNotification(post.user, {
+            saveNotification(updatedPost.user, {
                 type: 'cheers',
                 actorId: req.user._id,
                 actorUsername: req.user.username,
                 actorAvatarUrl: req.user.avatarUrl ?? null,
                 actorAvatarColor: req.user.avatarColor ?? null,
                 actorAvatarInitial: req.user.avatarInitial ?? null,
-                postId: post._id,
+                postId: updatedPost._id,
                 postThumbPath: post.storagePath ?? null,
             }).catch(() => {});
         }
@@ -582,16 +583,29 @@ router.get("/:id", authMiddleware, async (req, res) => {
     }
 });
 
-// POST /posts/:id/view  —  increment view count
+// POST /posts/:id/view  —  increment view count (viewer must be owner or friend)
 router.post("/:id/view", authMiddleware, async (req, res) => {
     try {
-        const post = await Post.findByIdAndUpdate(
-            req.params.id,
+        const post = await Post.findById(req.params.id).select("user stats.views");
+        if (!post) return res.status(404).json({ message: "Post not found" });
+
+        if (post.user.toString() !== req.user._id.toString()) {
+            const friendship = await Friend.findOne({
+                $or: [
+                    { requester: req.user._id, recipient: post.user },
+                    { requester: post.user, recipient: req.user._id },
+                ],
+                status: "accepted",
+            });
+            if (!friendship) return res.status(403).json({ message: "Access denied" });
+        }
+
+        const updated = await Post.findByIdAndUpdate(
+            post._id,
             { $inc: { "stats.views": 1 } },
             { new: true, select: "stats.views" }
         );
-        if (!post) return res.status(404).json({ message: "Post not found" });
-        res.json({ views: post.stats.views });
+        res.json({ views: updated.stats.views });
     } catch (error) {
         res.status(500).json({ message: "Could not record view", error: error.message });
     }

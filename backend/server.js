@@ -21,6 +21,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const appNotificationRoutes = require("./routes/appNotificationRoutes");
 const achievementRoutes = require("./routes/achievementRoutes");
 const { reportRouter, adminRouter } = require("./routes/reportRoutes");
+const { router: recapRouter, scheduleNightRecap } = require("./routes/recapRoutes");
 
 // Edit this list to change the default drinks shown to all users.
 const DEFAULT_DRINKS = [
@@ -147,8 +148,9 @@ app.use("/notify", notificationRoutes);
 app.use("/notifications", appNotificationRoutes);
 app.use("/achievements", achievementRoutes);
 app.use("/reports", reportRouter);
+app.use("/recap", recapRouter);
 app.get("/admin", (req, res) => {
-  res.sendFile(path.join(__dirname, "../admin.html"));
+  res.sendFile(path.join(__dirname, "admin.html"));
 });
 app.use("/admin", adminRouter);
 
@@ -295,6 +297,7 @@ async function startServer() {
     await migrateAvatarFields();
     await migrateInviteTokenIndex();
     await syncAdminUser();
+    scheduleNightRecap();
 
     const host = "0.0.0.0";
     const localIPv4 = getLocalIPv4();

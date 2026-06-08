@@ -84,8 +84,9 @@ router.get("/search", authMiddleware, async (req, res) => {
         if (q.length < 2) {
             return res.json({ users: [] });
         }
+        const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const users = await User.find({
-            username: { $regex: `^${q}`, $options: "i" },
+            username: { $regex: `^${escaped}`, $options: "i" },
             _id: { $ne: req.user._id },
         })
             .select("_id username avatarUrl avatarColor avatarInitial")
@@ -139,6 +140,10 @@ router.patch(
             const { data } = supabase.storage
                 .from(process.env.SUPABASE_AVATAR_BUCKET)
                 .getPublicUrl(storagePath);
+
+            if (!data?.publicUrl) {
+                return res.status(500).json({ message: "Could not retrieve avatar URL from storage" });
+            }
 
             const user = await User.findByIdAndUpdate(
                 req.user._id,

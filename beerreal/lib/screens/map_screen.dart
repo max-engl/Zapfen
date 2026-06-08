@@ -254,16 +254,22 @@ class _MapScreenState extends State<MapScreen> {
                 // Post pins
                 ..._posts
                     .where((post) => post.lat != null && post.lng != null)
-                    .map(
-                      (post) => Marker(
+                    .map((post) {
+                      final isRecent =
+                          DateTime.now().difference(post.createdAt).inHours <
+                          24;
+                      return Marker(
                         point: ll.LatLng(post.lat!, post.lng!),
-                        width: 110,
-                        height: 44,
-                        alignment: Alignment.bottomCenter,
+                        width: isRecent ? 110 : 18,
+                        height: isRecent ? 44 : 18,
+                        alignment: isRecent
+                            ? Alignment.bottomCenter
+                            : Alignment.center,
                         rotate: true,
                         child: _PostPin(
                           post: post,
                           t: t,
+                          isRecent: isRecent,
                           selected: _selected?.id == post.id,
                           onTap: () {
                             final point = ll.LatLng(post.lat!, post.lng!);
@@ -274,8 +280,8 @@ class _MapScreenState extends State<MapScreen> {
                             });
                           },
                         ),
-                      ),
-                    ),
+                      );
+                    }),
                 // Achievement locations
                 ..._achievementTargets.map(
                   (target) => Marker(
@@ -472,18 +478,51 @@ class _UserDot extends StatelessWidget {
 class _PostPin extends StatelessWidget {
   final FeedPost post;
   final PintTheme t;
+  final bool isRecent;
   final bool selected;
   final VoidCallback onTap;
 
   const _PostPin({
     required this.post,
     required this.t,
+    required this.isRecent,
     required this.selected,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (!isRecent) {
+      return GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: 18,
+          height: 18,
+          decoration: BoxDecoration(
+            color: selected ? t.gold : t.pinBg,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected ? Colors.white : t.gold,
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.22),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Icon(
+            Icons.sports_bar_outlined,
+            size: 9,
+            color: selected ? t.goldInk : t.gold,
+          ),
+        ),
+      );
+    }
+
     final bg = selected ? t.gold : t.pinBg;
     final fg = selected ? t.goldInk : Colors.white;
     final borderColor = selected ? Colors.white : t.gold;

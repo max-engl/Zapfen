@@ -1,376 +1,978 @@
 <!DOCTYPE html>
 <html lang="de">
+
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Pint — Admin</title>
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg: #0f0f0f;
-    --surface: #1a1a1a;
-    --surface2: #242424;
-    --border: #2e2e2e;
-    --text: #f0f0f0;
-    --muted: #888;
-    --faint: #555;
-    --gold: #F6B733;
-    --gold-soft: rgba(246,183,51,.12);
-    --red: #e05454;
-    --red-soft: rgba(224,84,84,.12);
-    --green: #4caf72;
-    --green-soft: rgba(76,175,114,.12);
-    --radius: 12px;
-  }
-  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; min-height: 100vh; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pint — Admin</title>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-  /* ── Login ── */
-  #login-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-  .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 40px 32px; width: 340px; }
-  .login-card h1 { font-size: 22px; font-weight: 800; margin-bottom: 6px; letter-spacing: -.4px; }
-  .login-card p { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
-  .field { margin-bottom: 14px; }
-  .field label { display: block; font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .06em; }
-  .field input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 11px 14px; color: var(--text); font-size: 14px; outline: none; transition: border-color .15s; }
-  .field input:focus { border-color: var(--gold); }
-  .btn-primary { width: 100%; background: var(--gold); color: #1a1000; border: none; border-radius: 12px; padding: 13px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; letter-spacing: -.1px; transition: opacity .15s; }
-  .btn-primary:hover { opacity: .88; }
-  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-  .error-msg { color: var(--red); font-size: 13px; margin-top: 10px; text-align: center; min-height: 18px; }
+    :root {
+      --bg: #0f0f0f;
+      --surface: #1a1a1a;
+      --surface2: #242424;
+      --border: #2e2e2e;
+      --text: #f0f0f0;
+      --muted: #888;
+      --faint: #555;
+      --gold: #F6B733;
+      --gold-soft: rgba(246, 183, 51, .12);
+      --red: #e05454;
+      --red-soft: rgba(224, 84, 84, .12);
+      --green: #4caf72;
+      --green-soft: rgba(76, 175, 114, .12);
+      --radius: 12px;
+    }
 
-  /* ── App shell ── */
-  #app { display: none; }
-  .top-bar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 28px; display: flex; align-items: center; gap: 0; height: 56px; }
-  .top-bar .brand { font-size: 17px; font-weight: 800; letter-spacing: -.3px; margin-right: 32px; }
-  .top-bar .brand span { color: var(--gold); }
-  .tab-btn { background: none; border: none; color: var(--muted); font-size: 14px; font-weight: 600; padding: 0 16px; height: 56px; cursor: pointer; border-bottom: 2px solid transparent; transition: color .15s, border-color .15s; }
-  .tab-btn.active { color: var(--text); border-bottom-color: var(--gold); }
-  .top-bar .spacer { flex: 1; }
-  .logout-btn { background: none; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 13px; padding: 6px 14px; cursor: pointer; transition: border-color .15s, color .15s; }
-  .logout-btn:hover { border-color: var(--red); color: var(--red); }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      min-height: 100vh;
+    }
 
-  .content { padding: 32px 28px; max-width: 1100px; margin: 0 auto; }
+    /* ── Login ── */
+    #login-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
 
-  /* ── Stat cards ── */
-  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 32px; }
-  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 20px; }
-  .stat-card .label { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 700; margin-bottom: 10px; }
-  .stat-card .value { font-size: 36px; font-weight: 800; letter-spacing: -.8px; }
-  .stat-card.gold .value { color: var(--gold); }
-  .stat-card.red .value { color: var(--red); }
+    .login-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px 32px;
+      width: 340px;
+    }
 
-  /* ── Section header ── */
-  .section-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-  .section-head h2 { font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
-  .badge { background: var(--red); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; }
-  .badge.gold { background: var(--gold); color: #1a1000; }
+    .login-card h1 {
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 6px;
+      letter-spacing: -.4px;
+    }
 
-  /* ── Filter row ── */
-  .filter-row { display: flex; gap: 8px; margin-bottom: 16px; }
-  .filter-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 12px; font-weight: 600; padding: 6px 14px; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
-  .filter-btn.active { background: var(--gold-soft); border-color: var(--gold); color: var(--gold); }
+    .login-card p {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 28px;
+    }
 
-  /* ── Table ── */
-  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { background: var(--surface2); color: var(--muted); text-align: left; padding: 11px 16px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; border-bottom: 1px solid var(--border); }
-  td { padding: 13px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-  tr:last-child td { border-bottom: none; }
-  tr:hover td { background: var(--surface2); }
+    .field {
+      margin-bottom: 14px;
+    }
 
-  /* ── Avatar chip ── */
-  .avatar { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
-  .user-cell { display: flex; align-items: center; gap: 10px; }
-  .username { font-weight: 600; }
-  .role-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px; margin-left: 6px; text-transform: uppercase; letter-spacing: .06em; }
-  .role-badge.admin { background: var(--gold-soft); color: var(--gold); }
-  .role-badge.user { background: var(--surface2); color: var(--faint); }
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
 
-  /* ── Report card ── */
-  .report-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 16px; overflow: hidden; }
-  .report-card.reviewed { opacity: .6; }
-  .report-card.dismissed { opacity: .45; }
+    .field input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 11px 14px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color .15s;
+    }
 
-  .rc-header { display: flex; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--border); background: var(--surface2); }
-  .report-status { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 99px; text-transform: uppercase; letter-spacing: .07em; }
-  .status-pending { background: var(--red-soft); color: var(--red); }
-  .status-reviewed { background: var(--green-soft); color: var(--green); }
-  .status-dismissed { background: rgba(255,255,255,.06); color: var(--faint); }
-  .rc-header-meta { font-size: 12px; color: var(--muted); }
-  .rc-header-meta strong { color: var(--text); }
+    .field input:focus {
+      border-color: var(--gold);
+    }
 
-  .rc-body { display: grid; grid-template-columns: auto 1fr; gap: 0; }
-  .rc-images { display: flex; flex-direction: column; gap: 6px; padding: 16px; background: #111; border-right: 1px solid var(--border); }
-  .rc-main-img { width: 160px; height: 213px; border-radius: 10px; object-fit: cover; background: var(--surface2); display: block; }
-  .rc-selfie-img { width: 160px; height: 60px; border-radius: 8px; object-fit: cover; background: var(--surface2); display: block; }
-  .rc-img-placeholder { width: 160px; height: 213px; border-radius: 10px; background: var(--surface2); display: flex; align-items: center; justify-content: center; color: var(--faint); font-size: 32px; }
-  .rc-img-label { font-size: 10px; color: var(--faint); text-align: center; text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
+    .btn-primary {
+      width: 100%;
+      background: var(--gold);
+      color: #1a1000;
+      border: none;
+      border-radius: 12px;
+      padding: 13px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+      letter-spacing: -.1px;
+      transition: opacity .15s;
+    }
 
-  .rc-details { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+    .btn-primary:hover {
+      opacity: .88;
+    }
 
-  .rc-post-header { display: flex; align-items: center; gap: 10px; }
-  .rc-username { font-size: 15px; font-weight: 700; }
-  .rc-drink { font-size: 13px; color: var(--gold); font-weight: 600; }
-  .rc-date { font-size: 12px; color: var(--muted); margin-left: auto; }
+    .btn-primary:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
 
-  .rc-caption { font-size: 14px; line-height: 1.55; color: var(--text); background: var(--surface2); border-radius: 8px; padding: 10px 14px; white-space: pre-wrap; word-break: break-word; }
-  .rc-no-caption { font-size: 13px; color: var(--faint); font-style: italic; }
+    .error-msg {
+      color: var(--red);
+      font-size: 13px;
+      margin-top: 10px;
+      text-align: center;
+      min-height: 18px;
+    }
 
-  .rc-stats { display: flex; gap: 20px; }
-  .rc-stat { display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--muted); font-weight: 600; }
-  .rc-stat span { font-size: 15px; }
+    /* ── App shell ── */
+    #app {
+      display: none;
+    }
 
-  .rc-reason-wrap { border-top: 1px solid var(--border); padding-top: 12px; }
-  .rc-reason-label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; margin-bottom: 6px; }
-  .rc-reason { font-size: 14px; line-height: 1.55; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+    .top-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      height: 56px;
+    }
 
-  .rc-actions { display: flex; gap: 8px; flex-wrap: wrap; border-top: 1px solid var(--border); padding: 12px 16px; background: var(--surface2); }
-  .action-btn { border: 1px solid var(--border); border-radius: 8px; background: none; color: var(--text); font-size: 12px; font-weight: 600; padding: 7px 14px; cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s, color .15s; }
-  .action-btn:hover { background: var(--surface); }
-  .action-btn.danger { border-color: var(--red); color: var(--red); }
-  .action-btn.danger:hover { background: var(--red-soft); }
-  .action-btn.success { border-color: var(--green); color: var(--green); }
-  .action-btn.success:hover { background: var(--green-soft); }
+    .top-bar .brand {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -.3px;
+      margin-right: 32px;
+    }
 
-  /* ── Empty / loading states ── */
-  .empty { text-align: center; padding: 48px 24px; color: var(--muted); font-size: 14px; }
-  .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin .7s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .loading-row { text-align: center; padding: 40px; }
+    .top-bar .brand span {
+      color: var(--gold);
+    }
 
-  /* ── Toast ── */
-  #toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 20px; font-size: 14px; font-weight: 600; opacity: 0; transition: transform .3s, opacity .3s; pointer-events: none; z-index: 999; }
-  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 600;
+      padding: 0 16px;
+      height: 56px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color .15s, border-color .15s;
+    }
 
-  /* ── Lightbox ── */
-  #lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.92); z-index: 1000; display: none; align-items: center; justify-content: center; cursor: zoom-out; }
-  #lightbox.open { display: flex; }
-  #lightbox img { max-width: min(90vw, 480px); max-height: 90vh; border-radius: 14px; object-fit: contain; box-shadow: 0 24px 80px rgba(0,0,0,.8); cursor: default; }
-  #lightbox-close { position: absolute; top: 20px; right: 24px; background: rgba(255,255,255,.1); border: none; color: #fff; font-size: 22px; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s; }
-  #lightbox-close:hover { background: rgba(255,255,255,.2); }
+    .tab-btn.active {
+      color: var(--text);
+      border-bottom-color: var(--gold);
+    }
 
-  .rc-main-img, .rc-selfie-img { cursor: zoom-in; transition: opacity .15s; }
-  .rc-main-img:hover, .rc-selfie-img:hover { opacity: .85; }
+    .top-bar .spacer {
+      flex: 1;
+    }
 
-  @media (max-width: 640px) {
-    .content { padding: 20px 16px; }
-    .rc-body { grid-template-columns: 1fr; }
-    .rc-images { flex-direction: row; border-right: none; border-bottom: 1px solid var(--border); }
-    .rc-main-img, .rc-img-placeholder { width: 100px; height: 133px; }
-    .rc-selfie-img { width: 60px; height: 80px; }
-  }
-</style>
+    .logout-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: border-color .15s, color .15s;
+    }
+
+    .logout-btn:hover {
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    .content {
+      padding: 32px 28px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* ── Stat cards ── */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 20px;
+    }
+
+    .stat-card .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--muted);
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .stat-card .value {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -.8px;
+    }
+
+    .stat-card.gold .value {
+      color: var(--gold);
+    }
+
+    .stat-card.red .value {
+      color: var(--red);
+    }
+
+    /* ── Section header ── */
+    .section-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .section-head h2 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -.2px;
+    }
+
+    .badge {
+      background: var(--red);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 99px;
+    }
+
+    .badge.gold {
+      background: var(--gold);
+      color: #1a1000;
+    }
+
+    /* ── Filter row ── */
+    .filter-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .filter-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+
+    .filter-btn.active {
+      background: var(--gold-soft);
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+
+    /* ── Table ── */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th {
+      background: var(--surface2);
+      color: var(--muted);
+      text-align: left;
+      padding: 11px 16px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-weight: 700;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 13px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background: var(--surface2);
+    }
+
+    /* ── Avatar chip ── */
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .user-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .username {
+      font-weight: 600;
+    }
+
+    .role-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 99px;
+      margin-left: 6px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .role-badge.admin {
+      background: var(--gold-soft);
+      color: var(--gold);
+    }
+
+    .role-badge.user {
+      background: var(--surface2);
+      color: var(--faint);
+    }
+
+    /* ── Report card ── */
+    .report-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+
+    .report-card.reviewed {
+      opacity: .6;
+    }
+
+    .report-card.dismissed {
+      opacity: .45;
+    }
+
+    .rc-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+
+    .report-status {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 99px;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+    }
+
+    .status-pending {
+      background: var(--red-soft);
+      color: var(--red);
+    }
+
+    .status-reviewed {
+      background: var(--green-soft);
+      color: var(--green);
+    }
+
+    .status-dismissed {
+      background: rgba(255, 255, 255, .06);
+      color: var(--faint);
+    }
+
+    .rc-header-meta {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .rc-header-meta strong {
+      color: var(--text);
+    }
+
+    .rc-body {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0;
+    }
+
+    .rc-images {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 16px;
+      background: #111;
+      border-right: 1px solid var(--border);
+    }
+
+    .rc-main-img {
+      width: 160px;
+      height: 213px;
+      border-radius: 10px;
+      object-fit: cover;
+      background: var(--surface2);
+      display: block;
+    }
+
+    .rc-selfie-img {
+      width: 160px;
+      height: 60px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: var(--surface2);
+      display: block;
+    }
+
+    .rc-img-placeholder {
+      width: 160px;
+      height: 213px;
+      border-radius: 10px;
+      background: var(--surface2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--faint);
+      font-size: 32px;
+    }
+
+    .rc-img-label {
+      font-size: 10px;
+      color: var(--faint);
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-top: 2px;
+    }
+
+    .rc-details {
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .rc-post-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .rc-username {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .rc-drink {
+      font-size: 13px;
+      color: var(--gold);
+      font-weight: 600;
+    }
+
+    .rc-date {
+      font-size: 12px;
+      color: var(--muted);
+      margin-left: auto;
+    }
+
+    .rc-caption {
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--text);
+      background: var(--surface2);
+      border-radius: 8px;
+      padding: 10px 14px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .rc-no-caption {
+      font-size: 13px;
+      color: var(--faint);
+      font-style: italic;
+    }
+
+    .rc-stats {
+      display: flex;
+      gap: 20px;
+    }
+
+    .rc-stat {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .rc-stat span {
+      font-size: 15px;
+    }
+
+    .rc-reason-wrap {
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+    }
+
+    .rc-reason-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .rc-reason {
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .rc-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      border-top: 1px solid var(--border);
+      padding: 12px 16px;
+      background: var(--surface2);
+    }
+
+    .action-btn {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: none;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 7px 14px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .15s, border-color .15s, color .15s;
+    }
+
+    .action-btn:hover {
+      background: var(--surface);
+    }
+
+    .action-btn.danger {
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    .action-btn.danger:hover {
+      background: var(--red-soft);
+    }
+
+    .action-btn.success {
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    .action-btn.success:hover {
+      background: var(--green-soft);
+    }
+
+    /* ── Empty / loading states ── */
+    .empty {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .loading-row {
+      text-align: center;
+      padding: 40px;
+    }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      opacity: 0;
+      transition: transform .3s, opacity .3s;
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Lightbox ── */
+    #lightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .92);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: zoom-out;
+    }
+
+    #lightbox.open {
+      display: flex;
+    }
+
+    #lightbox img {
+      max-width: min(90vw, 480px);
+      max-height: 90vh;
+      border-radius: 14px;
+      object-fit: contain;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, .8);
+      cursor: default;
+    }
+
+    #lightbox-close {
+      position: absolute;
+      top: 20px;
+      right: 24px;
+      background: rgba(255, 255, 255, .1);
+      border: none;
+      color: #fff;
+      font-size: 22px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background .15s;
+    }
+
+    #lightbox-close:hover {
+      background: rgba(255, 255, 255, .2);
+    }
+
+    .rc-main-img,
+    .rc-selfie-img {
+      cursor: zoom-in;
+      transition: opacity .15s;
+    }
+
+    .rc-main-img:hover,
+    .rc-selfie-img:hover {
+      opacity: .85;
+    }
+
+    @media (max-width: 640px) {
+      .content {
+        padding: 20px 16px;
+      }
+
+      .rc-body {
+        grid-template-columns: 1fr;
+      }
+
+      .rc-images {
+        flex-direction: row;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .rc-main-img,
+      .rc-img-placeholder {
+        width: 100px;
+        height: 133px;
+      }
+
+      .rc-selfie-img {
+        width: 60px;
+        height: 80px;
+      }
+    }
+  </style>
 </head>
+
 <body>
 
-<!-- Login -->
-<div id="login-wrap">
-  <div class="login-card">
-    <h1>🍺 Pint Admin</h1>
-    <p>Melde dich mit deinem Admin-Konto an.</p>
-    <div class="field"><label>E-Mail oder Nutzername</label><input type="text" id="email" placeholder="admin@example.com" /></div>
-    <div class="field"><label>Passwort</label><input type="password" id="password" placeholder="••••••••" /></div>
-    <button class="btn-primary" id="login-btn" onclick="doLogin()">Anmelden</button>
-    <div class="error-msg" id="login-error"></div>
-  </div>
-</div>
-
-<!-- App -->
-<div id="app">
-  <div class="top-bar">
-    <div class="brand">Pint <span>Admin</span></div>
-    <button class="tab-btn active" onclick="showTab('overview')">Übersicht</button>
-    <button class="tab-btn" onclick="showTab('reports')">Meldungen <span id="pending-badge" style="display:none"></span></button>
-    <button class="tab-btn" onclick="showTab('users')">Nutzer</button>
-    <div class="spacer"></div>
-    <button class="logout-btn" onclick="logout()">Abmelden</button>
-  </div>
-
-  <div class="content">
-    <!-- Overview -->
-    <div id="tab-overview">
-      <div class="stat-grid" id="stat-grid">
-        <div class="loading-row"><span class="spinner"></span></div>
-      </div>
-    </div>
-
-    <!-- Reports -->
-    <div id="tab-reports" style="display:none">
-      <div class="section-head">
-        <h2>Gemeldete Beiträge</h2>
-        <span class="badge" id="reports-count-badge">–</span>
-      </div>
-      <div class="filter-row">
-        <button class="filter-btn active" onclick="setReportFilter('all', this)">Alle</button>
-        <button class="filter-btn" onclick="setReportFilter('pending', this)">Ausstehend</button>
-        <button class="filter-btn" onclick="setReportFilter('reviewed', this)">Überprüft</button>
-        <button class="filter-btn" onclick="setReportFilter('dismissed', this)">Behalten</button>
-      </div>
-      <div id="reports-list"><div class="loading-row"><span class="spinner"></span></div></div>
-    </div>
-
-    <!-- Users -->
-    <div id="tab-users" style="display:none">
-      <div class="section-head">
-        <h2>Alle Nutzer</h2>
-        <span class="badge gold" id="users-count-badge">–</span>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Nutzer</th>
-              <th>E-Mail</th>
-              <th style="text-align:right">Beiträge</th>
-              <th>Rolle</th>
-              <th>Registriert</th>
-            </tr>
-          </thead>
-          <tbody id="users-tbody">
-            <tr><td colspan="5" class="loading-row"><span class="spinner"></span></td></tr>
-          </tbody>
-        </table>
-      </div>
+  <!-- Login -->
+  <div id="login-wrap">
+    <div class="login-card">
+      <h1>🍺 Pint Admin</h1>
+      <p>Melde dich mit deinem Admin-Konto an.</p>
+      <div class="field"><label>E-Mail oder Nutzername</label><input type="text" id="email"
+          placeholder="admin@example.com" /></div>
+      <div class="field"><label>Passwort</label><input type="password" id="password" placeholder="••••••••" /></div>
+      <button class="btn-primary" id="login-btn" onclick="doLogin()">Anmelden</button>
+      <div class="error-msg" id="login-error"></div>
     </div>
   </div>
-</div>
 
-<div id="toast"></div>
+  <!-- App -->
+  <div id="app">
+    <div class="top-bar">
+      <div class="brand">Pint <span>Admin</span></div>
+      <button class="tab-btn active" onclick="showTab('overview')">Übersicht</button>
+      <button class="tab-btn" onclick="showTab('reports')">Meldungen <span id="pending-badge"
+          style="display:none"></span></button>
+      <button class="tab-btn" onclick="showTab('users')">Nutzer</button>
+      <div class="spacer"></div>
+      <button class="logout-btn" onclick="logout()">Abmelden</button>
+    </div>
 
-<div id="lightbox" onclick="closeLightbox()">
-  <button id="lightbox-close" onclick="closeLightbox()">✕</button>
-  <img id="lightbox-img" src="" alt="Vollbild" onclick="event.stopPropagation()" />
-</div>
+    <div class="content">
+      <!-- Overview -->
+      <div id="tab-overview">
+        <div class="stat-grid" id="stat-grid">
+          <div class="loading-row"><span class="spinner"></span></div>
+        </div>
+      </div>
 
-<script>
-  const STORED_HOST = localStorage.getItem('pint_admin_host');
-  const HOST = STORED_HOST || (window.location.protocol === 'http:' || window.location.protocol === 'https:'
-    ? window.location.origin
-    : 'http://localhost:3000');
-  let TOKEN = localStorage.getItem('pint_admin_token') || '';
-  let _stats = null;
-  let _reportFilter = 'all';
+      <!-- Reports -->
+      <div id="tab-reports" style="display:none">
+        <div class="section-head">
+          <h2>Gemeldete Beiträge</h2>
+          <span class="badge" id="reports-count-badge">–</span>
+        </div>
+        <div class="filter-row">
+          <button class="filter-btn active" onclick="setReportFilter('all', this)">Alle</button>
+          <button class="filter-btn" onclick="setReportFilter('pending', this)">Ausstehend</button>
+          <button class="filter-btn" onclick="setReportFilter('reviewed', this)">Überprüft</button>
+          <button class="filter-btn" onclick="setReportFilter('dismissed', this)">Behalten</button>
+        </div>
+        <div id="reports-list">
+          <div class="loading-row"><span class="spinner"></span></div>
+        </div>
+      </div>
 
-  // ── Auth ──────────────────────────────────────────────────────────────────
+      <!-- Users -->
+      <div id="tab-users" style="display:none">
+        <div class="section-head">
+          <h2>Alle Nutzer</h2>
+          <span class="badge gold" id="users-count-badge">–</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nutzer</th>
+                <th>E-Mail</th>
+                <th style="text-align:right">Beiträge</th>
+                <th>Rolle</th>
+                <th>Registriert</th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody">
+              <tr>
+                <td colspan="5" class="loading-row"><span class="spinner"></span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 
-  async function doLogin() {
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value;
-    const btn = document.getElementById('login-btn');
-    const errEl = document.getElementById('login-error');
-    errEl.textContent = '';
-    btn.disabled = true;
-    btn.textContent = '…';
-    try {
-      const res = await fetch(`${HOST}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emailOrUsername: email, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Login fehlgeschlagen');
-      if (data.user?.role !== 'admin') throw new Error('Kein Admin-Konto');
-      TOKEN = data.token;
-      localStorage.setItem('pint_admin_token', TOKEN);
-      enterApp();
-    } catch (e) {
-      errEl.textContent = e.message;
-      btn.disabled = false;
-      btn.textContent = 'Anmelden';
-    }
-  }
+  <div id="toast"></div>
 
-  function logout() {
-    TOKEN = '';
-    localStorage.removeItem('pint_admin_token');
-    document.getElementById('app').style.display = 'none';
-    document.getElementById('login-wrap').style.display = 'flex';
-    document.getElementById('login-error').textContent = '';
-  }
+  <div id="lightbox" onclick="closeLightbox()">
+    <button id="lightbox-close" onclick="closeLightbox()">✕</button>
+    <img id="lightbox-img" src="" alt="Vollbild" onclick="event.stopPropagation()" />
+  </div>
 
-  function api(path, opts = {}) {
-    return fetch(`${HOST}${path}`, {
-      ...opts,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${TOKEN}`,
-        ...(opts.headers || {}),
-      },
-      body: opts.body ? JSON.stringify(opts.body) : undefined,
-    }).then(async r => {
-      if (r.status === 401 || r.status === 403) { logout(); throw new Error('Session abgelaufen'); }
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.message || 'Fehler');
-      return d;
-    });
-  }
+  <script>
+    const STORED_HOST = localStorage.getItem('pint_admin_host');
+    const HOST = STORED_HOST || (window.location.protocol === 'http:' || window.location.protocol === 'https:'
+      ? window.location.origin
+      : 'http://localhost:3000');
+    let TOKEN = localStorage.getItem('pint_admin_token') || '';
+    let _stats = null;
+    let _reportFilter = 'all';
 
-  // ── App entry ─────────────────────────────────────────────────────────────
+    // ── Auth ──────────────────────────────────────────────────────────────────
 
-  function enterApp() {
-    document.getElementById('login-wrap').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    loadStats();
-  }
-
-  // Auto-login if token present
-  window.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('password').addEventListener('keydown', e => {
-      if (e.key === 'Enter') doLogin();
-    });
-    if (TOKEN) {
-      api('/admin/stats').then(data => {
-        _stats = data;
+    async function doLogin() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const btn = document.getElementById('login-btn');
+      const errEl = document.getElementById('login-error');
+      errEl.textContent = '';
+      btn.disabled = true;
+      btn.textContent = '…';
+      try {
+        const res = await fetch(`${HOST}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ emailOrUsername: email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Login fehlgeschlagen');
+        if (data.user?.role !== 'admin') throw new Error('Kein Admin-Konto');
+        TOKEN = data.token;
+        localStorage.setItem('pint_admin_token', TOKEN);
         enterApp();
-      }).catch(() => {
-        TOKEN = '';
-        localStorage.removeItem('pint_admin_token');
+      } catch (e) {
+        errEl.textContent = e.message;
+        btn.disabled = false;
+        btn.textContent = 'Anmelden';
+      }
+    }
+
+    function logout() {
+      TOKEN = '';
+      localStorage.removeItem('pint_admin_token');
+      document.getElementById('app').style.display = 'none';
+      document.getElementById('login-wrap').style.display = 'flex';
+      document.getElementById('login-error').textContent = '';
+    }
+
+    function api(path, opts = {}) {
+      return fetch(`${HOST}${path}`, {
+        ...opts,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${TOKEN}`,
+          ...(opts.headers || {}),
+        },
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+      }).then(async r => {
+        if (r.status === 401 || r.status === 403) { logout(); throw new Error('Session abgelaufen'); }
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.message || 'Fehler');
+        return d;
       });
     }
-  });
 
-  // ── Tabs ──────────────────────────────────────────────────────────────────
+    // ── App entry ─────────────────────────────────────────────────────────────
 
-  function showTab(name) {
-    ['overview', 'reports', 'users'].forEach(t => {
-      document.getElementById(`tab-${t}`).style.display = t === name ? 'block' : 'none';
-    });
-    document.querySelectorAll('.tab-btn').forEach((b, i) => {
-      b.classList.toggle('active', ['overview', 'reports', 'users'][i] === name);
-    });
-    if (name === 'reports') loadReports();
-    if (name === 'users') renderUsers();
-  }
-
-  // ── Stats / Overview ──────────────────────────────────────────────────────
-
-  async function loadStats() {
-    try {
-      _stats = await api('/admin/stats');
-      renderOverview();
-      // Pre-fill users badge
-      document.getElementById('users-count-badge').textContent = _stats.totalUsers;
-      // Pending badge in tab
-      if (_stats.pendingReports > 0) {
-        const b = document.getElementById('pending-badge');
-        b.textContent = _stats.pendingReports;
-        b.style.display = 'inline';
-        b.style.background = '#e05454';
-        b.style.color = '#fff';
-        b.style.fontSize = '10px';
-        b.style.fontWeight = '700';
-        b.style.padding = '1px 7px';
-        b.style.borderRadius = '99px';
-        b.style.marginLeft = '6px';
-      }
-    } catch (e) {
-      document.getElementById('stat-grid').innerHTML = `<div class="empty">Fehler beim Laden: ${e.message}</div>`;
+    function enterApp() {
+      document.getElementById('login-wrap').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      loadStats();
     }
-  }
 
-  function renderOverview() {
-    const s = _stats;
-    document.getElementById('stat-grid').innerHTML = `
+    // Auto-login if token present
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('password').addEventListener('keydown', e => {
+        if (e.key === 'Enter') doLogin();
+      });
+      if (TOKEN) {
+        api('/admin/stats').then(data => {
+          _stats = data;
+          enterApp();
+        }).catch(() => {
+          TOKEN = '';
+          localStorage.removeItem('pint_admin_token');
+        });
+      }
+    });
+
+    // ── Tabs ──────────────────────────────────────────────────────────────────
+
+    function showTab(name) {
+      ['overview', 'reports', 'users'].forEach(t => {
+        document.getElementById(`tab-${t}`).style.display = t === name ? 'block' : 'none';
+      });
+      document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', ['overview', 'reports', 'users'][i] === name);
+      });
+      if (name === 'reports') loadReports();
+      if (name === 'users') renderUsers();
+    }
+
+    // ── Stats / Overview ──────────────────────────────────────────────────────
+
+    async function loadStats() {
+      try {
+        _stats = await api('/admin/stats');
+        renderOverview();
+        // Pre-fill users badge
+        document.getElementById('users-count-badge').textContent = _stats.totalUsers;
+        // Pending badge in tab
+        if (_stats.pendingReports > 0) {
+          const b = document.getElementById('pending-badge');
+          b.textContent = _stats.pendingReports;
+          b.style.display = 'inline';
+          b.style.background = '#e05454';
+          b.style.color = '#fff';
+          b.style.fontSize = '10px';
+          b.style.fontWeight = '700';
+          b.style.padding = '1px 7px';
+          b.style.borderRadius = '99px';
+          b.style.marginLeft = '6px';
+        }
+      } catch (e) {
+        document.getElementById('stat-grid').innerHTML = `<div class="empty">Fehler beim Laden: ${e.message}</div>`;
+      }
+    }
+
+    function renderOverview() {
+      const s = _stats;
+      document.getElementById('stat-grid').innerHTML = `
       <div class="stat-card gold">
         <div class="label">Nutzer gesamt</div>
         <div class="value">${s.totalUsers}</div>
@@ -388,19 +990,19 @@
         <div class="value">${s.totalUsers > 0 ? (s.totalPosts / s.totalUsers).toFixed(1) : '0'}</div>
       </div>
     `;
-  }
-
-  // ── Users tab ─────────────────────────────────────────────────────────────
-
-  function renderUsers() {
-    if (!_stats) { loadStats().then(renderUsers); return; }
-    const tbody = document.getElementById('users-tbody');
-    document.getElementById('users-count-badge').textContent = _stats.users.length;
-    if (_stats.users.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty">Keine Nutzer gefunden.</td></tr>';
-      return;
     }
-    tbody.innerHTML = _stats.users.map(u => `
+
+    // ── Users tab ─────────────────────────────────────────────────────────────
+
+    function renderUsers() {
+      if (!_stats) { loadStats().then(renderUsers); return; }
+      const tbody = document.getElementById('users-tbody');
+      document.getElementById('users-count-badge').textContent = _stats.users.length;
+      if (_stats.users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">Keine Nutzer gefunden.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = _stats.users.map(u => `
       <tr>
         <td>
           <div class="user-cell">
@@ -414,66 +1016,66 @@
         <td style="color:var(--muted)">${fmtDate(u.createdAt)}</td>
       </tr>
     `).join('');
-  }
-
-  // ── Reports tab ───────────────────────────────────────────────────────────
-
-  async function loadReports() {
-    const list = document.getElementById('reports-list');
-    list.innerHTML = '<div class="loading-row"><span class="spinner"></span></div>';
-    try {
-      const url = _reportFilter === 'all' ? '/admin/reports' : `/admin/reports?status=${_reportFilter}`;
-      const reports = await api(url);
-      document.getElementById('reports-count-badge').textContent = reports.length;
-      renderReports(reports);
-    } catch (e) {
-      list.innerHTML = `<div class="empty">Fehler: ${e.message}</div>`;
     }
-  }
 
-  function setReportFilter(f, btn) {
-    _reportFilter = f;
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    loadReports();
-  }
+    // ── Reports tab ───────────────────────────────────────────────────────────
 
-  function renderReports(reports) {
-    const list = document.getElementById('reports-list');
-    if (reports.length === 0) {
-      list.innerHTML = '<div class="empty">Keine Meldungen in dieser Kategorie.</div>';
-      return;
+    async function loadReports() {
+      const list = document.getElementById('reports-list');
+      list.innerHTML = '<div class="loading-row"><span class="spinner"></span></div>';
+      try {
+        const url = _reportFilter === 'all' ? '/admin/reports' : `/admin/reports?status=${_reportFilter}`;
+        const reports = await api(url);
+        document.getElementById('reports-count-badge').textContent = reports.length;
+        renderReports(reports);
+      } catch (e) {
+        list.innerHTML = `<div class="empty">Fehler: ${e.message}</div>`;
+      }
     }
-    list.innerHTML = reports.map(r => {
-      const statusClass = `status-${r.status}`;
-      const statusLabel = { pending: 'Ausstehend', reviewed: 'Überprüft', dismissed: 'Behalten' }[r.status] || r.status;
-      const postDeleted = !r.post;
-      const p = r.post || {};
-      const drinkLabel = p.drink?.emoji ? `${p.drink.emoji} ${esc(p.drink.name)}` : '';
-      const stats = p.stats || {};
 
-      const imgEl = r.postImageUrl
-        ? `<img class="rc-main-img" src="${r.postImageUrl}" alt="Post" onclick="openLightbox('${r.postImageUrl}')" title="Vollbild anzeigen" />`
-        : `<div class="rc-img-placeholder">🍺</div>`;
+    function setReportFilter(f, btn) {
+      _reportFilter = f;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadReports();
+    }
 
-      const selfieEl = r.postSelfieUrl
-        ? `<img class="rc-selfie-img" src="${r.postSelfieUrl}" alt="Selfie" onclick="openLightbox('${r.postSelfieUrl}')" title="Vollbild anzeigen" /><div class="rc-img-label">Selfie</div>`
-        : '';
+    function renderReports(reports) {
+      const list = document.getElementById('reports-list');
+      if (reports.length === 0) {
+        list.innerHTML = '<div class="empty">Keine Meldungen in dieser Kategorie.</div>';
+        return;
+      }
+      list.innerHTML = reports.map(r => {
+        const statusClass = `status-${r.status}`;
+        const statusLabel = { pending: 'Ausstehend', reviewed: 'Überprüft', dismissed: 'Behalten' }[r.status] || r.status;
+        const postDeleted = !r.post;
+        const p = r.post || {};
+        const drinkLabel = p.drink?.emoji ? `${p.drink.emoji} ${esc(p.drink.name)}` : '';
+        const stats = p.stats || {};
 
-      const captionEl = p.caption
-        ? `<div class="rc-caption">${esc(p.caption)}</div>`
-        : `<div class="rc-no-caption">Kein Caption</div>`;
+        const imgEl = r.postImageUrl
+          ? `<img class="rc-main-img" src="${r.postImageUrl}" alt="Post" onclick="openLightbox('${r.postImageUrl}')" title="Vollbild anzeigen" />`
+          : `<div class="rc-img-placeholder">🍺</div>`;
 
-      const statsEl = postDeleted ? '' : `
+        const selfieEl = r.postSelfieUrl
+          ? `<img class="rc-selfie-img" src="${r.postSelfieUrl}" alt="Selfie" onclick="openLightbox('${r.postSelfieUrl}')" title="Vollbild anzeigen" /><div class="rc-img-label">Selfie</div>`
+          : '';
+
+        const captionEl = p.caption
+          ? `<div class="rc-caption">${esc(p.caption)}</div>`
+          : `<div class="rc-no-caption">Kein Caption</div>`;
+
+        const statsEl = postDeleted ? '' : `
         <div class="rc-stats">
           <div class="rc-stat"><span>👁</span>${stats.views ?? 0} Aufrufe</div>
           <div class="rc-stat"><span>💬</span>${stats.comments ?? 0} Kommentare</div>
           <div class="rc-stat"><span>⚡</span>${stats.reactions ?? 0} Reaktionen</div>
         </div>`;
 
-      const postInfo = postDeleted
-        ? `<div style="color:var(--red);font-size:13px;font-weight:600">⚠ Beitrag wurde bereits gelöscht</div>`
-        : `
+        const postInfo = postDeleted
+          ? `<div style="color:var(--red);font-size:13px;font-weight:600">⚠ Beitrag wurde bereits gelöscht</div>`
+          : `
           <div class="rc-post-header">
             <div class="avatar" style="background:${r.reportedUser?.avatarColor}20;color:${r.reportedUser?.avatarColor}">${r.reportedUser?.avatarInitial ?? '?'}</div>
             <span class="rc-username">@${esc(r.reportedUser?.username || '?')}</span>
@@ -483,7 +1085,7 @@
           ${captionEl}
           ${statsEl}`;
 
-      return `
+        return `
         <div class="report-card ${r.status}" id="rc-${r._id}">
           <div class="rc-header">
             <span class="report-status ${statusClass}">${statusLabel}</span>
@@ -517,82 +1119,83 @@
           </div>
         </div>
       `;
-    }).join('');
-  }
-
-  async function updateReport(reportId, status) {
-    try {
-      await api(`/admin/reports/${reportId}`, { method: 'PUT', body: { status } });
-      showToast('Status aktualisiert');
-      loadReports();
-      loadStats();
-    } catch (e) {
-      showToast('Fehler: ' + e.message);
+      }).join('');
     }
-  }
 
-  async function deleteReport(reportId) {
-    if (!confirm('Meldung endgültig löschen?')) return;
-    try {
-      await api(`/admin/reports/${reportId}`, { method: 'DELETE' });
-      showToast('Meldung gelöscht');
-      loadReports();
-      loadStats();
-    } catch (e) {
-      showToast('Fehler: ' + e.message);
+    async function updateReport(reportId, status) {
+      try {
+        await api(`/admin/reports/${reportId}`, { method: 'PUT', body: { status } });
+        showToast('Status aktualisiert');
+        loadReports();
+        loadStats();
+      } catch (e) {
+        showToast('Fehler: ' + e.message);
+      }
     }
-  }
 
-  async function deletePost(reportId, postId) {
-    if (!confirm('Beitrag unwiderruflich löschen? Alle Reaktionen und Kommentare werden ebenfalls gelöscht.')) return;
-    try {
-      await api(`/admin/posts/${postId}`, { method: 'DELETE' });
-      showToast('Beitrag gelöscht');
-      loadReports();
-      loadStats();
-    } catch (e) {
-      showToast('Fehler: ' + e.message);
+    async function deleteReport(reportId) {
+      if (!confirm('Meldung endgültig löschen?')) return;
+      try {
+        await api(`/admin/reports/${reportId}`, { method: 'DELETE' });
+        showToast('Meldung gelöscht');
+        loadReports();
+        loadStats();
+      } catch (e) {
+        showToast('Fehler: ' + e.message);
+      }
     }
-  }
 
-  // ── Lightbox ─────────────────────────────────────────────────────────────
+    async function deletePost(reportId, postId) {
+      if (!confirm('Beitrag unwiderruflich löschen? Alle Reaktionen und Kommentare werden ebenfalls gelöscht.')) return;
+      try {
+        await api(`/admin/posts/${postId}`, { method: 'DELETE' });
+        showToast('Beitrag gelöscht');
+        loadReports();
+        loadStats();
+      } catch (e) {
+        showToast('Fehler: ' + e.message);
+      }
+    }
 
-  function openLightbox(src) {
-    document.getElementById('lightbox-img').src = src;
-    document.getElementById('lightbox').classList.add('open');
-    document.addEventListener('keydown', _lbKey);
-  }
+    // ── Lightbox ─────────────────────────────────────────────────────────────
 
-  function closeLightbox() {
-    document.getElementById('lightbox').classList.remove('open');
-    document.getElementById('lightbox-img').src = '';
-    document.removeEventListener('keydown', _lbKey);
-  }
+    function openLightbox(src) {
+      document.getElementById('lightbox-img').src = src;
+      document.getElementById('lightbox').classList.add('open');
+      document.addEventListener('keydown', _lbKey);
+    }
 
-  function _lbKey(e) { if (e.key === 'Escape') closeLightbox(); }
+    function closeLightbox() {
+      document.getElementById('lightbox').classList.remove('open');
+      document.getElementById('lightbox-img').src = '';
+      document.removeEventListener('keydown', _lbKey);
+    }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+    function _lbKey(e) { if (e.key === 'Escape') closeLightbox(); }
 
-  function esc(s) {
-    return String(s ?? '').replace(/[&<>"']/g, c =>
-      ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])
-    );
-  }
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
-  function fmtDate(iso) {
-    if (!iso) return '–';
-    const d = new Date(iso);
-    return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  }
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+      );
+    }
 
-  let _toastTimer;
-  function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.add('show');
-    clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
-  }
-</script>
+    function fmtDate(iso) {
+      if (!iso) return '–';
+      const d = new Date(iso);
+      return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+
+    let _toastTimer;
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(_toastTimer);
+      _toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+    }
+  </script>
 </body>
+
 </html>

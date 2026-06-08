@@ -82,6 +82,30 @@ class _FriendsScreenState extends State<FriendsScreen> {
           const SizedBox(height: 18),
         ],
 
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+          child: GestureDetector(
+            onTap: () => _openAddFriend(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: t.goldBorderStrong, width: 1.5),
+              ),
+              child: Center(
+                child: Text(
+                  '+ Freund hinzufügen',
+                  style: TextStyle(
+                    color: t.goldText,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+
         if (fp.loading && fp.friends.isEmpty && fp.requests.isEmpty)
           const _ShimmerFriendList()
         else if (fp.friends.isEmpty)
@@ -115,30 +139,6 @@ class _FriendsScreenState extends State<FriendsScreen> {
             ),
           ),
         ],
-
-        Padding(
-          padding: const EdgeInsets.all(18),
-          child: GestureDetector(
-            onTap: () => _openAddFriend(context),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: t.goldBorderStrong, width: 1.5),
-              ),
-              child: Center(
-                child: Text(
-                  '+ Freund hinzufügen',
-                  style: TextStyle(
-                    color: t.goldText,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }

@@ -36,6 +36,8 @@ import 'features/notifications/services/notification_api_service.dart';
 import 'features/notifications/providers/notification_provider.dart';
 import 'features/achievements/services/achievement_service.dart';
 import 'features/achievements/providers/achievement_provider.dart';
+import 'features/recap/services/recap_service.dart';
+import 'screens/night_recap_screen.dart';
 import 'widgets/avatar.dart';
 import 'widgets/pint_loading.dart';
 import 'widgets/top_bar.dart';
@@ -114,6 +116,7 @@ Future<void> _main() async {
   final leaderboardService = LeaderboardService(apiClient);
   final statsService = StatsService(apiClient);
   final reportService = ReportService(apiClient);
+  final recapService = RecapService(apiClient);
   final notificationApiService = NotificationApiService(apiClient);
   final achievementService = AchievementService(apiClient);
 
@@ -133,6 +136,7 @@ Future<void> _main() async {
         Provider<ProfileService>.value(value: profileService),
         Provider<PostCacheManager>.value(value: postCacheManager),
         Provider<ReportService>.value(value: reportService),
+        Provider<RecapService>.value(value: recapService),
         Provider<AchievementService>.value(value: achievementService),
         ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
         ChangeNotifierProvider<FeedProvider>(
@@ -418,6 +422,10 @@ class _PintAppState extends State<PintApp> {
         _openFriendProfile(data);
       case 'group_active':
         setState(() => _screen = PintScreen.feed);
+      case 'night_recap':
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) NightRecapScreen.show(context);
+        });
     }
   }
 

@@ -12,7 +12,9 @@ class FriendProvider extends ChangeNotifier {
 
   List<ApiFriend> _friends = [];
   List<ApiFriendRequest> _requests = [];
+  List<FriendRecommendation> _recommendations = [];
   bool _loading = false;
+  bool _recommendationsLoading = false;
   String? _error;
 
   // per-user UI state for AddFriendScreen
@@ -20,7 +22,9 @@ class FriendProvider extends ChangeNotifier {
 
   List<ApiFriend> get friends => _friends;
   List<ApiFriendRequest> get requests => _requests;
+  List<FriendRecommendation> get recommendations => _recommendations;
   bool get loading => _loading;
+  bool get recommendationsLoading => _recommendationsLoading;
   String? get error => _error;
   String? actionFor(String userId) => _userActions[userId];
 
@@ -92,7 +96,13 @@ class FriendProvider extends ChangeNotifier {
   Future<bool> acceptRequest(String userId) async {
     try {
       await _friendService.acceptFriendRequest(userId);
-      final req = _requests.firstWhere((r) => r.from.id == userId);
+      final idx = _requests.indexWhere((r) => r.from.id == userId);
+      if (idx == -1) {
+        // Request already gone (race condition / double-tap) — sync with server
+        load();
+        return true;
+      }
+      final req = _requests[idx];
       _friends = [..._friends, req.from];
       _requests.removeWhere((r) => r.from.id == userId);
       _userActions[userId] = 'accepted';
@@ -128,6 +138,21 @@ class FriendProvider extends ChangeNotifier {
       return true;
     } catch (_) {
       return false;
+    }
+  }
+
+  Future<void> loadRecommendations() async {
+    if (_recommendationsLoading) return;
+    _recommendationsLoading = true;
+    notifyListeners();
+    try {
+      final results = await _friendService.getRecommendations();
+      _recommendations = results;
+    } catch (_) {
+      _recommendations = [];
+    } finally {
+      _recommendationsLoading = false;
+      notifyListeners();
     }
   }
 

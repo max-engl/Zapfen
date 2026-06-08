@@ -33,12 +33,14 @@ class PintBottomNav extends StatelessWidget {
             children: [
               _Tab(
                 icon: Icons.grid_view_outlined,
+                activeIcon: Icons.grid_view,
                 label: 'Feed',
                 active: current == PintScreen.feed,
                 onTap: () => onSelect(PintScreen.feed),
               ),
               _Tab(
                 icon: Icons.map_outlined,
+                activeIcon: Icons.map,
                 label: 'Karte',
                 active: current == PintScreen.map,
                 onTap: () => onSelect(PintScreen.map),
@@ -46,6 +48,7 @@ class PintBottomNav extends StatelessWidget {
               _CaptureTab(onTap: onCapture),
               _Tab(
                 icon: Icons.people_outline,
+                activeIcon: Icons.people,
                 label: 'Freunde',
                 active: current == PintScreen.friends,
                 onTap: () => onSelect(PintScreen.friends),
@@ -53,6 +56,7 @@ class PintBottomNav extends StatelessWidget {
               ),
               _Tab(
                 icon: Icons.person_outline,
+                activeIcon: Icons.person,
                 label: 'Ich',
                 active: current == PintScreen.profile,
                 onTap: () => onSelect(PintScreen.profile),
@@ -69,6 +73,7 @@ class PintBottomNav extends StatelessWidget {
 
 class _Tab extends StatefulWidget {
   final IconData icon;
+  final IconData activeIcon;
   final String label;
   final bool active;
   final VoidCallback onTap;
@@ -76,6 +81,7 @@ class _Tab extends StatefulWidget {
 
   const _Tab({
     required this.icon,
+    required this.activeIcon,
     required this.label,
     required this.active,
     required this.onTap,
@@ -113,7 +119,7 @@ class _TabState extends State<_Tab> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final t = PintThemeProvider.of(context);
-    final color = widget.active ? t.text : t.textMuted;
+    final labelColor = widget.active ? t.goldText : t.textMuted;
     return Expanded(
       child: GestureDetector(
         onTap: widget.onTap,
@@ -126,35 +132,54 @@ class _TabState extends State<_Tab> with SingleTickerProviderStateMixin {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Icon(widget.icon, size: 24, color: color),
-                  if (widget.badge)
-                    Positioned(
-                      right: -3,
-                      top: -2,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: t.gold,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: t.bg, width: 1.5),
-                        ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeInOut,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                decoration: BoxDecoration(
+                  color: widget.active ? t.goldSoft : Colors.transparent,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 180),
+                      child: Icon(
+                        widget.active ? widget.activeIcon : widget.icon,
+                        key: ValueKey(widget.active),
+                        size: 22,
+                        color: widget.active ? t.goldText : t.textMuted,
                       ),
                     ),
-                ],
+                    if (widget.badge)
+                      Positioned(
+                        right: -3,
+                        top: -2,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: t.gold,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: t.bg, width: 1.5),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 3),
-              Text(
-                widget.label,
+              const SizedBox(height: 2),
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeInOut,
                 style: TextStyle(
-                  color: color,
+                  color: labelColor,
                   fontSize: 10,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: widget.active ? FontWeight.w700 : FontWeight.w600,
                   letterSpacing: -0.1,
                 ),
+                child: Text(widget.label),
               ),
             ],
           ),
@@ -215,13 +240,8 @@ class _CaptureTabState extends State<_CaptureTab>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Icon(Icons.camera_alt_outlined, size: 24, color: t.goldText),
-                ],
-              ),
-              const SizedBox(height: 3),
+              Icon(Icons.camera_alt_outlined, size: 22, color: t.goldText),
+              const SizedBox(height: 2),
               Text(
                 'Zapfen',
                 style: TextStyle(

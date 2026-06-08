@@ -27,6 +27,16 @@ const LOCATION_ACHIEVEMENTS = [
         radiusMeters: 50,
         goal: 1,
     },
+    {
+        id: "maseven",
+        icon: "streak",
+        name: "Maseven drink",
+        blurb: "Logge ein Bier im Maseven",
+        latitude: 50.0981172,
+        longitude: 8.6430633,
+        radiusMeters: 300,
+        goal: 1,
+    },
 ].map(createLocationAchievement);
 
 // Each achievement with progress tracking
@@ -35,7 +45,7 @@ const ACHIEVEMENTS = [
         id: "first",
         icon: "first",
         name: "Erste Runde",
-        blurb: "Du hast dein erstes Bier geloggt.",
+        blurb: "Du hast deinen ersten Drink geloggt.",
         getProgress: (posts) => ({
             earned: posts.length >= 1,
             date: posts.length >= 1 ? posts[posts.length - 1].createdAt : null,
@@ -45,7 +55,7 @@ const ACHIEVEMENTS = [
         id: "five_day_streak",
         icon: "streak",
         name: "Heiße Serie",
-        blurb: "Logge an 5 Tagen hintereinander ein Bier.",
+        blurb: "Logge an 5 Tagen hintereinander einen Drink.",
         getProgress: (posts) => {
             const streak = computeStreak(posts);
             return { earned: streak >= 5, have: streak, goal: 5 };
@@ -55,7 +65,7 @@ const ACHIEVEMENTS = [
         id: "first_beer_abroad",
         icon: "globe",
         name: "Erstes Auslandsbier",
-        blurb: "Logge dein erstes Bier außerhalb Deutschlands.",
+        blurb: "Logge deinen ersten Drink außerhalb Deutschlands.",
         getProgress: (posts) => {
             const post = posts.find((p) => {
                 if (p.location?.coordinates?.length !== 2) return false;
@@ -73,8 +83,8 @@ const ACHIEVEMENTS = [
     {
         id: "century",
         icon: "century",
-        name: "100 Biere",
-        blurb: "Logge insgesamt 100 Biere.",
+        name: "100 Drinks",
+        blurb: "Logge insgesamt 100 Drinks.",
         getProgress: (posts) => ({
             earned: posts.length >= 100,
             have: posts.length,
@@ -82,21 +92,10 @@ const ACHIEVEMENTS = [
         }),
     },
     {
-        id: "podium",
-        icon: "trophy",
-        name: "Auf dem Podium",
-        blurb: "Beende die Woche in deinem Kreis unter den Top 3.",
-        getProgress: () => ({
-            earned: false,
-            have: 0,
-            goal: 1,
-        }),
-    },
-    {
         id: "explorer",
         icon: "explorer",
         name: "Entdecker",
-        blurb: "Logge Bier an 20 verschiedenen Orten.",
+        blurb: "Logge Drinks an 20 verschiedenen Orten.",
         getProgress: (posts) => {
             const uniqueSpots = countUniqueSpots(posts);
             return { earned: uniqueSpots >= 20, have: uniqueSpots, goal: 20 };
@@ -119,7 +118,7 @@ const ACHIEVEMENTS = [
         id: "globe",
         icon: "globe",
         name: "Weltenbummler",
-        blurb: "Logge Bier in 5 verschiedenen Ländern.",
+        blurb: "Logge Drinks in 5 verschiedenen Ländern.",
         getProgress: (posts) => {
             const countries = countUniqueCountries(posts);
             return { earned: countries >= 5, have: countries, goal: 5 };
@@ -129,7 +128,7 @@ const ACHIEVEMENTS = [
         id: "owl",
         icon: "owl",
         name: "Nachteule",
-        blurb: "Logge 10 Biere nach Mitternacht.",
+        blurb: "Logge 10 Drinks nach Mitternacht.",
         getProgress: (posts) => {
             const nightPours = posts.filter(
                 (p) =>
@@ -143,7 +142,7 @@ const ACHIEVEMENTS = [
         id: "legend",
         icon: "crown",
         name: "Lokale Legende",
-        blurb: "Erreiche 250 geloggte Biere.",
+        blurb: "Erreiche 250 geloggte Drinks.",
         getProgress: (posts) => ({
             earned: posts.length >= 250,
             have: posts.length,

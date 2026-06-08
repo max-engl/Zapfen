@@ -720,7 +720,7 @@ class _DowChart extends StatelessWidget {
     final maxI = maxVal > 0 ? dow.indexOf(maxVal) : -1;
 
     return SizedBox(
-      height: 116,
+      height: 120,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [

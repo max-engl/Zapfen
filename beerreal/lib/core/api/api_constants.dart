@@ -1,6 +1,19 @@
 class ApiConstants {
-  static const String host = '192.168.2.228';
-  static String get baseUrl => 'http://$host:3000';
+  // Override at build time:
+  //   flutter run --dart-define=API_HOST=yourapp.com --dart-define=API_SCHEME=https --dart-define=API_PORT=443
+  static const String host = String.fromEnvironment(
+    'API_HOST',
+    defaultValue: '10.170.54.9',
+  );
+  static const String scheme = String.fromEnvironment(
+    'API_SCHEME',
+    defaultValue: 'http',
+  );
+  static const String port = String.fromEnvironment(
+    'API_PORT',
+    defaultValue: '3000',
+  );
+  static String get baseUrl => '$scheme://$host:$port';
 
   // Auth
   static const String login = '/auth/login';
@@ -24,6 +37,7 @@ class ApiConstants {
   static String sendFriendRequest(String userId) => '/friends/request/$userId';
   static String acceptFriendRequest(String userId) => '/friends/accept/$userId';
   static String removeFriend(String userId) => '/friends/$userId';
+  static const String friendRecommendations = '/friends/recommendations';
   static const String myInvite = '/friends/invite';
   static String resolveInvite(String token) => '/friends/invite/$token';
   static String acceptInvite(String token) => '/friends/invite/$token/accept';
@@ -63,6 +77,9 @@ class ApiConstants {
       '/achievements/location-targets';
   static String achievementsForUser(String userId) =>
       '/achievements/user/$userId';
+
+  // Recap
+  static const String nightRecap = '/recap/night';
 
   // Notifications
   static const String notifications = '/notifications';

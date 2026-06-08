@@ -18,7 +18,7 @@ class LeaderboardScreen extends StatefulWidget {
 
 class _LeaderboardScreenState extends State<LeaderboardScreen> {
   String _board = 'friends';
-  String _metric = 'pints';
+  String _metric = 'pints'; // 'pints' | 'drinksWk' | 'drinksMo'
 
   static String _fmtCount(int n) {
     if (n >= 1000000) {
@@ -63,7 +63,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     final countLabel = _board == 'friends'
         ? '${provider.friendEntries.length} in deinem Kreis'
         : '${_fmtCount(provider.totalUsers)} Zapfer';
-    final periodLabel = _metric == 'pints' ? 'Getränken' : 'dieser Woche';
+    final periodLabel = _metric == 'drinksWk'
+        ? 'dieser Woche'
+        : _metric == 'drinksMo'
+        ? 'diesem Monat'
+        : 'Gesamt';
 
     return Scaffold(
       backgroundColor: t.bg,
@@ -73,9 +77,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           children: [
             _LBHeader(
               onBack: () => Navigator.of(context).pop(),
-              onStats: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const StatsScreen()),
-              ),
+              onStats: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const StatsScreen())),
             ),
             Expanded(
               child: Stack(
@@ -110,6 +114,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                                   metric: _metric,
                                   onChanged: (m) => setState(() => _metric = m),
                                 ),
+
                                 if (top3.isNotEmpty)
                                   _Podium(top3: top3, metric: _metric),
                                 _SectionLabel(t: t),
@@ -123,7 +128,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                                     ),
                                   ),
                                 ),
-                                _SeasonNote(t: t),
                               ],
                             ),
                           ),
@@ -191,19 +195,7 @@ class _LBHeader extends StatelessWidget {
               ],
             ),
           ),
-          GestureDetector(
-            onTap: onStats,
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: t.surfaceWeak,
-                border: Border.all(color: t.border),
-              ),
-              child: Icon(Icons.bar_chart_rounded, size: 18, color: t.goldText),
-            ),
-          ),
+          const SizedBox(width: 36),
         ],
       ),
     );
@@ -358,8 +350,15 @@ class _MetricChips extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           _Chip(
-            label: 'Cheers · diese Woche',
-            id: 'cheersWk',
+            label: 'Diese Woche',
+            id: 'drinksWk',
+            metric: metric,
+            onChanged: onChanged,
+          ),
+          const SizedBox(width: 8),
+          _Chip(
+            label: 'Dieser Monat',
+            id: 'drinksMo',
             metric: metric,
             onChanged: onChanged,
           ),
@@ -469,7 +468,11 @@ class _PodiumColumn extends StatelessWidget {
     final isFirst = slot.rank == 1;
     final ringColor = isFirst ? t.gold : t.selfieOutline;
     // Visual order left→right: rank2=0, rank1=1, rank3=2
-    final staggerIndex = slot.rank == 2 ? 0 : slot.rank == 1 ? 1 : 2;
+    final staggerIndex = slot.rank == 2
+        ? 0
+        : slot.rank == 1
+        ? 1
+        : 2;
     const animMs = 420;
     const staggerMs = 90;
     const totalMs = animMs + staggerMs * 2;
@@ -488,102 +491,104 @@ class _PodiumColumn extends StatelessWidget {
         ),
       ),
       child: Column(
-      children: [
-        // Crown for 1st
-        SizedBox(
-          height: 28,
-          child: isFirst
-              ? Icon(Icons.workspace_premium_rounded, size: 24, color: t.gold)
-              : null,
-        ),
-        // Avatar + rank badge
-        Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.bottomCenter,
-          children: [
-            Container(
-              width: slot.avatarSize,
-              height: slot.avatarSize,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: ringColor, width: isFirst ? 3 : 2),
-              ),
-              child: ClipOval(
-                child: PintAvatar(
-                  size: slot.avatarSize,
-                  imageUrl: slot.entry.avatarUrl,
-                  avatarColor: slot.entry.avatarColor,
-                  initials: slot.entry.avatarInitial,
-                  tone: ImgTone.avatar,
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -4,
-              child: Container(
-                width: 22,
-                height: 22,
+        children: [
+          // Crown for 1st
+          SizedBox(
+            height: 28,
+            child: isFirst
+                ? Icon(Icons.workspace_premium_rounded, size: 24, color: t.gold)
+                : null,
+          ),
+          // Avatar + rank badge
+          Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.bottomCenter,
+            children: [
+              Container(
+                width: slot.avatarSize,
+                height: slot.avatarSize,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isFirst ? t.gold : t.surface,
-                  border: Border.all(color: t.bg, width: 2),
+                  border: Border.all(color: ringColor, width: isFirst ? 3 : 2),
                 ),
-                child: Center(
-                  child: Text(
-                    '${slot.rank}',
-                    style: TextStyle(
-                      color: isFirst ? t.goldInk : t.text,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
+                child: ClipOval(
+                  child: PintAvatar(
+                    size: slot.avatarSize,
+                    imageUrl: slot.entry.avatarUrl,
+                    avatarColor: slot.entry.avatarColor,
+                    initials: slot.entry.avatarInitial,
+                    tone: ImgTone.avatar,
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: -4,
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isFirst ? t.gold : t.surface,
+                    border: Border.all(color: t.bg, width: 2),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${slot.rank}',
+                      style: TextStyle(
+                        color: isFirst ? t.goldInk : t.text,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Name
+          Text(
+            slot.entry.username.split(' ').first,
+            style: TextStyle(
+              color: t.text,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.1,
             ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        // Name
-        Text(
-          slot.entry.username.split(' ').first,
-          style: TextStyle(
-            color: t.text,
-            fontSize: 12.5,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.1,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 3),
-        _MetricVal(entry: slot.entry, metric: metric, big: isFirst),
-        const SizedBox(height: 10),
-        // Pedestal
-        Container(
-          height: slot.pedestalH,
-          decoration: BoxDecoration(
-            color: isFirst ? t.gold : t.surfaceWeak,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            border: isFirst ? null : Border.all(color: t.border),
-          ),
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                '${slot.rank}',
-                style: TextStyle(
-                  color: isFirst ? t.goldInk : t.textFaint,
-                  fontSize: isFirst ? 30 : 22,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -1.5,
+          const SizedBox(height: 3),
+          _MetricVal(entry: slot.entry, metric: metric, big: isFirst),
+          const SizedBox(height: 10),
+          // Pedestal
+          Container(
+            height: slot.pedestalH,
+            decoration: BoxDecoration(
+              color: isFirst ? t.gold : t.surfaceWeak,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(12),
+              ),
+              border: isFirst ? null : Border.all(color: t.border),
+            ),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  '${slot.rank}',
+                  style: TextStyle(
+                    color: isFirst ? t.goldInk : t.textFaint,
+                    fontSize: isFirst ? 30 : 22,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -1.5,
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
       ),
     );
   }
@@ -612,18 +617,13 @@ class _MetricVal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = PintThemeProvider.of(context);
-    final isPints = metric == 'pints';
     final val = entry.valueFor(metric);
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
       children: [
-        Icon(
-          isPints ? Icons.sports_bar_rounded : Icons.celebration_rounded,
-          size: big ? 13 : 12,
-          color: t.goldText,
-        ),
+        Icon(Icons.sports_bar_rounded, size: big ? 13 : 12, color: t.goldText),
         const SizedBox(width: 3),
         Text(
           _fmt(val),
@@ -636,7 +636,7 @@ class _MetricVal extends StatelessWidget {
         ),
         const SizedBox(width: 2),
         Text(
-          isPints ? 'Biere' : '🍻',
+          'Biere',
           style: TextStyle(
             color: t.textFaint,
             fontSize: big ? 11 : 10,
@@ -827,7 +827,7 @@ class _MoveDelta extends StatelessWidget {
         children: [
           Icon(
             up ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded,
-            size: 16,
+            size: 14,
             color: col,
           ),
           Text(
@@ -836,38 +836,6 @@ class _MoveDelta extends StatelessWidget {
               color: col,
               fontSize: 11,
               fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Season note ───────────────────────────────────────────────────────────────
-
-class _SeasonNote extends StatelessWidget {
-  final PintTheme t;
-  const _SeasonNote({required this.t});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 18, 16, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: t.surfaceWeaker,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: t.border, style: BorderStyle.solid),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.emoji_events_rounded, size: 16, color: t.goldText),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Die Saison endet Sonntag. Die Top 3 deines Kreises erhalten ein goldenes Glas auf ihrem Profil.',
-              style: TextStyle(color: t.textMuted, fontSize: 12),
             ),
           ),
         ],
@@ -904,7 +872,6 @@ class _YouBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = PintThemeProvider.of(context);
-    final isPints = metric == 'pints';
     final rankLabel = board == 'global' ? '#${_fmt(rank)}' : '#$rank';
     final sub = board == 'global'
         ? (yourPercentile.isNotEmpty
@@ -1013,13 +980,7 @@ class _YouBar extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
-                    Icon(
-                      isPints
-                          ? Icons.sports_bar_rounded
-                          : Icons.celebration_rounded,
-                      size: 13,
-                      color: t.goldInk,
-                    ),
+                    Icon(Icons.sports_bar_rounded, size: 13, color: t.goldInk),
                     const SizedBox(width: 3),
                     Text(
                       _fmt(youEntry.valueFor(metric)),
@@ -1032,7 +993,7 @@ class _YouBar extends StatelessWidget {
                     ),
                     const SizedBox(width: 2),
                     Text(
-                      isPints ? 'Biere' : '🍻',
+                      'Biere',
                       style: const TextStyle(
                         color: Color(0x993A1F02),
                         fontSize: 10,

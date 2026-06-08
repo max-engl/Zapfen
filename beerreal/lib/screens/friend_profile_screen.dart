@@ -18,6 +18,15 @@ import '../widgets/shimmer_box.dart';
 import '../widgets/stagger_item.dart';
 import 'post_detail_screen.dart';
 
+int _drinkLevel(int count) {
+  if (count <= 0) return 0;
+  if (count == 1) return 1;
+  if (count <= 3) return 2;
+  if (count <= 6) return 3;
+  if (count <= 9) return 4;
+  return 5;
+}
+
 DateTime _cellIndexToDay(int cellIndex) {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
@@ -293,7 +302,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
                           style: TextStyle(color: t.textMuted, fontSize: 11),
                         ),
                         ...List.generate(
-                          4,
+                          6,
                           (i) => Container(
                             width: 10,
                             height: 10,
@@ -618,7 +627,7 @@ class _HeatmapGridState extends State<_HeatmapGrid>
                               ? (widget.t.isDark
                                     ? const Color(0xFF6B7280)
                                     : const Color(0xFF9CA3AF))
-                              : widget.t.streakCell[v.clamp(0, widget.t.streakCell.length - 1)],
+                              : widget.t.streakCell[_drinkLevel(v)],
                           borderRadius: BorderRadius.circular(3),
                         ),
                       ),

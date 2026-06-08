@@ -19,6 +19,7 @@ import '../features/posts/providers/profile_posts_provider.dart';
 import '../features/posts/services/comment_service.dart';
 import '../features/posts/services/post_service.dart';
 import '../widgets/avatar.dart';
+import '../widgets/post_card.dart' show ReactorsSheet;
 import '../widgets/report_post_sheet.dart';
 import '../widgets/shimmer_box.dart';
 
@@ -298,6 +299,7 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
                 // Reactions bar
                 SliverToBoxAdapter(
                   child: _ReactionBar(
+                    postId: _post.id,
                     reactions: _post.reactions,
                     myReaction: _post.myReaction,
                     onReact: _onReact,
@@ -810,19 +812,36 @@ class _ZoomablePhotoState extends State<_ZoomablePhoto> {
 // ── Reaction bar ──────────────────────────────────────────────────────────────
 
 class _ReactionBar extends StatelessWidget {
+  final String postId;
   final List<PostReaction> reactions;
   final String? myReaction;
   final void Function(String emoji) onReact;
 
   const _ReactionBar({
+    required this.postId,
     required this.reactions,
     required this.myReaction,
     required this.onReact,
   });
 
+  void _showReactors(BuildContext context) {
+    final svc = context.read<PostService>();
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => ReactorsSheet(
+        postId: postId,
+        reactions: reactions,
+        postService: svc,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = PintThemeProvider.of(context);
+    final totalReactions = reactions.fold(0, (sum, r) => sum + r.count);
 
     final Map<String, int> countMap = {
       for (final r in reactions) r.emoji: r.count,
@@ -877,6 +896,33 @@ class _ReactionBar extends StatelessWidget {
               ),
             );
           }),
+          if (totalReactions > 0)
+            GestureDetector(
+              onTap: () => _showReactors(context),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                decoration: BoxDecoration(
+                  color: t.surfaceWeak,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: t.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.people_outline, size: 15, color: t.textMuted),
+                    const SizedBox(width: 5),
+                    Text(
+                      '$totalReactions',
+                      style: TextStyle(
+                        color: t.textMuted,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

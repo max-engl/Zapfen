@@ -1,22 +1,12 @@
 const express = require('express');
 const Post = require('../models/Post');
-const Friend = require('../models/Friend');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
+const { getFriendIds } = require('../utils/friends');
 
 const router = express.Router();
 
 const DAY_NAMES = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
-
-async function getFriendIds(userId) {
-  const friendships = await Friend.find({
-    $or: [{ requester: userId }, { recipient: userId }],
-    status: 'accepted',
-  }).select('requester recipient');
-  return friendships.map(f =>
-    f.requester.toString() === userId.toString() ? f.recipient : f.requester
-  );
-}
 
 function utcDay(date) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));

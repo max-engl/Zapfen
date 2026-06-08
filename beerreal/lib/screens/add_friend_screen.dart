@@ -32,6 +32,7 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<FriendProvider>().load();
+      context.read<FriendProvider>().loadRecommendations();
       _loadInviteLink();
     });
   }
@@ -124,6 +125,90 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                         controller: _searchCtrl,
                         onChanged: (v) => _onQueryChanged(v, fp),
                       ),
+
+                      // Recommendations (shown when not searching)
+                      if (_query.length < 2) ...[
+                        if (fp.recommendationsLoading || fp.recommendations.isNotEmpty) ...[
+                          _SectionLabel(
+                            label: 'Vielleicht kennst du',
+                            t: t,
+                          ),
+                          if (fp.recommendationsLoading)
+                            Column(
+                              children: List.generate(
+                                3,
+                                (_) => Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 18,
+                                    vertical: 10,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const SizedBox(
+                                        width: 44,
+                                        height: 44,
+                                        child: ShimmerBox.circle(),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            SizedBox(
+                                              height: 12,
+                                              child: ShimmerBox(
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 5),
+                                            FractionallySizedBox(
+                                              widthFactor: 0.55,
+                                              child: SizedBox(
+                                                height: 10,
+                                                child: ShimmerBox(
+                                                  borderRadius:
+                                                      BorderRadius.circular(5),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      SizedBox(
+                                        width: 90,
+                                        height: 32,
+                                        child: ShimmerBox(
+                                          borderRadius:
+                                              BorderRadius.circular(999),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            ...fp.recommendations.map(
+                              (rec) => _RecommendationRow(
+                                rec: rec,
+                                t: t,
+                                actionState: fp.actionFor(rec.id),
+                                isFriend: fp.friends.any((f) => f.id == rec.id),
+                                onAdd: () async {
+                                  await fp.sendRequest(rec.id);
+                                  if (context.mounted) {
+                                    _showToast(
+                                      'Anfrage an @${rec.username} gesendet',
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                        ],
+                      ],
 
                       // Search results
                       if (_query.length >= 2) ...[
@@ -589,6 +674,111 @@ class _SearchResultRow extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 letterSpacing: -0.15,
               ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          GestureDetector(
+            onTap: requested ? null : onAdd,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: requested ? t.surfaceWeak : t.goldSoft,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: requested ? t.border : t.goldBorder),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: requested
+                    ? [
+                        Icon(Icons.check, size: 13, color: t.textMuted),
+                        const SizedBox(width: 4),
+                        Text(
+                          isFriend ? 'Befreundet' : 'Angefragt',
+                          style: TextStyle(
+                            color: t.textMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ]
+                    : [
+                        Icon(Icons.add, size: 13, color: t.goldText),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Hinzufügen',
+                          style: TextStyle(
+                            color: t.goldText,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Recommendation row ────────────────────────────────────────────────────
+
+class _RecommendationRow extends StatelessWidget {
+  final FriendRecommendation rec;
+  final String? actionState;
+  final bool isFriend;
+  final PintTheme t;
+  final VoidCallback onAdd;
+  const _RecommendationRow({
+    required this.rec,
+    required this.actionState,
+    required this.isFriend,
+    required this.t,
+    required this.onAdd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final requested = actionState == 'requested' || isFriend;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: t.divider)),
+      ),
+      child: Row(
+        children: [
+          PintAvatar(
+            size: 44,
+            imageUrl: rec.avatarUrl,
+            avatarColor: rec.avatarColor,
+            initials: rec.avatarInitial,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '@${rec.username}',
+                  style: TextStyle(
+                    color: t.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.15,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  rec.mutualCount == 1
+                      ? '1 gemeinsamer Freund'
+                      : '${rec.mutualCount} gemeinsame Freunde',
+                  style: TextStyle(
+                    color: t.textMuted,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 10),

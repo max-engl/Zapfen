@@ -556,7 +556,7 @@ class _QuickReactions extends StatelessWidget {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _ReactorsSheet(
+      builder: (_) => ReactorsSheet(
         postId: post.id,
         reactions: post.reactions,
         postService: svc,
@@ -649,22 +649,23 @@ class _QuickReactions extends StatelessWidget {
 
 // ── Who reacted sheet ─────────────────────────────────────────────────────────
 
-class _ReactorsSheet extends StatefulWidget {
+class ReactorsSheet extends StatefulWidget {
   final String postId;
   final List<PostReaction> reactions;
   final PostService postService;
 
-  const _ReactorsSheet({
+  const ReactorsSheet({
+    super.key,
     required this.postId,
     required this.reactions,
     required this.postService,
   });
 
   @override
-  State<_ReactorsSheet> createState() => _ReactorsSheetState();
+  State<ReactorsSheet> createState() => ReactorsSheetState();
 }
 
-class _ReactorsSheetState extends State<_ReactorsSheet> {
+class ReactorsSheetState extends State<ReactorsSheet> {
   List<ReactionActor>? _actors;
   // null = "Alle" (show everyone), non-null = filter by that emoji
   String? _selectedEmoji;

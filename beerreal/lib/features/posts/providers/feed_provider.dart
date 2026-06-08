@@ -26,6 +26,7 @@ class FeedProvider extends ChangeNotifier {
   bool get loading => _loading;
   bool get loadingMore => _loadingMore;
   bool get hasMore => _hasMore;
+  bool get loadMoreFailed => _loadMoreFailed;
   String? get error => _error;
   bool isLiked(String postId) =>
       _posts.any((p) => p.id == postId && p.likedByMe);
@@ -37,7 +38,9 @@ class FeedProvider extends ChangeNotifier {
     final cached = await _feedDb.loadPosts();
     if (cached.isNotEmpty) {
       _posts = cached;
-      _prefetchImages(cached);
+      // Do NOT prefetch here — cached URLs are signed and expire after 1 hour.
+      // CachedNetworkImage will serve from disk cache if available, or show
+      // a placeholder until fresh URLs arrive from the network.
       _loading = false; // data ready — hide loading state
     }
     // If cache is empty, keep _loading=true so the feed shows shimmer
@@ -66,7 +69,7 @@ class FeedProvider extends ChangeNotifier {
       if (cached.isNotEmpty) {
         _posts = cached;
         notifyListeners();
-        _prefetchImages(cached);
+        // Do not prefetch cached posts — signed URLs may be expired.
       }
     }
 
@@ -96,6 +99,12 @@ class FeedProvider extends ChangeNotifier {
         notifyListeners();
       }
     }
+  }
+
+  void retryLoadMore() {
+    _loadMoreFailed = false;
+    notifyListeners();
+    loadMore();
   }
 
   Future<void> loadMore() async {
@@ -211,20 +220,23 @@ class FeedProvider extends ChangeNotifier {
   void _prefetchImages(List<FeedPost> posts) {
     for (final post in posts) {
       if (post.imageUrl.isNotEmpty) {
-        AppCacheManager.instance.downloadFile(
-          post.imageUrl,
-          key: post.imagePath ?? post.id,
-        );
+        AppCacheManager.instance
+            .downloadFile(post.imageUrl, key: post.imagePath ?? post.id)
+            .then<void>((_) {}, onError: (_) {});
       }
       if (post.selfieUrl.isNotEmpty) {
-        AppCacheManager.instance.downloadFile(
-          post.selfieUrl,
-          key: post.selfiePath ?? '${post.id}_selfie',
-        );
+        AppCacheManager.instance
+            .downloadFile(
+              post.selfieUrl,
+              key: post.selfiePath ?? '${post.id}_selfie',
+            )
+            .then<void>((_) {}, onError: (_) {});
       }
       final avatar = post.avatarUrl;
       if (avatar != null && avatar.isNotEmpty) {
-        AppCacheManager.instance.downloadFile(avatar);
+        AppCacheManager.instance
+            .downloadFile(avatar)
+            .then<void>((_) {}, onError: (_) {});
       }
     }
   }

@@ -1,21 +1,10 @@
 const express = require('express');
 const Post = require('../models/Post');
-const PostReaction = require('../models/PostReaction');
-const Friend = require('../models/Friend');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
+const { getFriendIds } = require('../utils/friends');
 
 const router = express.Router();
-
-async function getFriendIds(userId) {
-  const friendships = await Friend.find({
-    $or: [{ requester: userId }, { recipient: userId }],
-    status: 'accepted',
-  }).select('requester recipient');
-  return friendships.map(f =>
-    f.requester.toString() === userId.toString() ? f.recipient : f.requester
-  );
-}
 
 function computeRankMap(items, field) {
   const sorted = [...items].sort((a, b) => (b[field] || 0) - (a[field] || 0));
@@ -26,11 +15,12 @@ function computeRankMap(items, field) {
 
 async function buildEntries(userIds, callerId) {
   const now = new Date();
-  const weekAgo   = new Date(now - 7  * 24 * 60 * 60 * 1000);
-  const twoWeeksAgo = new Date(now - 14 * 24 * 60 * 60 * 1000);
-  const monthAgo  = new Date(now - 30 * 24 * 60 * 60 * 1000);
+  const weekAgo      = new Date(now - 7  * 24 * 60 * 60 * 1000);
+  const twoWeeksAgo  = new Date(now - 14 * 24 * 60 * 60 * 1000);
+  const monthAgo     = new Date(now - 30 * 24 * 60 * 60 * 1000);
+  const twoMonthsAgo = new Date(now - 60 * 24 * 60 * 60 * 1000);
 
-  // All-time pints (total post count per user)
+  // All-time drinks
   const allTimeAgg = await Post.aggregate([
     { $match: { user: { $in: userIds } } },
     { $group: { _id: '$user', count: { $sum: 1 } } },
@@ -38,7 +28,7 @@ async function buildEntries(userIds, callerId) {
   const pintsMap = {};
   for (const a of allTimeAgg) pintsMap[a._id.toString()] = a.count;
 
-  // Previous period pints (posts before last 30 days) for rank-change calc
+  // Previous period all-time (for rank-change: exclude last 30 days)
   const prevPintsAgg = await Post.aggregate([
     { $match: { user: { $in: userIds }, createdAt: { $lt: monthAgo } } },
     { $group: { _id: '$user', count: { $sum: 1 } } },
@@ -46,27 +36,37 @@ async function buildEntries(userIds, callerId) {
   const prevPintsMap = {};
   for (const a of prevPintsAgg) prevPintsMap[a._id.toString()] = a.count;
 
-  // CheersWk: reactions received on posts created this week
-  const thisWeekPosts = await Post.find({ user: { $in: userIds }, createdAt: { $gte: weekAgo } }).select('_id user');
-  const thisPostToUser = {};
-  for (const p of thisWeekPosts) thisPostToUser[p._id.toString()] = p.user.toString();
-  const thisReactions = await PostReaction.find({ post: { $in: thisWeekPosts.map(p => p._id) } }).select('post');
-  const cheersWkMap = {};
-  for (const r of thisReactions) {
-    const uid = thisPostToUser[r.post.toString()];
-    if (uid) cheersWkMap[uid] = (cheersWkMap[uid] || 0) + 1;
-  }
+  // This week's drinks
+  const thisWkAgg = await Post.aggregate([
+    { $match: { user: { $in: userIds }, createdAt: { $gte: weekAgo } } },
+    { $group: { _id: '$user', count: { $sum: 1 } } },
+  ]);
+  const drinksWkMap = {};
+  for (const a of thisWkAgg) drinksWkMap[a._id.toString()] = a.count;
 
-  // Previous-week reactions for rank-change calc
-  const prevWeekPosts = await Post.find({ user: { $in: userIds }, createdAt: { $gte: twoWeeksAgo, $lt: weekAgo } }).select('_id user');
-  const prevPostToUser = {};
-  for (const p of prevWeekPosts) prevPostToUser[p._id.toString()] = p.user.toString();
-  const prevReactions = await PostReaction.find({ post: { $in: prevWeekPosts.map(p => p._id) } }).select('post');
-  const prevCheersMap = {};
-  for (const r of prevReactions) {
-    const uid = prevPostToUser[r.post.toString()];
-    if (uid) prevCheersMap[uid] = (prevCheersMap[uid] || 0) + 1;
-  }
+  // Previous week's drinks (for rank-change)
+  const prevWkAgg = await Post.aggregate([
+    { $match: { user: { $in: userIds }, createdAt: { $gte: twoWeeksAgo, $lt: weekAgo } } },
+    { $group: { _id: '$user', count: { $sum: 1 } } },
+  ]);
+  const prevDrinksWkMap = {};
+  for (const a of prevWkAgg) prevDrinksWkMap[a._id.toString()] = a.count;
+
+  // This month's drinks
+  const thisMoAgg = await Post.aggregate([
+    { $match: { user: { $in: userIds }, createdAt: { $gte: monthAgo } } },
+    { $group: { _id: '$user', count: { $sum: 1 } } },
+  ]);
+  const drinksMoMap = {};
+  for (const a of thisMoAgg) drinksMoMap[a._id.toString()] = a.count;
+
+  // Previous month's drinks (for rank-change)
+  const prevMoAgg = await Post.aggregate([
+    { $match: { user: { $in: userIds }, createdAt: { $gte: twoMonthsAgo, $lt: monthAgo } } },
+    { $group: { _id: '$user', count: { $sum: 1 } } },
+  ]);
+  const prevDrinksMoMap = {};
+  for (const a of prevMoAgg) prevDrinksMoMap[a._id.toString()] = a.count;
 
   const users = await User.find({ _id: { $in: userIds } }).select('username avatarUrl');
 
@@ -76,24 +76,30 @@ async function buildEntries(userIds, callerId) {
     avatarUrl: u.avatarUrl || null,
     pints: pintsMap[u._id.toString()] || 0,
     prevPints: prevPintsMap[u._id.toString()] || 0,
-    cheersWk: cheersWkMap[u._id.toString()] || 0,
-    prevCheersWk: prevCheersMap[u._id.toString()] || 0,
+    drinksWk: drinksWkMap[u._id.toString()] || 0,
+    prevDrinksWk: prevDrinksWkMap[u._id.toString()] || 0,
+    drinksMo: drinksMoMap[u._id.toString()] || 0,
+    prevDrinksMo: prevDrinksMoMap[u._id.toString()] || 0,
     isYou: u._id.toString() === callerId.toString(),
   }));
 
-  const currentPintsRanks  = computeRankMap(raw, 'pints');
-  const prevPintsRanks     = computeRankMap(raw.map(e => ({ userId: e.userId, pints: e.prevPints })), 'pints');
-  const currentCheersRanks = computeRankMap(raw, 'cheersWk');
-  const prevCheersRanks    = computeRankMap(raw.map(e => ({ userId: e.userId, cheersWk: e.prevCheersWk })), 'cheersWk');
+  const currentPintsRanks = computeRankMap(raw, 'pints');
+  const prevPintsRanks    = computeRankMap(raw.map(e => ({ userId: e.userId, pints: e.prevPints })), 'pints');
+  const currentWkRanks    = computeRankMap(raw, 'drinksWk');
+  const prevWkRanks       = computeRankMap(raw.map(e => ({ userId: e.userId, drinksWk: e.prevDrinksWk })), 'drinksWk');
+  const currentMoRanks    = computeRankMap(raw, 'drinksMo');
+  const prevMoRanks       = computeRankMap(raw.map(e => ({ userId: e.userId, drinksMo: e.prevDrinksMo })), 'drinksMo');
 
   return raw.map(e => ({
     userId: e.userId,
     username: e.username,
     avatarUrl: e.avatarUrl,
     pints: e.pints,
-    cheersWk: e.cheersWk,
-    pintMove:   (prevPintsRanks[e.userId]  || raw.length) - (currentPintsRanks[e.userId]  || raw.length),
-    cheersMove: (prevCheersRanks[e.userId] || raw.length) - (currentCheersRanks[e.userId] || raw.length),
+    drinksWk: e.drinksWk,
+    drinksMo: e.drinksMo,
+    pintMove: (prevPintsRanks[e.userId] || raw.length) - (currentPintsRanks[e.userId] || raw.length),
+    wkMove:   (prevWkRanks[e.userId]    || raw.length) - (currentWkRanks[e.userId]    || raw.length),
+    moMove:   (prevMoRanks[e.userId]    || raw.length) - (currentMoRanks[e.userId]    || raw.length),
     isNew: e.prevPints === 0 && e.pints > 0,
     isYou: e.isYou,
   }));
@@ -124,17 +130,14 @@ router.get('/global', authMiddleware, async (req, res) => {
     ]);
     const topUserIds = topAgg.map(a => a._id);
 
-    // Always include the caller so their isYou flag is set
     const callerInTop = topUserIds.some(id => id.toString() === userId.toString());
     const queryIds = callerInTop ? topUserIds : [...topUserIds, userId];
 
     const allEntries = await buildEntries(queryIds, userId);
 
-    // Expose only the top-50 entries in the response (caller may be extra)
     const topIdSet = new Set(topUserIds.map(id => id.toString()));
     const entries = allEntries.filter(e => topIdSet.has(e.userId));
 
-    // Caller's global rank by all-time pints
     const yourPints = allEntries.find(e => e.isYou)?.pints ?? 0;
     const aboveResult = await Post.aggregate([
       { $group: { _id: '$user', count: { $sum: 1 } } },

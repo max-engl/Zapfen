@@ -11,7 +11,10 @@ class NotificationService {
   /// Wires up local notification display for foreground messages.
   static Future<void> init() async {
     await _localNotifications.initialize(
-      settings: const InitializationSettings(iOS: DarwinInitializationSettings()),
+      settings: const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        iOS: DarwinInitializationSettings(),
+      ),
     );
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -22,6 +25,12 @@ class NotificationService {
         title: notification.title,
         body: notification.body,
         notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'default',
+            'Benachrichtigungen',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
           iOS: DarwinNotificationDetails(),
         ),
       );

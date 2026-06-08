@@ -89,10 +89,12 @@ class PintTheme {
     selfieOutline: Color(0x2EFFFFFF), // rgba(255,255,255,0.18)
     onlineDotRing: Color(0xFF0A0A0A),
     streakCell: [
-      Color(0x0AFFFFFF), // empty
-      Color(0x40F6B733), // low
-      Color(0x8CF6B733), // mid
-      Color(0xF2F6B733), // full
+      Color(0x0AFFFFFF), // 0 drinks  – empty
+      Color(0x33F6B733), // 1 drink   – faint amber
+      Color(0x70F6B733), // 2–3       – light amber
+      Color(0xCCF6B733), // 4–6       – strong amber
+      Color(0xFFF6B733), // 7–9       – full gold
+      Color(0xFFFF8C00), // 10+       – vivid orange
     ],
   );
 
@@ -124,10 +126,12 @@ class PintTheme {
     selfieOutline: Color(0x2E000000), // rgba(0,0,0,0.18)
     onlineDotRing: Color(0xFFF6F2EA),
     streakCell: [
-      Color(0x0D000000), // empty
-      Color(0x4DF6B733), // low
-      Color(0x99F6B733), // mid
-      Color(0xF2D98A14), // full
+      Color(0x0D000000), // 0 drinks  – empty
+      Color(0x33F6B733), // 1 drink   – faint amber
+      Color(0x80D98A14), // 2–3       – medium amber
+      Color(0xCCD98A14), // 4–6       – strong amber
+      Color(0xFFD98A14), // 7–9       – full gold
+      Color(0xFFB85C00), // 10+       – deep orange
     ],
   );
 }

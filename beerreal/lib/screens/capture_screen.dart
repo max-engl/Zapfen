@@ -1,8 +1,11 @@
+import 'dart:io' show Platform;
 import 'package:camera/camera.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image/image.dart' as img;
 import '../theme.dart';
 import '../features/drinks/models/drink_model.dart';
 import '../features/drinks/providers/drink_provider.dart';
@@ -10,6 +13,13 @@ import '../features/posts/models/feed_post.dart';
 import '../features/posts/services/post_service.dart';
 import '../widgets/pint_loading.dart';
 import 'drink_picker_sheet.dart';
+
+// Runs in a background isolate — flips a JPEG image horizontally.
+Uint8List _flipJpegHorizontal(Uint8List bytes) {
+  final decoded = img.decodeImage(bytes);
+  if (decoded == null) return bytes;
+  return Uint8List.fromList(img.encodeJpg(img.flipHorizontal(decoded), quality: 92));
+}
 
 enum _Stage { initializing, aim, review, describe, uploading }
 
@@ -34,7 +44,7 @@ class CaptureScreen extends StatefulWidget {
 }
 
 class _CaptureScreenState extends State<CaptureScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   _Stage _stage = _Stage.initializing;
   String? _initError;
   CameraController? _rearCtrl;
@@ -59,6 +69,8 @@ class _CaptureScreenState extends State<CaptureScreen>
     isCustom: false,
   );
   late final AnimationController _flashAnim;
+  late final AnimationController _successFlash;
+  bool _uploadSuccess = false;
   FlashMode _flashMode = FlashMode.off;
 
   @override
@@ -67,6 +79,10 @@ class _CaptureScreenState extends State<CaptureScreen>
     _flashAnim = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 160),
+    );
+    _successFlash = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
     );
     _initCameras();
     _captureLocation();
@@ -78,6 +94,7 @@ class _CaptureScreenState extends State<CaptureScreen>
     _frontCtrl?.dispose();
     _captionCtrl.dispose();
     _flashAnim.dispose();
+    _successFlash.dispose();
     super.dispose();
   }
 
@@ -135,6 +152,7 @@ class _CaptureScreenState extends State<CaptureScreen>
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 15),
         ),
       );
       if (!mounted) return;
@@ -272,7 +290,11 @@ class _CaptureScreenState extends State<CaptureScreen>
       if (frontCtrl != null && frontCtrl.value.isInitialized) {
         try {
           final selfieFile = await frontCtrl.takePicture();
-          selfieBytes = await selfieFile.readAsBytes();
+          final raw = await selfieFile.readAsBytes();
+          // Android front cameras capture mirrored pixels; flip to correct.
+          selfieBytes = Platform.isAndroid
+              ? await compute(_flipJpegHorizontal, raw)
+              : raw;
         } catch (_) {}
       }
 
@@ -331,6 +353,13 @@ class _CaptureScreenState extends State<CaptureScreen>
         drinkEmoji: _selectedDrink?.emoji,
         rating: _rating,
       );
+      if (!mounted) return;
+      setState(() => _uploadSuccess = true);
+      HapticFeedback.heavyImpact();
+      _successFlash.forward(from: 0);
+      await Future.delayed(const Duration(milliseconds: 80));
+      if (mounted) HapticFeedback.mediumImpact();
+      await Future.delayed(const Duration(milliseconds: 620));
       if (mounted) widget.onPosted(post);
     } catch (_) {
       if (mounted) {
@@ -368,21 +397,36 @@ class _CaptureScreenState extends State<CaptureScreen>
     return Material(
       color: Colors.black,
       child: AnimatedBuilder(
-        animation: _flashAnim,
-        builder: (context, child) => Stack(
-          children: [
-            child!,
-            if (_flashAnim.value > 0)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: Opacity(
-                    opacity: _flashAnim.value,
-                    child: Container(color: Colors.white),
+        animation: Listenable.merge([_flashAnim, _successFlash]),
+        builder: (context, child) {
+          final sv = _successFlash.value;
+          final goldAlpha = sv < 0.35
+              ? sv / 0.35
+              : (1 - (sv - 0.35) / 0.65).clamp(0.0, 1.0);
+          return Stack(
+            children: [
+              child!,
+              if (_flashAnim.value > 0)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Opacity(
+                      opacity: _flashAnim.value,
+                      child: Container(color: Colors.white),
+                    ),
                   ),
                 ),
-              ),
-          ],
-        ),
+              if (sv > 0)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Opacity(
+                      opacity: (goldAlpha * 0.45).clamp(0.0, 1.0),
+                      child: Container(color: const Color(0xFFF6B733)),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
         child: SafeArea(
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 280),
@@ -846,35 +890,11 @@ class _CaptureScreenState extends State<CaptureScreen>
                   ),
 
                 const SizedBox(height: 10),
-                GestureDetector(
-                  onTap: uploading ? null : _upload,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    decoration: BoxDecoration(
-                      color: t.gold,
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                    child: uploading
-                        ? Center(
-                            child: PintDots(
-                              color: t.goldInk,
-                              dotSize: 6,
-                              spacing: 5,
-                            ),
-                          )
-                        : Center(
-                            child: Text(
-                              'An deinen Kreis posten',
-                              style: TextStyle(
-                                color: t.goldInk,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.2,
-                              ),
-                            ),
-                          ),
-                  ),
+                _PostBtn(
+                  t: t,
+                  uploading: uploading,
+                  success: _uploadSuccess,
+                  onTap: uploading || _uploadSuccess ? null : _upload,
                 ),
               ],
             ),
@@ -2064,6 +2084,129 @@ class _CircleBtn extends StatelessWidget {
         ),
         child: Center(child: child),
       ),
+    );
+  }
+}
+
+// ── Post button with press animation and success state ────────────────────────
+
+class _PostBtn extends StatefulWidget {
+  final PintTheme t;
+  final bool uploading;
+  final bool success;
+  final VoidCallback? onTap;
+
+  const _PostBtn({
+    required this.t,
+    required this.uploading,
+    required this.success,
+    this.onTap,
+  });
+
+  @override
+  State<_PostBtn> createState() => _PostBtnState();
+}
+
+class _PostBtnState extends State<_PostBtn> {
+  bool _pressed = false;
+
+  void _onTapDown(TapDownDetails _) {
+    HapticFeedback.mediumImpact();
+    setState(() => _pressed = true);
+  }
+
+  void _onTapUp(TapUpDetails _) {
+    setState(() => _pressed = false);
+    widget.onTap?.call();
+  }
+
+  void _onTapCancel() => setState(() => _pressed = false);
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.t;
+    final disabled = widget.onTap == null;
+    return GestureDetector(
+      onTapDown: disabled ? null : _onTapDown,
+      onTapUp: disabled ? null : _onTapUp,
+      onTapCancel: disabled ? null : _onTapCancel,
+      child: AnimatedScale(
+        scale: _pressed ? 0.96 : 1.0,
+        duration: const Duration(milliseconds: 80),
+        curve: Curves.easeOut,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: double.infinity,
+          height: 60,
+          decoration: BoxDecoration(
+            color: widget.success ? const Color(0xFF22c55e) : t.gold,
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: Center(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              child: widget.success
+                  ? _SpringCheckmark(key: const ValueKey('check'))
+                  : widget.uploading
+                      ? SizedBox(
+                          key: const ValueKey('dots'),
+                          child: PintDots(color: t.goldInk, dotSize: 6, spacing: 5),
+                        )
+                      : Text(
+                          key: const ValueKey('label'),
+                          'An deinen Kreis posten',
+                          style: TextStyle(
+                            color: t.goldInk,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SpringCheckmark extends StatefulWidget {
+  const _SpringCheckmark({super.key});
+
+  @override
+  State<_SpringCheckmark> createState() => _SpringCheckmarkState();
+}
+
+class _SpringCheckmarkState extends State<_SpringCheckmark>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    )..forward();
+    _scale = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _scale,
+      child: const Icon(Icons.check_rounded, color: Colors.white, size: 28),
     );
   }
 }

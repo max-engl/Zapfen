@@ -200,10 +200,11 @@ commentRouter.delete("/:commentId", authMiddleware, async (req, res) => {
             return res.status(403).json({ message: "You can only delete your own comments" });
         }
 
-        const replyCount = await Comment.countDocuments({ parent: comment._id });
-        const totalDeleted = 1 + replyCount;
-
+        // Fetch reply IDs once; use same list for both the count and the cascade delete.
         const replyIds = await Comment.find({ parent: comment._id }).distinct("_id");
+        const totalDeleted = 1 + replyIds.length;
+
+        // Delete all documents first; only update the counter after successful deletion.
         await Promise.all([
             Comment.deleteMany({ parent: comment._id }),
             CommentReaction.deleteMany({ comment: { $in: [comment._id, ...replyIds] } }),

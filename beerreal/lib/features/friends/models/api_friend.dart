@@ -69,3 +69,32 @@ class UserSearchResult {
     );
   }
 }
+
+class FriendRecommendation {
+  final String id;
+  final String username;
+  final String? avatarUrl;
+  final String? avatarColor;
+  final String? avatarInitial;
+  final int mutualCount;
+
+  const FriendRecommendation({
+    required this.id,
+    required this.username,
+    this.avatarUrl,
+    this.avatarColor,
+    this.avatarInitial,
+    required this.mutualCount,
+  });
+
+  factory FriendRecommendation.fromJson(Map<String, dynamic> json) {
+    return FriendRecommendation(
+      id: (json['id'] ?? json['_id'] ?? '') as String,
+      username: (json['username'] ?? '') as String,
+      avatarUrl: json['avatarUrl'] as String?,
+      avatarColor: json['avatarColor'] as String?,
+      avatarInitial: json['avatarInitial'] as String?,
+      mutualCount: (json['mutualCount'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
