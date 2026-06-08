@@ -152,6 +152,76 @@ const ACHIEVEMENTS = [
     ...LOCATION_ACHIEVEMENTS,
 ];
 
+const HIDDEN_ACHIEVEMENTS = [
+    {
+        id: "hidden_all_week",
+        icon: "secret",
+        name: "Sieben-Tage-Woche",
+        blurb: "Du hast an allen 7 Wochentagen mindestens einmal geloggt.",
+        getProgress: (posts) => {
+            const days = new Set(posts.map((p) => new Date(p.createdAt).getDay()));
+            return { earned: days.size === 7 };
+        },
+    },
+    {
+        id: "hidden_midnight",
+        icon: "secret",
+        name: "Geisterstunde",
+        blurb: "Geloggt genau zwischen 00:00 und 00:05 Uhr.",
+        getProgress: (posts) => ({
+            earned: posts.some((p) => {
+                const d = new Date(p.createdAt);
+                return d.getHours() === 0 && d.getMinutes() < 5;
+            }),
+        }),
+    },
+    {
+        id: "hidden_monday_morning",
+        icon: "secret",
+        name: "Montagsfrühstück",
+        blurb: "Geloggt vor 9 Uhr morgens an einem Montag.",
+        getProgress: (posts) => ({
+            earned: posts.some((p) => {
+                const d = new Date(p.createdAt);
+                return d.getDay() === 1 && d.getHours() < 9;
+            }),
+        }),
+    },
+    {
+        id: "hidden_rainbow",
+        icon: "secret",
+        name: "Regenbogen",
+        blurb: "7 verschiedene Sorten an einem einzigen Tag geloggt.",
+        getProgress: (posts) => {
+            const byDay = {};
+            posts.forEach((p) => {
+                const key = new Date(p.createdAt).toDateString();
+                if (!byDay[key]) byDay[key] = new Set();
+                if (p.drink?.name) byDay[key].add(p.drink.name);
+            });
+            return { earned: Object.values(byDay).some((s) => s.size >= 7) };
+        },
+    },
+    {
+        id: "hidden_loyal",
+        icon: "secret",
+        name: "Stammgast",
+        blurb: "An demselben Ort an mindestens 5 verschiedenen Tagen geloggt.",
+        getProgress: (posts) => {
+            const spotDays = {};
+            posts.forEach((p) => {
+                if (p.location?.coordinates?.length === 2) {
+                    const [lng, lat] = p.location.coordinates;
+                    const spot = `${(lat * 10).toFixed(0)},${(lng * 10).toFixed(0)}`;
+                    if (!spotDays[spot]) spotDays[spot] = new Set();
+                    spotDays[spot].add(new Date(p.createdAt).toDateString());
+                }
+            });
+            return { earned: Object.values(spotDays).some((s) => s.size >= 5) };
+        },
+    },
+];
+
 function computeStreak(posts) {
     if (!posts.length) return 0;
 
@@ -357,7 +427,35 @@ router.get("/me", authMiddleware, async (req, res) => {
             return achievement;
         });
 
-        res.json({ achievements: results });
+        const hiddenResults = HIDDEN_ACHIEVEMENTS.map((a) => {
+            const progress = a.getProgress(posts);
+            if (!progress.earned) {
+                return {
+                    id: a.id,
+                    icon: "secret",
+                    name: "???",
+                    blurb: "Ein geheimes Achievement wartet auf dich.",
+                    earned: false,
+                    hidden: true,
+                    have: 0,
+                    goal: 1,
+                    statusLabel: "???",
+                };
+            }
+            return {
+                id: a.id,
+                icon: a.icon,
+                name: a.name,
+                blurb: a.blurb,
+                earned: true,
+                hidden: true,
+                have: 1,
+                goal: 1,
+                statusLabel: buildStatusLabel({ earned: true, have: 1, goal: 1 }, null),
+            };
+        });
+
+        res.json({ achievements: [...results, ...hiddenResults] });
     } catch (error) {
         res.status(500).json({
             message: "Erfolge konnten nicht geladen werden.",

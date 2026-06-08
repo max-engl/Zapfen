@@ -37,6 +37,8 @@ import 'features/notifications/providers/notification_provider.dart';
 import 'features/achievements/services/achievement_service.dart';
 import 'features/achievements/providers/achievement_provider.dart';
 import 'features/recap/services/recap_service.dart';
+import 'features/bingo/services/bingo_service.dart';
+import 'features/bingo/providers/bingo_provider.dart';
 import 'screens/night_recap_screen.dart';
 import 'widgets/avatar.dart';
 import 'widgets/pint_loading.dart';
@@ -117,6 +119,7 @@ Future<void> _main() async {
   final statsService = StatsService(apiClient);
   final reportService = ReportService(apiClient);
   final recapService = RecapService(apiClient);
+  final bingoService = BingoService(apiClient);
   final notificationApiService = NotificationApiService(apiClient);
   final achievementService = AchievementService(apiClient);
 
@@ -137,6 +140,7 @@ Future<void> _main() async {
         Provider<PostCacheManager>.value(value: postCacheManager),
         Provider<ReportService>.value(value: reportService),
         Provider<RecapService>.value(value: recapService),
+        Provider<BingoService>.value(value: bingoService),
         Provider<AchievementService>.value(value: achievementService),
         ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
         ChangeNotifierProvider<FeedProvider>(
@@ -163,6 +167,9 @@ Future<void> _main() async {
         ),
         ChangeNotifierProvider<AchievementProvider>(
           create: (_) => AchievementProvider(achievementService),
+        ),
+        ChangeNotifierProvider<BingoProvider>(
+          create: (_) => BingoProvider(bingoService),
         ),
       ],
       child: const PintRoot(),

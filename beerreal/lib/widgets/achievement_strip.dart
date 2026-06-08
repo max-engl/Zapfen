@@ -15,6 +15,7 @@ IconData achievementBadgeIcon(String icon) {
     'owl' => Icons.nightlight_round,
     'crown' => Icons.workspace_premium,
     'first' => Icons.sports_bar_outlined,
+    'secret' => Icons.lock_outline_rounded,
     _ => Icons.sports_bar_outlined,
   };
 }
@@ -209,6 +210,7 @@ class AchievementBadgeMedal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final earned = achievement.earned;
+    final mystery = achievement.hidden && !earned;
     final goal = achievement.goal <= 0 ? 1 : achievement.goal;
     final progress = earned
         ? 1.0
@@ -300,19 +302,19 @@ class AchievementBadgeMedal extends StatelessWidget {
             SizedBox(
               height: 25,
               child: Text(
-                achievement.name,
+                mystery ? '???' : achievement.name,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: locked ? t.textFaint : t.text,
+                  color: mystery ? t.textFaint : locked ? t.textFaint : t.text,
                   fontSize: 10.5,
                   fontWeight: FontWeight.w700,
                   height: 1.15,
                 ),
               ),
             ),
-            if (!earned) ...[
+            if (!earned && !mystery) ...[
               const SizedBox(height: 3),
               SizedBox(
                 height: 14,
@@ -348,6 +350,7 @@ class AchievementDetailCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final earned = achievement.earned;
+    final mystery = achievement.hidden && !earned;
     final goal = achievement.goal <= 0 ? 1 : achievement.goal;
     final progress = (achievement.have / goal).clamp(0.0, 1.0).toDouble();
     final statusLabel = achievementStatusLabel(achievement);
@@ -356,9 +359,15 @@ class AchievementDetailCard extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(18, 10, 18, 0),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: earned ? t.goldFaint : t.surfaceWeaker,
+        color: mystery
+            ? t.surfaceWeaker
+            : earned
+            ? t.goldFaint
+            : t.surfaceWeaker,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: earned ? t.goldBorder : t.border),
+        border: Border.all(
+          color: mystery ? t.border : earned ? t.goldBorder : t.border,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -366,22 +375,22 @@ class AchievementDetailCard extends StatelessWidget {
           Row(
             children: [
               Icon(
-                achievementBadgeIcon(achievement.icon),
+                mystery ? Icons.lock_outline_rounded : achievementBadgeIcon(achievement.icon),
                 size: 16,
-                color: t.goldText,
+                color: mystery ? t.textFaint : t.goldText,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  achievement.name,
+                  mystery ? 'Geheimes Achievement' : achievement.name,
                   style: TextStyle(
-                    color: t.text,
+                    color: mystery ? t.textMuted : t.text,
                     fontSize: 14.5,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
-              if (earned)
+              if (earned && !mystery)
                 Text(
                   statusLabel,
                   style: TextStyle(
@@ -394,10 +403,12 @@ class AchievementDetailCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            achievement.blurb,
+            mystery
+                ? 'Logge weiter, um dieses Achievement zu entdecken.'
+                : achievement.blurb,
             style: TextStyle(color: t.textMuted, fontSize: 13, height: 1.4),
           ),
-          if (!earned) ...[
+          if (!earned && !mystery) ...[
             const SizedBox(height: 11),
             ClipRRect(
               borderRadius: BorderRadius.circular(999),

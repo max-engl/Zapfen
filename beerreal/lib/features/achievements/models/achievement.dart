@@ -8,6 +8,7 @@ class Achievement {
   final int goal;
   final String statusLabel;
   final DateTime? earnedDate;
+  final bool hidden;
 
   const Achievement({
     required this.id,
@@ -19,6 +20,7 @@ class Achievement {
     required this.goal,
     required this.statusLabel,
     this.earnedDate,
+    this.hidden = false,
   });
 
   factory Achievement.fromJson(Map<String, dynamic> json) {
@@ -35,6 +37,7 @@ class Achievement {
       earnedDate: earnedDateValue == null
           ? null
           : DateTime.tryParse(earnedDateValue),
+      hidden: (json['hidden'] ?? false) as bool,
     );
   }
 }

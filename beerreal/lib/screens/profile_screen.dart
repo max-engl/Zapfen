@@ -7,6 +7,7 @@ import '../core/app_cache_manager.dart';
 import '../theme.dart';
 import '../features/achievements/providers/achievement_provider.dart';
 import '../features/auth/providers/auth_provider.dart';
+import '../features/bingo/providers/bingo_provider.dart';
 import '../features/posts/models/feed_post.dart';
 import '../features/posts/providers/profile_posts_provider.dart';
 import '../features/profile/services/profile_service.dart';
@@ -14,6 +15,7 @@ import '../widgets/achievement_strip.dart';
 import '../widgets/avatar.dart';
 import '../widgets/shimmer_box.dart';
 import '../widgets/stagger_item.dart';
+import 'bingo_screen.dart';
 import 'edit_profile_screen.dart';
 import 'post_detail_screen.dart';
 
@@ -67,6 +69,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ProfilePostsProvider>().load();
       context.read<AchievementProvider>().load();
+      context.read<BingoProvider>().load();
       _entranceCtrl.forward();
     });
   }
@@ -97,6 +100,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     final user = context.watch<AuthProvider>().user;
     final pp = context.watch<ProfilePostsProvider>();
     final achievements = context.watch<AchievementProvider>();
+    final bingo = context.watch<BingoProvider>();
     final grid = pp.heatmapGrid;
 
     final body = GestureDetector(
@@ -236,7 +240,15 @@ class _ProfileScreenState extends State<ProfileScreen>
             loading: achievements.loading,
             t: t,
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
+
+          // ── Bingo banner ──
+          _BingoBannerTile(
+            bingo: bingo,
+            t: t,
+            onTap: () => BingoScreen.show(context),
+          ),
+          const SizedBox(height: 22), // matches banner margin: "0 18px 22px"
 
           // ── Streak heatmap ──
           Padding(
@@ -423,6 +435,167 @@ class _ProfileScreenState extends State<ProfileScreen>
       );
     }
     return body;
+  }
+}
+
+// ── Bingo banner tile ─────────────────────────────────────────────────
+
+class _BingoBannerTile extends StatelessWidget {
+  final BingoProvider bingo;
+  final PintTheme t;
+  final VoidCallback onTap;
+
+  const _BingoBannerTile({
+    required this.bingo,
+    required this.t,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final card = bingo.card;
+    final monthAbbr =
+        card != null ? card.monthLabel.split(' ').first.toUpperCase() : '';
+    final linesText = card != null && card.completedLines > 0
+        ? ' · ${card.completedLines} ${card.completedLines == 1 ? 'Zeile' : 'Zeilen'}'
+        : '';
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 18),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: const Alignment(-0.97, -0.26),
+            end: const Alignment(0.97, 0.26),
+            colors: [t.goldSoft, t.goldFaint],
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: t.goldBorder),
+        ),
+        child: Row(
+          children: [
+            // Mini 5×5 dot grid on dark background
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: t.bg,
+                borderRadius: BorderRadius.circular(11),
+                border: Border.all(color: t.border),
+              ),
+              child: SizedBox(
+                width: 47, // 5×7px + 4×3px gaps
+                height: 47,
+                child: card != null
+                    ? GridView.builder(
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 5,
+                          mainAxisSpacing: 3,
+                          crossAxisSpacing: 3,
+                        ),
+                        itemCount: 25,
+                        itemBuilder: (_, i) => Opacity(
+                          opacity: card.cells[i].done ? 1.0 : 0.7,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: card.cells[i].done
+                                  ? t.gold
+                                  : t.surfaceWeak,
+                              borderRadius: BorderRadius.circular(2.5),
+                            ),
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Text('🍺', style: TextStyle(fontSize: 15)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Bier-Bingo',
+                        style: TextStyle(
+                          color: t.text,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      if (monthAbbr.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: t.gold,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            monthAbbr,
+                            style: TextStyle(
+                              color: t.goldInk,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.19, // 0.02em
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  if (bingo.loading && card == null)
+                    Text(
+                      'Wird geladen…',
+                      style: TextStyle(
+                          color: t.textMuted,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600),
+                    )
+                  else if (card != null)
+                    RichText(
+                      text: TextSpan(
+                        style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: t.textMuted),
+                        children: [
+                          TextSpan(
+                            text: '${card.totalDone}/25 erledigt',
+                            style: TextStyle(
+                                color: t.goldText,
+                                fontWeight: FontWeight.w800),
+                          ),
+                          if (linesText.isNotEmpty) TextSpan(text: linesText),
+                        ],
+                      ),
+                    )
+                  else
+                    Text(
+                      'Tippe um die Karte zu öffnen',
+                      style: TextStyle(
+                          color: t.textMuted,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.chevron_right_rounded, size: 20, color: t.goldText),
+          ],
+        ),
+      ),
+    );
   }
 }
 

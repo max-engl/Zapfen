@@ -205,11 +205,13 @@ class _FeedScreenState extends State<FeedScreen> {
 
     return RefreshIndicator(
       color: t.gold,
-      onRefresh: () => feed.loadFeed(),
+      onRefresh: () async {
+        await feed.loadFeed();
+      },
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.only(bottom: 100),
-        itemCount: feed.posts.length + 2, // header + posts + footer
+        itemCount: feed.posts.length + 2,
         itemBuilder: (context, index) {
           if (index == 0) {
             return Padding(

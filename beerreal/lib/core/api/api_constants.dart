@@ -81,6 +81,9 @@ class ApiConstants {
   // Recap
   static const String nightRecap = '/recap/night';
 
+  // Bingo
+  static const String bingoCard = '/bingo/card';
+
   // Notifications
   static const String notifications = '/notifications';
   static const String notificationsReadAll = '/notifications/read-all';
