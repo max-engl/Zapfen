@@ -46,6 +46,7 @@ class ApiConstants {
   static const String updateAvatar = '/users/me/avatar';
   static const String removeAvatar = '/users/me/avatar';
   static const String updateMe = '/users/me';
+  static const String deleteAccount = '/users/me';
   static const String searchUsers = '/users/search';
 
   // Auth – password change
@@ -83,6 +84,7 @@ class ApiConstants {
 
   // Bingo
   static const String bingoCard = '/bingo/card';
+  static String bingoCardForUser(String userId) => '/bingo/user/$userId';
 
   // Notifications
   static const String notifications = '/notifications';

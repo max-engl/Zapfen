@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../core/app_cache_manager.dart';
+import 'pint_loading.dart';
 import '../core/geocoding_service.dart';
 import '../theme.dart';
 import '../features/posts/models/feed_post.dart';
@@ -24,6 +25,7 @@ class PostCard extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
   final String heroTagPrefix;
+  final bool enableHero;
 
   const PostCard({
     super.key,
@@ -33,6 +35,7 @@ class PostCard extends StatelessWidget {
     this.onTap,
     this.onDelete,
     this.heroTagPrefix = '',
+    this.enableHero = true,
   });
 
   @override
@@ -50,7 +53,13 @@ class PostCard extends StatelessWidget {
             onDelete: onDelete,
           ),
           const SizedBox(height: 10),
-          _Photo(post: post, t: t, onTap: onTap, heroTagPrefix: heroTagPrefix),
+          _Photo(
+            post: post,
+            t: t,
+            onTap: onTap,
+            heroTagPrefix: heroTagPrefix,
+            enableHero: enableHero,
+          ),
           if (post.caption.isNotEmpty) ...[
             const SizedBox(height: 12),
             _Caption(post: post, t: t),
@@ -194,11 +203,13 @@ class _Photo extends StatefulWidget {
   final PintTheme t;
   final VoidCallback? onTap;
   final String heroTagPrefix;
+  final bool enableHero;
   const _Photo({
     required this.post,
     required this.t,
     this.onTap,
     this.heroTagPrefix = '',
+    this.enableHero = true,
   });
 
   @override
@@ -276,6 +287,33 @@ class _PhotoState extends State<_Photo> {
         ? (post.imagePath ?? post.id)
         : (post.selfiePath ?? '${post.id}_selfie');
 
+    final image = mainUrl.isNotEmpty
+        ? CachedNetworkImage(
+            imageUrl: mainUrl,
+            cacheKey: mainKey,
+            cacheManager: AppCacheManager.instance,
+            fit: BoxFit.cover,
+            fadeInDuration: _renderedImageKeys.contains(mainKey)
+                ? Duration.zero
+                : const Duration(milliseconds: 200),
+            placeholder: _renderedImageKeys.contains(mainKey)
+                ? null
+                : (_, __) => const ShimmerBox(),
+            imageBuilder: (_, imageProvider) {
+              _renderedImageKeys.add(mainKey);
+              return Image(image: imageProvider, fit: BoxFit.cover);
+            },
+            errorWidget: (_, __, ___) => Container(color: t.surfaceWeak),
+          )
+        : Container(color: t.surfaceWeak);
+
+    final mainImage = widget.enableHero
+        ? Hero(
+            tag: '${widget.heroTagPrefix}post_image_${post.id}',
+            child: image,
+          )
+        : image;
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(22),
       child: AspectRatio(
@@ -291,36 +329,7 @@ class _PhotoState extends State<_Photo> {
             return Stack(
               children: [
                 Positioned.fill(
-                  child: GestureDetector(
-                    onTap: widget.onTap,
-                    child: Hero(
-                      tag: '${widget.heroTagPrefix}post_image_${post.id}',
-                      child: mainUrl.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: mainUrl,
-                              cacheKey: mainKey,
-                              cacheManager: AppCacheManager.instance,
-                              fit: BoxFit.cover,
-                              fadeInDuration:
-                                  _renderedImageKeys.contains(mainKey)
-                                  ? Duration.zero
-                                  : const Duration(milliseconds: 200),
-                              placeholder: _renderedImageKeys.contains(mainKey)
-                                  ? null
-                                  : (_, __) => const ShimmerBox(),
-                              imageBuilder: (_, imageProvider) {
-                                _renderedImageKeys.add(mainKey);
-                                return Image(
-                                  image: imageProvider,
-                                  fit: BoxFit.cover,
-                                );
-                              },
-                              errorWidget: (_, __, ___) =>
-                                  Container(color: t.surfaceWeak),
-                            )
-                          : Container(color: t.surfaceWeak),
-                    ),
-                  ),
+                  child: GestureDetector(onTap: widget.onTap, child: mainImage),
                 ),
                 if (hasSelfie)
                   AnimatedPositioned(
@@ -809,8 +818,7 @@ class ReactorsSheetState extends State<ReactorsSheet> {
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: GestureDetector(
-                          onTap: () =>
-                              setState(() => _selectedEmoji = emoji),
+                          onTap: () => setState(() => _selectedEmoji = emoji),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 140),
                             padding: const EdgeInsets.symmetric(
@@ -859,14 +867,7 @@ class ReactorsSheetState extends State<ReactorsSheet> {
             child: _actors == null
                 ? Padding(
                     padding: const EdgeInsets.symmetric(vertical: 32),
-                    child: SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: t.gold,
-                      ),
-                    ),
+                    child: SpinningAppLogo(size: 24),
                   )
                 : (filtered?.isEmpty ?? true)
                 ? Padding(
@@ -906,10 +907,7 @@ class ReactorsSheetState extends State<ReactorsSheet> {
                                 ),
                               ),
                             ),
-                            Text(
-                              a.emoji,
-                              style: const TextStyle(fontSize: 18),
-                            ),
+                            Text(a.emoji, style: const TextStyle(fontSize: 18)),
                           ],
                         ),
                       );

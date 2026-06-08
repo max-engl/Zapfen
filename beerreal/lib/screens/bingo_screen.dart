@@ -2,13 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../features/bingo/providers/bingo_provider.dart';
+import '../widgets/pint_loading.dart';
 import '../features/bingo/services/bingo_service.dart';
 import '../theme.dart';
 
 class BingoScreen extends StatefulWidget {
-  const BingoScreen({super.key});
+  final BingoCard? initialCard;
+  final String? ownerName;
 
-  static Future<void> show(BuildContext context) {
+  const BingoScreen({super.key, this.initialCard, this.ownerName});
+
+  static Future<void> show(
+    BuildContext context, {
+    BingoCard? card,
+    String? ownerName,
+  }) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -17,7 +25,7 @@ class BingoScreen extends StatefulWidget {
         value: context.read<BingoService>(),
         child: ChangeNotifierProvider.value(
           value: context.read<BingoProvider>(),
-          child: const BingoScreen(),
+          child: BingoScreen(initialCard: card, ownerName: ownerName),
         ),
       ),
     );
@@ -32,7 +40,9 @@ class _BingoScreenState extends State<BingoScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<BingoProvider>().load();
+      if (widget.initialCard == null) {
+        context.read<BingoProvider>().load();
+      }
     });
   }
 
@@ -40,7 +50,9 @@ class _BingoScreenState extends State<BingoScreen> {
   Widget build(BuildContext context) {
     final t = PintThemeProvider.of(context);
     final prov = context.watch<BingoProvider>();
-    final card = prov.card;
+    final card = widget.initialCard ?? prov.card;
+    final loading = widget.initialCard == null && prov.loading;
+    final ownerName = widget.ownerName;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.92,
@@ -102,7 +114,9 @@ class _BingoScreenState extends State<BingoScreen> {
                       const SizedBox(height: 3),
                       Text(
                         card != null
-                            ? '${card.monthLabel} · für alle gleich'
+                            ? ownerName != null
+                                  ? '${card.monthLabel} · @$ownerName'
+                                  : '${card.monthLabel} · für alle gleich'
                             : 'Monatliche Challenge',
                         style: TextStyle(
                           color: t.goldText,
@@ -132,17 +146,8 @@ class _BingoScreenState extends State<BingoScreen> {
 
             // ── Scrollable body ───────────────────────────────────────────
             Expanded(
-              child: prov.loading && card == null
-                  ? Center(
-                      child: SizedBox(
-                        width: 26,
-                        height: 26,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: t.gold,
-                        ),
-                      ),
-                    )
+              child: loading && card == null
+                  ? Center(child: SpinningAppLogo(size: 26))
                   : card == null
                   ? Center(
                       child: Text(
@@ -310,7 +315,11 @@ class _StatPill extends StatelessWidget {
               color: hot ? t.gold : t.surfaceWeak,
               borderRadius: BorderRadius.circular(9),
             ),
-            child: Icon(icon, size: iconSize, color: hot ? t.goldInk : t.goldText),
+            child: Icon(
+              icon,
+              size: iconSize,
+              color: hot ? t.goldInk : t.goldText,
+            ),
           ),
           const SizedBox(width: 9),
           Column(
@@ -434,7 +443,8 @@ class _LineBanner extends StatelessWidget {
                     ),
                   ),
                   const TextSpan(
-                      text: ' komplett — die goldenen Felder zählen.'),
+                    text: ' komplett — die goldenen Felder zählen.',
+                  ),
                 ],
               ),
             ),
@@ -458,8 +468,7 @@ class _BingoGrid extends StatelessWidget {
       [0, 1, 2, 3, 4].every((c) => card.cells[row * 5 + c].done);
   bool _isColComplete(int col) =>
       [0, 1, 2, 3, 4].every((r) => card.cells[r * 5 + col].done);
-  bool get _isDiag1 =>
-      [0, 1, 2, 3, 4].every((i) => card.cells[i * 5 + i].done);
+  bool get _isDiag1 => [0, 1, 2, 3, 4].every((i) => card.cells[i * 5 + i].done);
   bool get _isDiag2 =>
       [0, 1, 2, 3, 4].every((i) => card.cells[i * 5 + (4 - i)].done);
 
@@ -485,11 +494,8 @@ class _BingoGrid extends StatelessWidget {
         childAspectRatio: 1.0,
       ),
       itemCount: 25,
-      itemBuilder: (_, i) => _BingoCell(
-        cell: card.cells[i],
-        inLine: _isInCompletedLine(i),
-        t: t,
-      ),
+      itemBuilder: (_, i) =>
+          _BingoCell(cell: card.cells[i], inLine: _isInCompletedLine(i), t: t),
     );
   }
 }
@@ -506,11 +512,7 @@ class _BingoCell extends StatelessWidget {
   final bool inLine;
   final PintTheme t;
 
-  const _BingoCell({
-    required this.cell,
-    required this.inLine,
-    required this.t,
-  });
+  const _BingoCell({required this.cell, required this.inLine, required this.t});
 
   @override
   Widget build(BuildContext context) {
@@ -573,10 +575,26 @@ class _BingoCell extends StatelessWidget {
                     opacity: 0.32,
                     child: ColorFiltered(
                       colorFilter: const ColorFilter.matrix([
-                        0.2126, 0.7152, 0.0722, 0, 0,
-                        0.2126, 0.7152, 0.0722, 0, 0,
-                        0.2126, 0.7152, 0.0722, 0, 0,
-                        0,      0,      0,      1, 0,
+                        0.2126,
+                        0.7152,
+                        0.0722,
+                        0,
+                        0,
+                        0.2126,
+                        0.7152,
+                        0.0722,
+                        0,
+                        0,
+                        0.2126,
+                        0.7152,
+                        0.0722,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        1,
+                        0,
                       ]),
                       child: Text(
                         cell.emoji,

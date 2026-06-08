@@ -45,6 +45,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _avatarRemoved = false;
   File? _pendingAvatar;
   bool _saving = false;
+  bool _deletingAccount = false;
   String? _toast;
 
   final _usernameFocus = FocusNode();
@@ -274,6 +275,124 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Future<void> _deleteAccount() async {
+    final t = PintThemeProvider.of(context);
+    final pwController = TextEditingController();
+    bool showPw = false;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: t.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: t.border),
+          ),
+          title: Text(
+            'Konto wirklich löschen?',
+            style: TextStyle(
+              color: t.text,
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Alle deine Posts, Freundschaften und Daten werden unwiderruflich gelöscht.',
+                style: TextStyle(color: t.textMuted, fontSize: 13, height: 1.5),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: t.surfaceWeak,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: t.border),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.lock_outline_rounded, size: 16, color: t.textMuted),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: pwController,
+                        obscureText: !showPw,
+                        autofocus: true,
+                        style: TextStyle(
+                          color: t.text,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                          border: InputBorder.none,
+                          hintText: 'Passwort zur Bestätigung',
+                          hintStyle: TextStyle(color: t.textFaint, fontSize: 14),
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => setDialogState(() => showPw = !showPw),
+                      child: Icon(
+                        showPw ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        size: 16,
+                        color: t.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(
+                'Abbrechen',
+                style: TextStyle(color: t.textMuted, fontWeight: FontWeight.w600),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text(
+                'Löschen',
+                style: TextStyle(color: Color(0xFFC2511E), fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    final password = pwController.text;
+
+    // Capture provider reference before any await — context may be gone after
+    final authProvider = context.read<AuthProvider>();
+
+    setState(() => _deletingAccount = true);
+    try {
+      await widget.profileService.deleteAccount(password);
+      // forceLogout() is synchronous — it immediately swaps the root widget
+      // to AuthScreen, which tears down the whole navigation stack cleanly.
+      authProvider.forceLogout();
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final data = e.response?.data;
+      final msg = (data is Map ? data['message'] as String? : null) ?? 'Konto konnte nicht gelöscht werden.';
+      _showToast(msg);
+    } finally {
+      if (mounted) setState(() => _deletingAccount = false);
+    }
+  }
+
   void _showToast(String msg) {
     setState(() => _toast = msg);
     Future.delayed(const Duration(milliseconds: 1800), () {
@@ -295,12 +414,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             children: [
               Column(
                 children: [
-                  _Header(
-                    t: t,
-                    canSave: _canSave,
-                    saving: _saving,
-                    onSave: _save,
-                  ),
+                  _Header(t: t),
                   Expanded(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.only(bottom: 32),
@@ -514,6 +628,43 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               onSave: _save,
                             ),
                           ),
+                          const SizedBox(height: 32),
+                          _SectionHeading(t: t, title: 'Gefahrenzone'),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: GestureDetector(
+                              onTap: _deletingAccount ? null : _deleteAccount,
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFDF2F0),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: const Color(0xFFC2511E).withValues(alpha: 0.35)),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    if (_deletingAccount)
+                                      PintDots(color: const Color(0xFFC2511E), dotSize: 5, spacing: 4)
+                                    else ...[
+                                      const Icon(Icons.delete_forever_rounded, size: 17, color: Color(0xFFC2511E)),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'Konto löschen',
+                                        style: TextStyle(
+                                          color: Color(0xFFC2511E),
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: -0.2,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
                           const SizedBox(height: 24),
                         ],
                       ),
@@ -540,16 +691,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
 class _Header extends StatelessWidget {
   final PintTheme t;
-  final bool canSave;
-  final bool saving;
-  final VoidCallback onSave;
 
-  const _Header({
-    required this.t,
-    required this.canSave,
-    required this.saving,
-    required this.onSave,
-  });
+  const _Header({required this.t});
 
   @override
   Widget build(BuildContext context) {
@@ -584,29 +727,7 @@ class _Header extends StatelessWidget {
               ),
             ),
           ),
-          GestureDetector(
-            onTap: canSave ? onSave : null,
-            child: Container(
-              margin: const EdgeInsets.only(right: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: canSave ? t.gold : t.surfaceWeak,
-                borderRadius: BorderRadius.circular(999),
-                border: canSave ? null : Border.all(color: t.border),
-              ),
-              child: saving
-                  ? PintDots(color: t.goldInk, dotSize: 4, spacing: 3)
-                  : Text(
-                      'Speichern',
-                      style: TextStyle(
-                        color: canSave ? t.goldInk : t.textFaint,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-            ),
-          ),
+          const SizedBox(width: 42),
         ],
       ),
     );

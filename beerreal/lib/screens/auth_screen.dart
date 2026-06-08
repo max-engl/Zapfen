@@ -26,44 +26,44 @@ class _AuthScreenState extends State<AuthScreen> {
   String _regPw = '';
 
   static int _depth(_Step s) => switch (s) {
-        _Step.welcome => 0,
-        _Step.credentials => 1,
-        _Step.handle => 2,
-        _Step.done => 3,
-      };
+    _Step.welcome => 0,
+    _Step.credentials => 1,
+    _Step.handle => 2,
+    _Step.done => 3,
+  };
 
   void _go(_Step s) => setState(() {
-        _forward = _depth(s) >= _depth(_step);
-        _step = s;
-      });
+    _forward = _depth(s) >= _depth(_step);
+    _step = s;
+  });
 
   Widget _buildStep() => switch (_step) {
-        _Step.welcome => _WelcomeStep(
-            onSignUp: () {
-              _signIn = false;
-              _go(_Step.credentials);
-            },
-            onSignIn: () {
-              _signIn = true;
-              _go(_Step.credentials);
-            },
-          ),
-        _Step.credentials => _CredentialsStep(
-            signIn: _signIn,
-            onBack: () => _go(_Step.welcome),
-            onNext: (email, pw) {
-              _regEmail = email;
-              _regPw = pw;
-              _go(_Step.handle);
-            },
-          ),
-        _Step.handle => _HandleStep(
-            onBack: () => _go(_Step.credentials),
-            regEmail: _regEmail,
-            regPw: _regPw,
-          ),
-        _Step.done => _SuccessStep(onEnter: () {}),
-      };
+    _Step.welcome => _WelcomeStep(
+      onSignUp: () {
+        _signIn = false;
+        _go(_Step.credentials);
+      },
+      onSignIn: () {
+        _signIn = true;
+        _go(_Step.credentials);
+      },
+    ),
+    _Step.credentials => _CredentialsStep(
+      signIn: _signIn,
+      onBack: () => _go(_Step.welcome),
+      onNext: (email, pw) {
+        _regEmail = email;
+        _regPw = pw;
+        _go(_Step.handle);
+      },
+    ),
+    _Step.handle => _HandleStep(
+      onBack: () => _go(_Step.credentials),
+      regEmail: _regEmail,
+      regPw: _regPw,
+    ),
+    _Step.done => _SuccessStep(onEnter: () {}),
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -73,13 +73,19 @@ class _AuthScreenState extends State<AuthScreen> {
         final entering =
             animation.status != AnimationStatus.reverse &&
             animation.status != AnimationStatus.dismissed;
-        final slide = Tween<Offset>(
-          begin: entering
-              ? Offset(_forward ? 0.9 : -0.9, 0.0)
-              : Offset(_forward ? -0.15 : 0.15, 0.0),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutQuart));
-        final fade = CurvedAnimation(parent: animation, curve: const Interval(0.0, 0.7));
+        final slide =
+            Tween<Offset>(
+              begin: entering
+                  ? Offset(_forward ? 0.9 : -0.9, 0.0)
+                  : Offset(_forward ? -0.15 : 0.15, 0.0),
+              end: Offset.zero,
+            ).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutQuart),
+            );
+        final fade = CurvedAnimation(
+          parent: animation,
+          curve: const Interval(0.0, 0.7),
+        );
         return SlideTransition(
           position: slide,
           child: FadeTransition(opacity: fade, child: child),
@@ -139,7 +145,9 @@ class _AuthShell extends StatelessWidget {
                           width: isActive ? 22 : 6,
                           height: 6,
                           decoration: BoxDecoration(
-                            color: (isActive || isDone) ? t.gold : t.surfaceWeak,
+                            color: (isActive || isDone)
+                                ? t.gold
+                                : t.surfaceWeak,
                             borderRadius: BorderRadius.circular(3),
                             border: Border.all(
                               color: (isActive || isDone)
@@ -461,7 +469,11 @@ class _WelcomeStep extends StatelessWidget {
                 Text(
                   'Jeden Tag erscheint zu einer zufälligen Zeit ein Prompt.\nZapf, knips und sieh, was dein Kreis trinkt.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: t.textMuted, fontSize: 14, height: 1.45),
+                  style: TextStyle(
+                    color: t.textMuted,
+                    fontSize: 14,
+                    height: 1.45,
+                  ),
                 ),
               ],
             ),
@@ -570,7 +582,8 @@ class _CredentialsStepState extends State<_CredentialsStep> {
   String _error = '';
   bool _loading = false;
 
-  bool get _emailOk => RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(_email.trim());
+  bool get _emailOk =>
+      RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(_email.trim());
   bool get _pwOk => _pw.length >= 8;
   bool get _valid => _emailOk && _pwOk;
 
@@ -594,7 +607,8 @@ class _CredentialsStepState extends State<_CredentialsStep> {
     if (!mounted) return;
     if (!ok) {
       setState(() {
-        _error = context.read<AuthProvider>().errorMessage ??
+        _error =
+            context.read<AuthProvider>().errorMessage ??
             'E-Mail oder Passwort falsch. Der Barkeeper kennt dich nicht.';
         _loading = false;
       });
@@ -621,7 +635,9 @@ class _CredentialsStepState extends State<_CredentialsStep> {
                   _StepLabel(widget.signIn ? 'ANMELDEN' : 'SCHRITT 1 VON 2'),
                   const SizedBox(height: 8),
                   Text(
-                    widget.signIn ? 'Willkommen\nzurück.' : 'Erstelle dein\nKonto.',
+                    widget.signIn
+                        ? 'Willkommen\nzurück.'
+                        : 'Erstelle dein\nKonto.',
                     style: TextStyle(
                       color: t.text,
                       fontWeight: FontWeight.w800,
@@ -635,12 +651,20 @@ class _CredentialsStepState extends State<_CredentialsStep> {
                     widget.signIn
                         ? 'Melde dich mit der E-Mail und dem Passwort an, mit dem du dein erstes Bier gezapft hast.'
                         : 'Nutze deine E-Mail und ein Passwort. Deine Adresse bleibt privat – nur dein Handle wird angezeigt.',
-                    style: TextStyle(color: t.textMuted, fontSize: 14, height: 1.45),
+                    style: TextStyle(
+                      color: t.textMuted,
+                      fontSize: 14,
+                      height: 1.45,
+                    ),
                   ),
                   const SizedBox(height: 24),
                   _AuthField(
                     label: 'E-Mail',
-                    icon: Icon(Icons.mail_outline, size: 18, color: t.textMuted),
+                    icon: Icon(
+                      Icons.mail_outline,
+                      size: 18,
+                      color: t.textMuted,
+                    ),
                     value: _email,
                     onChange: (v) => setState(() {
                       _email = v;
@@ -654,14 +678,20 @@ class _CredentialsStepState extends State<_CredentialsStep> {
                   const SizedBox(height: 14),
                   _AuthField(
                     label: 'Passwort',
-                    icon: Icon(Icons.lock_outline, size: 18, color: t.textMuted),
+                    icon: Icon(
+                      Icons.lock_outline,
+                      size: 18,
+                      color: t.textMuted,
+                    ),
                     value: _pw,
                     onChange: (v) => setState(() {
                       _pw = v;
                       _error = '';
                     }),
                     obscureText: !_showPw,
-                    placeholder: widget.signIn ? 'Dein Passwort' : 'Mindestens 8 Zeichen',
+                    placeholder: widget.signIn
+                        ? 'Dein Passwort'
+                        : 'Mindestens 8 Zeichen',
                     highlighted: _pwOk,
                     labelRight: widget.signIn
                         ? GestureDetector(
@@ -710,8 +740,11 @@ class _CredentialsStepState extends State<_CredentialsStep> {
                       padding: const EdgeInsets.only(left: 4),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline,
-                              size: 12, color: Color(0xFFC2511E)),
+                          const Icon(
+                            Icons.error_outline,
+                            size: 12,
+                            color: Color(0xFFC2511E),
+                          ),
                           const SizedBox(width: 5),
                           Expanded(
                             child: Text(
@@ -792,7 +825,8 @@ class _HandleStepState extends State<_HandleStep> {
       setState(() => _loading = false);
       showPintSnackBar(
         context,
-        context.read<AuthProvider>().errorMessage ?? 'Registrierung fehlgeschlagen.',
+        context.read<AuthProvider>().errorMessage ??
+            'Registrierung fehlgeschlagen.',
         isError: true,
       );
     }
@@ -830,7 +864,8 @@ class _HandleStepState extends State<_HandleStep> {
 
     String statusText() {
       if (status == 'ok') return '@$_handle gehört dir.';
-      if (status == 'taken') return '@$_handle ist vergeben. Versuch ${_handle}_42';
+      if (status == 'taken')
+        return '@$_handle ist vergeben. Versuch ${_handle}_42';
       if (status == 'short') return 'Mindestens 3 Zeichen.';
       if (status == 'long') return 'Maximal 16 Zeichen.';
       if (status == 'chars') return 'Nur Buchstaben, Zahlen und Unterstriche.';
@@ -865,7 +900,11 @@ class _HandleStepState extends State<_HandleStep> {
                   const SizedBox(height: 8),
                   Text(
                     'Dein Handle ist, wie Freunde dich finden und in Bieren markieren. Kleinbuchstaben, Zahlen, Unterstriche.',
-                    style: TextStyle(color: t.textMuted, fontSize: 14, height: 1.45),
+                    style: TextStyle(
+                      color: t.textMuted,
+                      fontSize: 14,
+                      height: 1.45,
+                    ),
                   ),
                   const SizedBox(height: 18),
                   Row(
@@ -876,7 +915,10 @@ class _HandleStepState extends State<_HandleStep> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: t.goldFaint,
-                          border: Border.all(color: t.goldBorderStrong, width: 2),
+                          border: Border.all(
+                            color: t.goldBorderStrong,
+                            width: 2,
+                          ),
                         ),
                         child: Center(
                           child: Text(
@@ -896,7 +938,10 @@ class _HandleStepState extends State<_HandleStep> {
                       ),
                       const SizedBox(width: 14),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           color: t.surfaceWeak,
                           borderRadius: BorderRadius.circular(999),
@@ -934,10 +979,16 @@ class _HandleStepState extends State<_HandleStep> {
                     ),
                     decoration: InputDecoration(
                       hintText: 'Dein Name',
-                      hintStyle: TextStyle(color: t.textFaint, fontWeight: FontWeight.w400),
+                      hintStyle: TextStyle(
+                        color: t.textFaint,
+                        fontWeight: FontWeight.w400,
+                      ),
                       filled: true,
                       fillColor: t.surfaceWeak,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide(color: t.border),
@@ -991,7 +1042,8 @@ class _HandleStepState extends State<_HandleStep> {
                         Expanded(
                           child: TextField(
                             onChanged: (v) => setState(
-                              () => _handle = v.toLowerCase().replaceAll(' ', ''),
+                              () =>
+                                  _handle = v.toLowerCase().replaceAll(' ', ''),
                             ),
                             style: TextStyle(
                               color: t.text,
@@ -1006,12 +1058,19 @@ class _HandleStepState extends State<_HandleStep> {
                                 fontWeight: FontWeight.w400,
                               ),
                               filled: false,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 14,
+                              ),
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
                               focusedBorder: InputBorder.none,
                               suffixIcon: status == 'ok'
-                                  ? Icon(Icons.check, size: 18, color: t.goldText)
+                                  ? Icon(
+                                      Icons.check,
+                                      size: 18,
+                                      color: t.goldText,
+                                    )
                                   : null,
                             ),
                           ),
@@ -1052,14 +1111,19 @@ class _HandleStepState extends State<_HandleStep> {
                         Expanded(
                           child: RichText(
                             text: TextSpan(
-                              style: TextStyle(color: t.text, fontSize: 12, height: 1.45),
+                              style: TextStyle(
+                                color: t.text,
+                                fontSize: 12,
+                                height: 1.45,
+                              ),
                               children: [
                                 const TextSpan(
                                   text: 'Schick mir den täglichen Prompt. ',
                                   style: TextStyle(fontWeight: FontWeight.w700),
                                 ),
                                 TextSpan(
-                                  text: 'Eine Push-Nachricht pro Tag. Zufällige Zeit. Verpasst du sie, wird dein Bier trotzdem angezeigt.',
+                                  text:
+                                      'Eine Push-Nachricht pro Tag. Zufällige Zeit. Verpasst du sie, wird dein Bier trotzdem angezeigt.',
                                   style: TextStyle(color: t.textMuted),
                                 ),
                               ],
@@ -1134,7 +1198,11 @@ class _SuccessStep extends StatelessWidget {
                 Text(
                   'Der nächste Prompt kommt irgendwann morgen.\nWir geben Bescheid, wenn es Zeit ist zu zapfen.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: t.textMuted, fontSize: 14, height: 1.45),
+                  style: TextStyle(
+                    color: t.textMuted,
+                    fontSize: 14,
+                    height: 1.45,
+                  ),
                 ),
               ],
             ),

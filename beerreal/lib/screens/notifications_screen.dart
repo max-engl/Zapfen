@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import '../widgets/pint_loading.dart';
 import 'package:provider/provider.dart';
 
 import '../core/app_cache_manager.dart';
@@ -469,13 +470,9 @@ class _NotifRowState extends State<_NotifRow> {
             ),
             // Post thumbnail or loading spinner
             if (_loading)
-              const Padding(
-                padding: EdgeInsets.only(left: 10),
-                child: SizedBox(
-                  width: 46,
-                  height: 46,
-                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                ),
+              Padding(
+                padding: const EdgeInsets.only(left: 10),
+                child: SpinningAppLogo(size: 46),
               )
             else if (n.postThumbUrl != null) ...[
               const SizedBox(width: 10),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/pint_loading.dart';
 import '../features/drinks/models/drink_model.dart';
 import '../features/drinks/providers/drink_provider.dart';
 import '../theme.dart';
@@ -286,9 +287,7 @@ class _DrinkPickerSheetState extends State<DrinkPickerSheet> {
           listenable: widget.provider,
           builder: (_, __) {
             if (widget.provider.loading) {
-              return const Center(
-                child: CircularProgressIndicator(color: Color(0xFFF6B733), strokeWidth: 2),
-              );
+              return const Center(child: SpinningAppLogo());
             }
 
             final customs = _filteredCustom;
@@ -425,14 +424,7 @@ class _DrinkPickerSheetState extends State<DrinkPickerSheet> {
                 ),
                 child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                   if (_saving)
-                    SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: canSave ? PintTheme.dark.goldInk : const Color(0x59FFFFFF),
-                      ),
-                    )
+                    SpinningAppLogo(size: 18)
                   else ...[
                     Icon(Icons.check_rounded,
                         size: 16,

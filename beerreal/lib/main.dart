@@ -683,14 +683,7 @@ class _InviteSheetState extends State<_InviteSheet> {
           if (_resolving)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 32),
-              child: SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: t.gold,
-                ),
-              ),
+              child: SpinningAppLogo(size: 28),
             )
           else if (_error != null && !_done)
             Padding(
@@ -815,14 +808,7 @@ class _InviteSheetState extends State<_InviteSheet> {
                       ),
                       child: Center(
                         child: _sending
-                            ? SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: t.goldInk,
-                                ),
-                              )
+                            ? SpinningAppLogo(size: 18)
                             : Text(
                                 'Hinzufügen',
                                 style: TextStyle(

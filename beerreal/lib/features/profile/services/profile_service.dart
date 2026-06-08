@@ -41,4 +41,11 @@ class ProfileService {
     final res = await _client.dio.delete(ApiConstants.removeAvatar);
     return AppUser.fromJson(res.data['user'] as Map<String, dynamic>);
   }
+
+  Future<void> deleteAccount(String password) async {
+    await _client.dio.delete(
+      ApiConstants.deleteAccount,
+      data: {'password': password},
+    );
+  }
 }

@@ -7,6 +7,7 @@ import '../core/app_cache_manager.dart';
 import '../theme.dart';
 import '../features/achievements/models/achievement.dart';
 import '../features/achievements/services/achievement_service.dart';
+import '../features/bingo/services/bingo_service.dart';
 import '../features/friends/models/api_friend.dart';
 import '../features/posts/models/feed_post.dart';
 import '../features/posts/services/post_service.dart';
@@ -16,6 +17,7 @@ import '../widgets/avatar.dart';
 import '../widgets/post_card.dart';
 import '../widgets/shimmer_box.dart';
 import '../widgets/stagger_item.dart';
+import 'bingo_screen.dart';
 import 'post_detail_screen.dart';
 
 int _drinkLevel(int count) {
@@ -57,6 +59,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
   bool _loading = true;
   List<Achievement> _achievements = [];
   bool _achievementsLoading = true;
+  BingoCard? _bingoCard;
+  bool _bingoLoading = true;
   int? _selectedCell;
   late AnimationController _entranceCtrl;
 
@@ -67,9 +71,12 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
       vsync: this,
       duration: const Duration(milliseconds: 650),
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) => _entranceCtrl.forward());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _entranceCtrl.forward(),
+    );
     _loadPosts();
     _loadAchievements();
+    _loadBingoCard();
   }
 
   @override
@@ -96,11 +103,18 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
     if (_posts.isEmpty) return 0;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final days = _posts
-        .map((p) => DateTime(p.createdAt.year, p.createdAt.month, p.createdAt.day))
-        .toSet()
-        .toList()
-      ..sort((a, b) => b.compareTo(a));
+    final days =
+        _posts
+            .map(
+              (p) => DateTime(
+                p.createdAt.year,
+                p.createdAt.month,
+                p.createdAt.day,
+              ),
+            )
+            .toSet()
+            .toList()
+          ..sort((a, b) => b.compareTo(a));
     if (today.difference(days.first).inDays > 1) return 0;
     int count = 1;
     for (int i = 1; i < days.length; i++) {
@@ -141,6 +155,19 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
       debugPrint('[FriendProfile] achievements error: $e');
     } finally {
       if (mounted) setState(() => _achievementsLoading = false);
+    }
+  }
+
+  Future<void> _loadBingoCard() async {
+    try {
+      final card = await context.read<BingoService>().fetchCardForUser(
+        widget.friend.id,
+      );
+      if (mounted) setState(() => _bingoCard = card);
+    } catch (e) {
+      debugPrint('[FriendProfile] bingo error: $e');
+    } finally {
+      if (mounted) setState(() => _bingoLoading = false);
     }
   }
 
@@ -250,7 +277,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
                         animation: _statAnim(1),
                         child: _StatTile(
                           value: _posts.length,
-                          label: 'Biere',
+                          label: 'Drinks',
                           t: t,
                         ),
                       ),
@@ -259,23 +286,11 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
                     Expanded(
                       child: _AnimatedTile(
                         animation: _statAnim(2),
-                        child: _StatTile(
-                          value: _spots,
-                          label: 'Orte',
-                          t: t,
-                        ),
+                        child: _StatTile(value: _spots, label: 'Orte', t: t),
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 18),
-
-              // ── Achievements ──
-              AchievementStrip(
-                achievements: _achievements,
-                loading: _achievementsLoading,
-                t: t,
               ),
               const SizedBox(height: 18),
 
@@ -368,6 +383,29 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 18),
+
+              // ── Achievements ──
+              AchievementStrip(
+                achievements: _achievements,
+                loading: _achievementsLoading,
+                t: t,
+              ),
+              const SizedBox(height: 18),
+
+              // ── Bingo ──
+              _FriendBingoBanner(
+                card: _bingoCard,
+                loading: _bingoLoading,
+                t: t,
+                onTap: _bingoCard == null
+                    ? null
+                    : () => BingoScreen.show(
+                        context,
+                        card: _bingoCard,
+                        ownerName: widget.friend.username,
+                      ),
               ),
               const SizedBox(height: 18),
 
@@ -484,10 +522,14 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
                     child: PostCard(
                       post: e.value,
                       heroTagPrefix: 'fp_',
-                      onReact: (emoji) => feed.toggleReaction(e.value.id, emoji),
+                      onReact: (emoji) =>
+                          feed.toggleReaction(e.value.id, emoji),
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => PostDetailScreen(post: e.value, heroTagPrefix: 'fp_'),
+                          builder: (_) => PostDetailScreen(
+                            post: e.value,
+                            heroTagPrefix: 'fp_',
+                          ),
                         ),
                       ),
                     ),
@@ -496,6 +538,188 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Bingo banner tile ─────────────────────────────────────────────────────
+
+class _FriendBingoBanner extends StatelessWidget {
+  final BingoCard? card;
+  final bool loading;
+  final PintTheme t;
+  final VoidCallback? onTap;
+
+  const _FriendBingoBanner({
+    required this.card,
+    required this.loading,
+    required this.t,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final monthAbbr = card != null
+        ? card!.monthLabel.split(' ').first.toUpperCase()
+        : '';
+    final linesText = card != null && card!.completedLines > 0
+        ? ' · ${card!.completedLines} ${card!.completedLines == 1 ? 'Zeile' : 'Zeilen'}'
+        : '';
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 18),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: const Alignment(-0.97, -0.26),
+            end: const Alignment(0.97, 0.26),
+            colors: [t.goldSoft, t.goldFaint],
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: t.goldBorder),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: t.bg,
+                borderRadius: BorderRadius.circular(11),
+                border: Border.all(color: t.border),
+              ),
+              child: SizedBox(
+                width: 47,
+                height: 47,
+                child: card != null
+                    ? GridView.builder(
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 5,
+                              mainAxisSpacing: 3,
+                              crossAxisSpacing: 3,
+                            ),
+                        itemCount: 25,
+                        itemBuilder: (_, i) => Opacity(
+                          opacity: card!.cells[i].done ? 1.0 : 0.7,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: card!.cells[i].done
+                                  ? t.gold
+                                  : t.surfaceWeak,
+                              borderRadius: BorderRadius.circular(2.5),
+                            ),
+                          ),
+                        ),
+                      )
+                    : loading
+                    ? const ShimmerBox()
+                    : Icon(
+                        Icons.grid_view_rounded,
+                        size: 24,
+                        color: t.textFaint,
+                      ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Text('🍺', style: TextStyle(fontSize: 15)),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          'Bier-Bingo',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: t.text,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                      ),
+                      if (monthAbbr.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: t.gold,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            monthAbbr,
+                            style: TextStyle(
+                              color: t.goldInk,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.19,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  if (loading && card == null)
+                    Text(
+                      'Wird geladen...',
+                      style: TextStyle(
+                        color: t.textMuted,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    )
+                  else if (card != null)
+                    RichText(
+                      text: TextSpan(
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: t.textMuted,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: '${card!.totalDone}/25 erledigt',
+                            style: TextStyle(
+                              color: t.goldText,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          if (linesText.isNotEmpty) TextSpan(text: linesText),
+                        ],
+                      ),
+                    )
+                  else
+                    Text(
+                      'Karte nicht verfügbar',
+                      style: TextStyle(
+                        color: t.textMuted,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: onTap == null ? t.textFaint : t.goldText,
+            ),
+          ],
         ),
       ),
     );

@@ -91,6 +91,44 @@ class _PintLogoLoaderInlineState extends State<PintLogoLoaderInline>
   }
 }
 
+/// Spinning app logo — drop-in replacement for CircularProgressIndicator.
+class SpinningAppLogo extends StatefulWidget {
+  final double size;
+  const SpinningAppLogo({super.key, this.size = 32});
+
+  @override
+  State<SpinningAppLogo> createState() => _SpinningAppLogoState();
+}
+
+class _SpinningAppLogoState extends State<SpinningAppLogo>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RotationTransition(
+      turns: _ctrl,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(widget.size * 0.28),
+        child: Image.asset(
+          'assets/icons/app_icon.png',
+          width: widget.size,
+          height: widget.size,
+        ),
+      ),
+    );
+  }
+}
+
 /// Three staggered pulsing dots — used inline inside buttons and small spaces.
 class PintDots extends StatefulWidget {
   final Color color;

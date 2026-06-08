@@ -159,8 +159,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                 GestureDetector(
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => EditProfileScreen(
-                        profileService: context.read<ProfileService>(),
+                      builder: (ctx) => EditProfileScreen(
+                        profileService: ctx.read<ProfileService>(),
                       ),
                     ),
                   ),
@@ -218,7 +218,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     animation: _statAnim(1),
                     child: _StatTile(
                       value: pp.totalPints,
-                      label: 'Biere',
+                      label: 'Drinks',
                       t: t,
                     ),
                   ),
@@ -234,21 +234,6 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
           ),
           const SizedBox(height: 18),
-
-          AchievementStrip(
-            achievements: achievements.achievements,
-            loading: achievements.loading,
-            t: t,
-          ),
-          const SizedBox(height: 12),
-
-          // ── Bingo banner ──
-          _BingoBannerTile(
-            bingo: bingo,
-            t: t,
-            onTap: () => BingoScreen.show(context),
-          ),
-          const SizedBox(height: 22), // matches banner margin: "0 18px 22px"
 
           // ── Streak heatmap ──
           Padding(
@@ -331,8 +316,22 @@ class _ProfileScreenState extends State<ProfileScreen>
               ],
             ),
           ),
+          const SizedBox(height: 12),
+
+          AchievementStrip(
+            achievements: achievements.achievements,
+            loading: achievements.loading,
+            t: t,
+          ),
           const SizedBox(height: 18),
 
+          // ── Bingo banner ──
+          _BingoBannerTile(
+            bingo: bingo,
+            t: t,
+            onTap: () => BingoScreen.show(context),
+          ),
+          const SizedBox(height: 22), // matches banner margin: "0 18px 22px"
           // ── Recent pours ──
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 0, 18, 0),
@@ -454,8 +453,9 @@ class _BingoBannerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final card = bingo.card;
-    final monthAbbr =
-        card != null ? card.monthLabel.split(' ').first.toUpperCase() : '';
+    final monthAbbr = card != null
+        ? card.monthLabel.split(' ').first.toUpperCase()
+        : '';
     final linesText = card != null && card.completedLines > 0
         ? ' · ${card.completedLines} ${card.completedLines == 1 ? 'Zeile' : 'Zeilen'}'
         : '';
@@ -492,10 +492,10 @@ class _BingoBannerTile extends StatelessWidget {
                         physics: const NeverScrollableScrollPhysics(),
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 5,
-                          mainAxisSpacing: 3,
-                          crossAxisSpacing: 3,
-                        ),
+                              crossAxisCount: 5,
+                              mainAxisSpacing: 3,
+                              crossAxisSpacing: 3,
+                            ),
                         itemCount: 25,
                         itemBuilder: (_, i) => Opacity(
                           opacity: card.cells[i].done ? 1.0 : 0.7,
@@ -534,7 +534,9 @@ class _BingoBannerTile extends StatelessWidget {
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: t.gold,
                             borderRadius: BorderRadius.circular(999),
@@ -557,23 +559,26 @@ class _BingoBannerTile extends StatelessWidget {
                     Text(
                       'Wird geladen…',
                       style: TextStyle(
-                          color: t.textMuted,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600),
+                        color: t.textMuted,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
                     )
                   else if (card != null)
                     RichText(
                       text: TextSpan(
                         style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            color: t.textMuted),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: t.textMuted,
+                        ),
                         children: [
                           TextSpan(
                             text: '${card.totalDone}/25 erledigt',
                             style: TextStyle(
-                                color: t.goldText,
-                                fontWeight: FontWeight.w800),
+                              color: t.goldText,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                           if (linesText.isNotEmpty) TextSpan(text: linesText),
                         ],
@@ -583,9 +588,10 @@ class _BingoBannerTile extends StatelessWidget {
                     Text(
                       'Tippe um die Karte zu öffnen',
                       style: TextStyle(
-                          color: t.textMuted,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600),
+                        color: t.textMuted,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                 ],
               ),

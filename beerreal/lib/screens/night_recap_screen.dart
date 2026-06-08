@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../features/recap/services/recap_service.dart';
+import '../widgets/pint_loading.dart';
 import '../theme.dart';
 
 /// Shows last night's drinking summary as a modal bottom sheet.
@@ -91,11 +92,7 @@ class _NightRecapScreenState extends State<NightRecapScreen>
           if (_loading)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 56),
-              child: SizedBox(
-                width: 26,
-                height: 26,
-                child: CircularProgressIndicator(strokeWidth: 2, color: t.gold),
-              ),
+              child: SpinningAppLogo(size: 26),
             )
           else if (_recap == null)
             _EmptyState(t: t)

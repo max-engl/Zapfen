@@ -1,5 +1,6 @@
 const express = require('express');
 const Post = require('../models/Post');
+const Friend = require('../models/Friend');
 const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -14,22 +15,22 @@ const BINGO_POOL = [
   { id: 'sunday', label: 'An einem Sonntag', emoji: '😴' },
   { id: 'five_in_week', label: '5 Biere in einer Woche', emoji: '🏆' },
   { id: 'after_10pm', label: 'Nach 22 Uhr', emoji: '🌆' },
-  { id: 'weizen', label: 'Ein Weizen', emoji: '🍺' },
-  { id: 'radler', label: 'Ein Radler', emoji: '🍋' },
+  { id: 'with_location', label: 'Mit Standort', emoji: '📍' },
   { id: 'with_caption', label: 'Mit Caption', emoji: '✍️' },
   { id: 'three_same_day', label: '3 Biere an einem Tag', emoji: '🎯' },
   { id: 'five_stars', label: '5 Sterne vergeben', emoji: '⭐' },
   { id: 'mittagsbier', label: 'Mittagsbier (12–14 Uhr)', emoji: '🌞' },
   { id: 'streak_5', label: '5 Tage in Folge', emoji: '🔥' },
-  { id: 'aperol', label: 'Aperol Spritz', emoji: '🍊' },
-  { id: 'wine', label: 'Einen Wein', emoji: '🍷' },
-  { id: 'cocktail', label: 'Einen Cocktail', emoji: '🍹' },
+  { id: 'three_locations', label: '3 Orte im Monat', emoji: '🧭' },
+  { id: 'same_spot_twice', label: '2 Tage am selben Ort', emoji: '🏠' },
+  { id: 'far_apart', label: '5 km Abstand', emoji: '🚶' },
   { id: 'thursday', label: 'An einem Donnerstag', emoji: '🍻' },
   { id: 'high_rating', label: '4+ Sterne', emoji: '✨' },
   { id: 'ten_total', label: '10 Biere diesen Monat', emoji: '💯' },
   { id: 'two_locations', label: '2 Orte an einem Tag', emoji: '🗺️' },
   { id: 'early_morning', label: 'Vor 10 Uhr morgens', emoji: '🌅' },
   { id: 'wednesday', label: 'An einem Mittwoch', emoji: '🐪' },
+  { id: 'story_caption', label: 'Story-Caption', emoji: '📝' },
 ];
 
 function seededShuffle(arr, seed) {
@@ -49,6 +50,29 @@ function getMonthCard(year, month) {
   const seed = (year * 100 + month) >>> 0;
   const picked = seededShuffle(BINGO_POOL, seed).slice(0, 24);
   return [...picked.slice(0, 12), FREE_CELL, ...picked.slice(12)];
+}
+
+function hasCoordinates(post) {
+  return post.location?.coordinates?.length === 2;
+}
+
+function getSpotKey(post) {
+  if (!hasCoordinates(post)) return null;
+  const [lng, lat] = post.location.coordinates;
+  return `${(lat * 10).toFixed(0)},${(lng * 10).toFixed(0)}`;
+}
+
+function distanceMeters(a, b) {
+  const [lngA, latA] = a.location.coordinates;
+  const [lngB, latB] = b.location.coordinates;
+  const toRad = degrees => (degrees * Math.PI) / 180;
+  const dLat = toRad(latB - latA);
+  const dLng = toRad(lngB - lngA);
+  const latARad = toRad(latA);
+  const latBRad = toRad(latB);
+  const h = Math.sin(dLat / 2) ** 2
+    + Math.cos(latARad) * Math.cos(latBRad) * Math.sin(dLng / 2) ** 2;
+  return 6371000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
 function checkCompletion(cellId, posts) {
@@ -80,10 +104,8 @@ function checkCompletion(cellId, posts) {
     }
     case 'after_10pm':
       return posts.some(p => new Date(p.createdAt).getHours() >= 22);
-    case 'weizen':
-      return posts.some(p => (p.drink?.name || '').toLowerCase().includes('weizen'));
-    case 'radler':
-      return posts.some(p => (p.drink?.name || '').toLowerCase().includes('radler'));
+    case 'with_location':
+      return posts.some(hasCoordinates);
     case 'with_caption':
       return posts.some(p => p.caption && p.caption.trim().length > 0);
     case 'three_same_day': {
@@ -105,12 +127,27 @@ function checkCompletion(cellId, posts) {
       }
       return max >= 5;
     }
-    case 'aperol':
-      return posts.some(p => (p.drink?.name || '').toLowerCase().includes('aperol'));
-    case 'wine':
-      return posts.some(p => { const n = (p.drink?.name || '').toLowerCase(); return n.includes('wein') || n.includes('sekt') || n.includes('schorle'); });
-    case 'cocktail':
-      return posts.some(p => { const n = (p.drink?.name || '').toLowerCase(); return ['gin', 'vodka', 'rum', 'hugo', 'mojito', 'tonic', 'korn', 'whisky', 'whiskey', 'long', 'cocktail'].some(c => n.includes(c)); });
+    case 'three_locations':
+      return new Set(posts.map(getSpotKey).filter(Boolean)).size >= 3;
+    case 'same_spot_twice': {
+      const spotDays = {};
+      posts.forEach(p => {
+        const spot = getSpotKey(p);
+        if (!spot) return;
+        if (!spotDays[spot]) spotDays[spot] = new Set();
+        spotDays[spot].add(new Date(p.createdAt).toDateString());
+      });
+      return Object.values(spotDays).some(s => s.size >= 2);
+    }
+    case 'far_apart': {
+      const locatedPosts = posts.filter(hasCoordinates);
+      for (let i = 0; i < locatedPosts.length; i++) {
+        for (let j = i + 1; j < locatedPosts.length; j++) {
+          if (distanceMeters(locatedPosts[i], locatedPosts[j]) >= 5000) return true;
+        }
+      }
+      return false;
+    }
     case 'thursday':
       return posts.some(p => new Date(p.createdAt).getDay() === 4);
     case 'high_rating':
@@ -133,6 +170,8 @@ function checkCompletion(cellId, posts) {
       return posts.some(p => new Date(p.createdAt).getHours() < 10);
     case 'wednesday':
       return posts.some(p => new Date(p.createdAt).getDay() === 3);
+    case 'story_caption':
+      return posts.some(p => (p.caption || '').trim().length >= 50);
     default:
       return false;
   }
@@ -152,41 +191,74 @@ function countCompletedLines(grid) {
   return count;
 }
 
+async function canViewUser(viewerId, targetId) {
+  if (targetId === viewerId) return true;
+  const friendship = await Friend.findOne({
+    $or: [
+      { requester: viewerId, recipient: targetId },
+      { requester: targetId, recipient: viewerId },
+    ],
+    status: 'accepted',
+  });
+  return Boolean(friendship);
+}
+
+async function buildBingoCardForUser(userId) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+
+  const startOfMonth = new Date(year, month - 1, 1);
+  const endOfMonth = new Date(year, month, 1);
+
+  const posts = await Post.find({
+    user: userId,
+    createdAt: { $gte: startOfMonth, $lt: endOfMonth },
+  }).select('createdAt drink caption rating location').lean();
+
+  const card = getMonthCard(year, month);
+  const grid = card.map(cell => ({
+    id: cell.id,
+    label: cell.label,
+    emoji: cell.emoji,
+    done: cell.id === 'free' || checkCompletion(cell.id, posts),
+  }));
+
+  const completedLines = countCompletedLines(grid);
+  const isBlackout = grid.every(c => c.done);
+  const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+
+  return {
+    card: grid,
+    completedLines,
+    isBlackout,
+    monthLabel: `${monthNames[month - 1]} ${year}`,
+    totalDone: grid.filter(c => c.done).length,
+  };
+}
+
 // GET /bingo/card
 router.get('/card', authMiddleware, async (req, res) => {
   try {
     res.set('Cache-Control', 'no-store');
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
+    res.json(await buildBingoCardForUser(req.user._id));
+  } catch (err) {
+    res.status(500).json({ message: 'Bingo-Karte konnte nicht geladen werden.', error: err.message });
+  }
+});
 
-    const startOfMonth = new Date(year, month - 1, 1);
-    const endOfMonth = new Date(year, month, 1);
+// GET /bingo/user/:userId  — bingo card for a friend's profile
+router.get('/user/:userId', authMiddleware, async (req, res) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    const viewerId = req.user._id.toString();
+    const targetId = req.params.userId;
 
-    const posts = await Post.find({
-      user: req.user._id,
-      createdAt: { $gte: startOfMonth, $lt: endOfMonth },
-    }).select('createdAt drink caption rating location').lean();
+    if (!await canViewUser(viewerId, targetId)) {
+      return res.status(403).json({ message: 'You can only view bingo cards of your friends' });
+    }
 
-    const card = getMonthCard(year, month);
-    const grid = card.map(cell => ({
-      id: cell.id,
-      label: cell.label,
-      emoji: cell.emoji,
-      done: cell.id === 'free' || checkCompletion(cell.id, posts),
-    }));
-
-    const completedLines = countCompletedLines(grid);
-    const isBlackout = grid.every(c => c.done);
-    const monthNames = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-
-    res.json({
-      card: grid,
-      completedLines,
-      isBlackout,
-      monthLabel: `${monthNames[month - 1]} ${year}`,
-      totalDone: grid.filter(c => c.done).length,
-    });
+    res.json(await buildBingoCardForUser(targetId));
   } catch (err) {
     res.status(500).json({ message: 'Bingo-Karte konnte nicht geladen werden.', error: err.message });
   }

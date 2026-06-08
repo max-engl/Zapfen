@@ -1,7 +1,17 @@
 const express = require("express");
 const { v4: uuidv4 } = require("uuid");
+const bcrypt = require("bcrypt");
 
 const User = require("../models/User");
+const Post = require("../models/Post");
+const Like = require("../models/Like");
+const PostReaction = require("../models/PostReaction");
+const Comment = require("../models/Comment");
+const CommentReaction = require("../models/CommentReaction");
+const Friend = require("../models/Friend");
+const AppNotification = require("../models/AppNotification");
+const Drink = require("../models/Drink");
+const Report = require("../models/Report");
 const supabase = require("../config/supabase");
 const upload = require("../middleware/uploadMiddleware");
 const authMiddleware = require("../middleware/authMiddleware");
@@ -187,6 +197,81 @@ router.put("/me/fcm-token", authMiddleware, async (req, res) => {
         res.json({ message: "FCM token saved" });
     } catch (error) {
         res.status(500).json({ message: "Could not save FCM token", error: error.message });
+    }
+});
+
+// DELETE /users/me  —  permanently delete account and all associated data
+router.delete("/me", authMiddleware, async (req, res) => {
+    try {
+        const { password } = req.body;
+        if (!password) {
+            return res.status(400).json({ message: "Password is required to delete your account" });
+        }
+
+        const user = await User.findById(req.user._id);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        const passwordMatch = await bcrypt.compare(password, user.passwordHash);
+        if (!passwordMatch) {
+            return res.status(400).json({ message: "Falsches Passwort" });
+        }
+
+        const userId = user._id;
+
+        // Collect all post storage paths to delete from Supabase
+        const posts = await Post.find({ user: userId }).select("storagePath selfieStoragePath");
+        const postIds = posts.map((p) => p._id);
+        const storagePaths = [];
+        for (const p of posts) {
+            if (p.storagePath) storagePaths.push(p.storagePath);
+            if (p.selfieStoragePath) storagePaths.push(p.selfieStoragePath);
+        }
+        if (storagePaths.length > 0) {
+            await supabase.storage.from(process.env.SUPABASE_POST_BUCKET).remove(storagePaths);
+        }
+
+        // Delete avatar from storage
+        if (user.avatarUrl) {
+            const avatarPath = user.avatarUrl.split(`/${process.env.SUPABASE_AVATAR_BUCKET}/`)[1];
+            if (avatarPath) {
+                await supabase.storage.from(process.env.SUPABASE_AVATAR_BUCKET).remove([avatarPath]);
+            }
+        }
+
+        // Get comment IDs authored by this user for CommentReaction cleanup
+        const userCommentIds = await Comment.find({ user: userId }).distinct("_id");
+        // Get comment IDs on this user's posts for full cleanup
+        const postCommentIds = postIds.length > 0
+            ? await Comment.find({ post: { $in: postIds } }).distinct("_id")
+            : [];
+        const allCommentIds = [...new Set([...userCommentIds.map(String), ...postCommentIds.map(String)])];
+
+        await Promise.all([
+            // Posts and their associated data
+            Post.deleteMany({ user: userId }),
+            Like.deleteMany({ $or: [{ user: userId }, { post: { $in: postIds } }] }),
+            PostReaction.deleteMany({ $or: [{ user: userId }, { post: { $in: postIds } }] }),
+            Comment.deleteMany({ $or: [{ user: userId }, { post: { $in: postIds } }] }),
+            allCommentIds.length > 0
+                ? CommentReaction.deleteMany({ $or: [{ user: userId }, { comment: { $in: allCommentIds } }] })
+                : Promise.resolve(),
+            // Social graph
+            Friend.deleteMany({ $or: [{ requester: userId }, { recipient: userId }] }),
+            // Notifications
+            AppNotification.deleteMany({ $or: [{ recipient: userId }, { actorId: userId }] }),
+            // User-created drinks
+            Drink.deleteMany({ user: userId }),
+            // Reports
+            Report.deleteMany({ reporter: userId }),
+        ]);
+
+        await User.findByIdAndDelete(userId);
+
+        res.json({ message: "Account deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ message: "Could not delete account", error: error.message });
     }
 });
 

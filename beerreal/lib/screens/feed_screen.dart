@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/cupertino.dart' show CupertinoSliverRefreshControl, RefreshIndicatorMode;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/app_cache_manager.dart';
@@ -203,117 +204,202 @@ class _FeedScreenState extends State<FeedScreen> {
 
     final currentUserId = context.read<AuthProvider>().user?.id;
 
-    return RefreshIndicator(
-      color: t.gold,
-      onRefresh: () async {
-        await feed.loadFeed();
-      },
-      child: ListView.builder(
-        controller: _scrollController,
-        padding: const EdgeInsets.only(bottom: 100),
-        itemCount: feed.posts.length + 2,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
-              child: Row(
-                children: [
-                  Text(
-                    'FREUNDE · HEUTE',
-                    style: TextStyle(
-                      color: t.textMuted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.8,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(child: Container(height: 1, color: t.border)),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${feed.posts.length}',
-                    style: TextStyle(color: t.textMuted, fontSize: 12),
-                  ),
-                ],
+    return CustomScrollView(
+      controller: _scrollController,
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
+      ),
+      slivers: [
+        CupertinoSliverRefreshControl(
+          onRefresh: () => feed.loadFeed(),
+          builder: (_, state, pulledExtent, triggerDistance, __) =>
+              _RefreshLogo(
+                state: state,
+                pulledExtent: pulledExtent,
+                triggerDistance: triggerDistance,
               ),
-            );
-          }
-
-          final postIndex = index - 1;
-
-          if (postIndex == feed.posts.length) {
-            if (feed.loadingMore) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24),
-                child: Center(
-                  child: PintDots(color: t.gold, dotSize: 6, spacing: 5),
-                ),
-              );
-            }
-            if (feed.loadMoreFailed) {
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                child: GestureDetector(
-                  onTap: () => feed.retryLoadMore(),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: t.surfaceWeak,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: t.border),
-                    ),
-                    child: Center(
-                      child: Text(
-                        'Laden fehlgeschlagen – tippe zum Wiederholen',
-                        style: TextStyle(
-                          color: t.textMuted,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.only(bottom: 100),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                if (index == 0) {
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+                    child: Row(
+                      children: [
+                        Text(
+                          'FREUNDE · HEUTE',
+                          style: TextStyle(
+                            color: t.textMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.8,
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Expanded(child: Container(height: 1, color: t.border)),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${feed.posts.length}',
+                          style: TextStyle(color: t.textMuted, fontSize: 12),
+                        ),
+                      ],
                     ),
-                  ),
-                ),
-              );
-            }
-            return const SizedBox.shrink();
-          }
+                  );
+                }
 
-          final p = feed.posts[postIndex];
-          return StaggerItem(
-            key: ValueKey(p.id),
-            index: postIndex,
-            child: PostCard(
-              post: p,
-              onReact: (emoji) => feed.toggleReaction(p.id, emoji),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => PostDetailScreen(post: p)),
-              ),
-              onDelete: p.userId == currentUserId
-                  ? () => feed.deletePost(p.id)
-                  : null,
-              onProfileTap: p.userId == currentUserId
-                  ? () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const ProfileScreen(standaloneRoute: true),
+                final postIndex = index - 1;
+
+                if (postIndex == feed.posts.length) {
+                  if (feed.loadingMore) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: PintDots(color: t.gold, dotSize: 6, spacing: 5),
                       ),
-                    )
-                  : () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => FriendProfileScreen(
-                          friend: ApiFriend(
-                            id: p.userId,
-                            username: p.username,
-                            avatarUrl: p.avatarUrl,
-                            avatarColor: p.avatarColor,
-                            avatarInitial: p.avatarInitial,
+                    );
+                  }
+                  if (feed.loadMoreFailed) {
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                      child: GestureDetector(
+                        onTap: () => feed.retryLoadMore(),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: t.surfaceWeak,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: t.border),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Laden fehlgeschlagen – tippe zum Wiederholen',
+                              style: TextStyle(
+                                color: t.textMuted,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ),
                       ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                }
+
+                final p = feed.posts[postIndex];
+                return StaggerItem(
+                  key: ValueKey(p.id),
+                  index: postIndex,
+                  child: PostCard(
+                    post: p,
+                    enableHero: false,
+                    onReact: (emoji) => feed.toggleReaction(p.id, emoji),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => PostDetailScreen(post: p),
+                      ),
                     ),
+                    onDelete: p.userId == currentUserId
+                        ? () => feed.deletePost(p.id)
+                        : null,
+                    onProfileTap: p.userId == currentUserId
+                        ? () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const ProfileScreen(standaloneRoute: true),
+                            ),
+                          )
+                        : () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => FriendProfileScreen(
+                                friend: ApiFriend(
+                                  id: p.userId,
+                                  username: p.username,
+                                  avatarUrl: p.avatarUrl,
+                                  avatarColor: p.avatarColor,
+                                  avatarInitial: p.avatarInitial,
+                                ),
+                              ),
+                            ),
+                          ),
+                  ),
+                );
+              },
+              childCount: feed.posts.length + 2,
             ),
-          );
-        },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RefreshLogo extends StatefulWidget {
+  final RefreshIndicatorMode state;
+  final double pulledExtent;
+  final double triggerDistance;
+
+  const _RefreshLogo({
+    required this.state,
+    required this.pulledExtent,
+    required this.triggerDistance,
+  });
+
+  @override
+  State<_RefreshLogo> createState() => _RefreshLogoState();
+}
+
+class _RefreshLogoState extends State<_RefreshLogo>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _spin = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  );
+
+  bool get _isRefreshing =>
+      widget.state == RefreshIndicatorMode.refresh ||
+      widget.state == RefreshIndicatorMode.armed;
+
+  @override
+  void didUpdateWidget(_RefreshLogo old) {
+    super.didUpdateWidget(old);
+    if (_isRefreshing && !_spin.isAnimating) {
+      _spin.repeat();
+    } else if (!_isRefreshing && _spin.isAnimating) {
+      _spin.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _spin.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress =
+        (widget.pulledExtent / widget.triggerDistance).clamp(0.0, 1.0);
+    return Center(
+      child: Opacity(
+        opacity: progress,
+        child: RotationTransition(
+          turns: _isRefreshing
+              ? _spin
+              : AlwaysStoppedAnimation(progress * 0.5),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.asset(
+              'assets/icons/app_icon.png',
+              width: 36,
+              height: 36,
+            ),
+          ),
+        ),
       ),
     );
   }
