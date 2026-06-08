@@ -323,7 +323,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             loading: achievements.loading,
             t: t,
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 30),
 
           // ── Bingo banner ──
           _BingoBannerTile(

@@ -3,7 +3,7 @@ class ApiConstants {
   //   flutter run --dart-define=API_HOST=yourapp.com --dart-define=API_SCHEME=https --dart-define=API_PORT=443
   static const String host = String.fromEnvironment(
     'API_HOST',
-    defaultValue: '10.170.54.9',
+    defaultValue: '10.250.2.19',
   );
   static const String scheme = String.fromEnvironment(
     'API_SCHEME',
@@ -46,11 +46,11 @@ class ApiConstants {
   static const String updateAvatar = '/users/me/avatar';
   static const String removeAvatar = '/users/me/avatar';
   static const String updateMe = '/users/me';
-  static const String deleteAccount = '/users/me';
   static const String searchUsers = '/users/search';
 
-  // Auth – password change
+  // Auth – password change / account deletion
   static const String changePassword = '/auth/password';
+  static const String deleteAccount = '/users/me';
 
   // Post reactions
   static String reactToPost(String id) => '/posts/$id/reactions';

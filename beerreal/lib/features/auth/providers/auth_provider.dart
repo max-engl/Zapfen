@@ -13,19 +13,26 @@ class AuthProvider extends ChangeNotifier {
   AuthStatus _status = AuthStatus.checking;
   AppUser? _user;
   String? _errorMessage;
+  bool _updateRequired = false;
+  List<String> _patchNotes = [];
 
   AuthProvider(this._authService);
 
   AuthStatus get status => _status;
   AppUser? get user => _user;
   String? get errorMessage => _errorMessage;
+  bool get updateRequired => _updateRequired;
+  List<String> get patchNotes => _patchNotes;
 
   Future<void> checkAuth() async {
     debugPrint('[startup] checkAuth start');
     _status = AuthStatus.checking;
     notifyListeners();
     try {
-      _user = await _authService.me();
+      final result = await _authService.me();
+      _user = result.user;
+      _updateRequired = result.updateRequired;
+      _patchNotes = result.patchNotes;
       _status = _user != null
           ? AuthStatus.authenticated
           : AuthStatus.unauthenticated;
@@ -43,10 +50,13 @@ class AuthProvider extends ChangeNotifier {
   }) async {
     _errorMessage = null;
     try {
-      _user = await _authService.login(
+      final result = await _authService.login(
         emailOrUsername: emailOrUsername,
         password: password,
       );
+      _user = result.user;
+      _updateRequired = result.updateRequired;
+      _patchNotes = result.patchNotes;
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
@@ -68,11 +78,14 @@ class AuthProvider extends ChangeNotifier {
   }) async {
     _errorMessage = null;
     try {
-      _user = await _authService.register(
+      final result = await _authService.register(
         username: username,
         email: email,
         password: password,
       );
+      _user = result.user;
+      _updateRequired = result.updateRequired;
+      _patchNotes = result.patchNotes;
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
@@ -99,6 +112,8 @@ class AuthProvider extends ChangeNotifier {
     await AppCacheManager.instance.emptyCache();
     PaintingBinding.instance.imageCache.clear();
     _user = null;
+    _updateRequired = false;
+    _patchNotes = [];
     _status = AuthStatus.unauthenticated;
     notifyListeners();
   }
@@ -107,6 +122,8 @@ class AuthProvider extends ChangeNotifier {
   /// async side-effects so it's safe to call from a Dio interceptor.
   void forceLogout() {
     _user = null;
+    _updateRequired = false;
+    _patchNotes = [];
     _status = AuthStatus.unauthenticated;
     notifyListeners();
   }

@@ -8,6 +8,29 @@ const { generateAvatarColor, getAvatarInitial } = require("../utils/avatarUtil")
 
 const router = express.Router();
 
+const MIN_CLIENT_VERSION = '1.1';
+
+const PATCH_NOTES = [
+    'Beer-Bingo mit deinem Freundeskreis',
+];
+
+function parseVersion(v) {
+    return String(v || '0').split('.').map(n => parseInt(n, 10) || 0);
+}
+
+function isOutdated(clientVersion) {
+    const client = parseVersion(clientVersion);
+    const min = parseVersion(MIN_CLIENT_VERSION);
+    const len = Math.max(client.length, min.length);
+    for (let i = 0; i < len; i++) {
+        const c = client[i] ?? 0;
+        const m = min[i] ?? 0;
+        if (c < m) return true;
+        if (c > m) return false;
+    }
+    return false;
+}
+
 function createToken(user) {
     const raw = process.env.JWT_EXPIRES_IN || "7d";
     // If purely numeric, treat as seconds (not ms); otherwise pass as-is (e.g. "30d")
@@ -25,7 +48,7 @@ function createToken(user) {
 // POST /auth/register
 router.post("/register", async (req, res) => {
     try {
-        const { username, email, password } = req.body;
+        const { username, email, password, clientVersion } = req.body;
 
         if (!username || !email || !password) {
             return res.status(400).json({
@@ -64,6 +87,8 @@ router.post("/register", async (req, res) => {
         res.status(201).json({
             message: "User registered successfully",
             token,
+            updateRequired: isOutdated(clientVersion),
+            patchNotes: PATCH_NOTES,
             user: {
                 id: user._id,
                 username: user.username,
@@ -85,7 +110,7 @@ router.post("/register", async (req, res) => {
 // POST /auth/login
 router.post("/login", async (req, res) => {
     try {
-        const { emailOrUsername, password } = req.body;
+        const { emailOrUsername, password, clientVersion } = req.body;
 
         if (!emailOrUsername || !password) {
             return res.status(400).json({
@@ -118,6 +143,8 @@ router.post("/login", async (req, res) => {
         res.json({
             message: "Login successful",
             token,
+            updateRequired: isOutdated(clientVersion),
+            patchNotes: PATCH_NOTES,
             user: {
                 id: user._id,
                 username: user.username,
@@ -139,6 +166,8 @@ router.post("/login", async (req, res) => {
 // GET /auth/me
 router.get("/me", authMiddleware, async (req, res) => {
     res.json({
+        updateRequired: isOutdated(req.query.v),
+        patchNotes: PATCH_NOTES,
         user: {
             id: req.user._id,
             username: req.user.username,

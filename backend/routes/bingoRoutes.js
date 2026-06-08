@@ -6,31 +6,42 @@ const authMiddleware = require('../middleware/authMiddleware');
 const router = express.Router();
 
 const BINGO_POOL = [
-  { id: 'after_2am', label: 'Nach 2 Uhr nachts', emoji: '🌙' },
-  { id: 'before_4pm', label: 'Vor 16 Uhr', emoji: '☀️' },
-  { id: 'three_types', label: '3 versch. Sorten', emoji: '🍻' },
-  { id: 'monday', label: 'An einem Montag', emoji: '😮' },
-  { id: 'friday', label: 'An einem Freitag', emoji: '🎉' },
-  { id: 'saturday', label: 'An einem Samstag', emoji: '🕺' },
-  { id: 'sunday', label: 'An einem Sonntag', emoji: '😴' },
-  { id: 'five_in_week', label: '5 Biere in einer Woche', emoji: '🏆' },
-  { id: 'after_10pm', label: 'Nach 22 Uhr', emoji: '🌆' },
-  { id: 'with_location', label: 'Mit Standort', emoji: '📍' },
-  { id: 'with_caption', label: 'Mit Caption', emoji: '✍️' },
-  { id: 'three_same_day', label: '3 Biere an einem Tag', emoji: '🎯' },
-  { id: 'five_stars', label: '5 Sterne vergeben', emoji: '⭐' },
-  { id: 'mittagsbier', label: 'Mittagsbier (12–14 Uhr)', emoji: '🌞' },
-  { id: 'streak_5', label: '5 Tage in Folge', emoji: '🔥' },
-  { id: 'three_locations', label: '3 Orte im Monat', emoji: '🧭' },
-  { id: 'same_spot_twice', label: '2 Tage am selben Ort', emoji: '🏠' },
-  { id: 'far_apart', label: '5 km Abstand', emoji: '🚶' },
-  { id: 'thursday', label: 'An einem Donnerstag', emoji: '🍻' },
-  { id: 'high_rating', label: '4+ Sterne', emoji: '✨' },
-  { id: 'ten_total', label: '10 Biere diesen Monat', emoji: '💯' },
-  { id: 'two_locations', label: '2 Orte an einem Tag', emoji: '🗺️' },
-  { id: 'early_morning', label: 'Vor 10 Uhr morgens', emoji: '🌅' },
-  { id: 'wednesday', label: 'An einem Mittwoch', emoji: '🐪' },
-  { id: 'story_caption', label: 'Story-Caption', emoji: '📝' },
+  // Easy
+  { id: 'friday',          label: 'An einem Freitag',            emoji: '🎉' },
+  { id: 'saturday',        label: 'An einem Samstag',            emoji: '🕺' },
+  { id: 'sunday',          label: 'An einem Sonntag',            emoji: '😴' },
+  { id: 'after_10pm',      label: 'Nach 22 Uhr',                 emoji: '🌆' },
+  { id: 'with_caption',    label: 'Mit Caption',                  emoji: '✍️' },
+  { id: 'with_location',   label: 'Mit Standort',                emoji: '📍' },
+  { id: 'high_rating',     label: '4+ Sterne vergeben',          emoji: '✨' },
+  { id: 'double_day',      label: '2 Biere an einem Tag',        emoji: '🍺' },
+
+  // Medium
+  { id: 'monday',          label: 'An einem Montag',             emoji: '😮' },
+  { id: 'wednesday',       label: 'An einem Mittwoch',           emoji: '🐪' },
+  { id: 'thursday',        label: 'An einem Donnerstag',         emoji: '🍻' },
+  { id: 'before_4pm',      label: 'Vor 16 Uhr',                  emoji: '☀️' },
+  { id: 'mittagsbier',     label: 'Mittagsbier (12–14 Uhr)',     emoji: '🌞' },
+  { id: 'same_spot_twice', label: '2 Tage am selben Ort',        emoji: '🏠' },
+  { id: 'story_caption',   label: 'Story-Caption (50+ Zeichen)', emoji: '📝' },
+  { id: 'two_locations',   label: '2 Orte an einem Tag',         emoji: '🗺️' },
+  { id: 'three_types',     label: '3 verschiedene Sorten',       emoji: '🍻' },
+  { id: 'full_weekend',    label: 'Fr, Sa & So in einer Woche',  emoji: '🎊' },
+
+  // Hard
+  { id: 'after_2am',       label: 'Nach 2 Uhr nachts',           emoji: '🌙' },
+  { id: 'three_same_day',  label: '3 Biere an einem Tag',        emoji: '🎯' },
+  { id: 'five_in_week',    label: '5 Biere in einer Woche',      emoji: '🏆' },
+  { id: 'three_locations', label: '3 Orte im Monat',             emoji: '🧭' },
+  { id: 'far_apart',       label: '5 km Abstand',                emoji: '🚶' },
+  { id: 'five_types',      label: '5 verschiedene Sorten',       emoji: '🍺' },
+  { id: 'early_morning',   label: 'Vor 10 Uhr morgens',          emoji: '🌅' },
+
+  // Very hard
+  { id: 'streak_5',        label: '5 Tage in Folge',             emoji: '🔥' },
+  { id: 'ten_total',       label: '10 Biere diesen Monat',       emoji: '💯' },
+  { id: 'streak_7',        label: '7 Tage in Folge',             emoji: '🔥' },
+  { id: 'fifteen_total',   label: '15 Biere diesen Monat',       emoji: '🏅' },
 ];
 
 function seededShuffle(arr, seed) {
@@ -172,6 +183,41 @@ function checkCompletion(cellId, posts) {
       return posts.some(p => new Date(p.createdAt).getDay() === 3);
     case 'story_caption':
       return posts.some(p => (p.caption || '').trim().length >= 50);
+    case 'double_day': {
+      const dayMap = {};
+      posts.forEach(p => { const k = new Date(p.createdAt).toDateString(); dayMap[k] = (dayMap[k] || 0) + 1; });
+      return Object.values(dayMap).some(v => v >= 2);
+    }
+    case 'five_types':
+      return new Set(posts.map(p => p.drink?.name).filter(Boolean)).size >= 5;
+    case 'full_weekend': {
+      // Anchor every Fri/Sat/Sun post to the Friday of its weekend
+      const weekends = {};
+      posts.forEach(p => {
+        const d = new Date(p.createdAt);
+        const day = d.getDay(); // 0=Sun 5=Fri 6=Sat
+        if (day !== 5 && day !== 6 && day !== 0) return;
+        const anchor = new Date(d);
+        if (day === 6) anchor.setDate(d.getDate() - 1);
+        if (day === 0) anchor.setDate(d.getDate() - 2);
+        const key = anchor.toDateString();
+        if (!weekends[key]) weekends[key] = new Set();
+        weekends[key].add(day);
+      });
+      return Object.values(weekends).some(days => days.has(5) && days.has(6) && days.has(0));
+    }
+    case 'streak_7': {
+      const daySet = new Set(posts.map(p => new Date(p.createdAt).toDateString()));
+      const days = [...daySet].map(d => new Date(d)).sort((a, b) => a - b);
+      let streak = 1, max = 1;
+      for (let i = 1; i < days.length; i++) {
+        const diff = (days[i] - days[i - 1]) / 86400000;
+        if (diff <= 1.5) { streak++; max = Math.max(max, streak); } else streak = 1;
+      }
+      return max >= 7;
+    }
+    case 'fifteen_total':
+      return posts.length >= 15;
     default:
       return false;
   }

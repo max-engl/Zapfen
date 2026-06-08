@@ -41,6 +41,7 @@ import 'features/bingo/services/bingo_service.dart';
 import 'features/bingo/providers/bingo_provider.dart';
 import 'screens/night_recap_screen.dart';
 import 'widgets/avatar.dart';
+import 'widgets/brand_mark.dart';
 import 'widgets/pint_loading.dart';
 import 'widgets/top_bar.dart';
 import 'widgets/bottom_nav.dart';
@@ -147,7 +148,8 @@ Future<void> _main() async {
           create: (_) => FeedProvider(postService, FeedDatabase.instance),
         ),
         ChangeNotifierProvider<ProfilePostsProvider>(
-          create: (_) => ProfilePostsProvider(postService, FeedDatabase.instance),
+          create: (_) =>
+              ProfilePostsProvider(postService, FeedDatabase.instance),
         ),
         ChangeNotifierProvider<FriendProvider>(
           create: (_) => FriendProvider(friendService, FriendDatabase.instance),
@@ -192,6 +194,7 @@ class _PintRootState extends State<PintRoot> {
   bool _preloadStarted = false;
   bool _onboardingDone = false;
   bool _onboardingChecked = false;
+  bool _updateDialogShown = false;
   PintScreen _postOnboardingScreen = PintScreen.feed;
 
   // Deep links
@@ -277,6 +280,21 @@ class _PintRootState extends State<PintRoot> {
     }
   }
 
+  void _showUpdateDialog(BuildContext context) {
+    final patchNotes = context.read<AuthProvider>().patchNotes;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
+      isScrollControlled: true,
+      enableDrag: true,
+      builder: (_) => _UpdateSheet(
+        onDismiss: () => Navigator.of(context).pop(),
+        patchNotes: patchNotes,
+      ),
+    );
+  }
+
   Future<void> _toggleTheme() async {
     final next = _theme.isDark ? PintTheme.light : PintTheme.dark;
     setState(() => _theme = next);
@@ -294,7 +312,18 @@ class _PintRootState extends State<PintRoot> {
       ),
     );
 
-    final authStatus = context.watch<AuthProvider>().status;
+    final authProvider = context.watch<AuthProvider>();
+    final authStatus = authProvider.status;
+
+    if (authStatus == AuthStatus.authenticated &&
+        authProvider.updateRequired &&
+        !_updateDialogShown) {
+      _updateDialogShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final navCtx = _navigatorKey.currentContext;
+        if (mounted && navCtx != null) _showUpdateDialog(navCtx);
+      });
+    }
 
     // As soon as auth succeeds, kick off the SQLite preload exactly once.
     // The loading screen stays visible until preload finishes so the feed
@@ -440,9 +469,9 @@ class _PintAppState extends State<PintApp> {
     try {
       final post = await context.read<PostService>().getPostById(postId);
       if (!mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)),
-      );
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)));
     } catch (_) {}
   }
 
@@ -826,6 +855,284 @@ class _InviteSheetState extends State<_InviteSheet> {
           ],
         ],
       ),
+    );
+  }
+}
+
+// ── Update sheet ──────────────────────────────────────────────────────────────
+
+class _UpdateSheet extends StatelessWidget {
+  final VoidCallback onDismiss;
+  final List<String> patchNotes;
+  const _UpdateSheet({required this.onDismiss, required this.patchNotes});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = PintThemeProvider.of(context);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 28),
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: t.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x73000000),
+            blurRadius: 60,
+            offset: Offset(0, 24),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          // Gold glow blob behind the icon
+          Positioned(
+            top: -50,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                width: 240,
+                height: 180,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(120),
+                  gradient: RadialGradient(
+                    colors: [t.goldFaint, Colors.transparent],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(22, 26, 22, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Download icon with BrandMark badge
+                SizedBox(
+                  width: 84,
+                  height: 84,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: t.gold,
+                          borderRadius: BorderRadius.circular(22),
+                          boxShadow: [
+                            BoxShadow(
+                              color: t.goldStrong,
+                              blurRadius: 22,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.download_rounded,
+                            color: t.goldInk,
+                            size: 32,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: t.surface,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.all(3),
+                          child: const BrandMark(size: 26),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Version chip
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: t.goldSoft,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: t.goldBorder),
+                  ),
+                  child: Text(
+                    'NEUE VERSION',
+                    style: TextStyle(
+                      color: t.goldText,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Headline
+                Text(
+                  'Zeit für einen frischen Schluck',
+                  style: TextStyle(
+                    color: t.text,
+                    fontSize: 23,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.7,
+                    height: 1.12,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                // Subtitle
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    'Eine neue Version von Zapfen ist bereit. Aktualisiere jetzt, um deinen Streak zu sichern.',
+                    style: TextStyle(
+                      color: t.textMuted,
+                      fontSize: 13.5,
+                      height: 1.45,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                // What's new list
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: t.surfaceWeaker,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: t.borderWeak),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (int i = 0; i < patchNotes.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 11),
+                        _NewLine(patchNotes[i]),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Primary action
+                GestureDetector(
+                  onTap: onDismiss,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    decoration: BoxDecoration(
+                      color: t.gold,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.download_rounded,
+                          color: t.goldInk,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 9),
+                        Text(
+                          'Ok mach ich!',
+                          style: TextStyle(
+                            color: t.goldInk,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                // Secondary action
+                GestureDetector(
+                  onTap: onDismiss,
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Text(
+                        'Nicht jetzt',
+                        style: TextStyle(
+                          color: t.textMuted,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                // Footnote
+                Text(
+                  '18 MB · dauert ein paar Sekunden',
+                  style: TextStyle(
+                    color: t.textFaint,
+                    fontSize: 11,
+                    letterSpacing: 0.11,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NewLine extends StatelessWidget {
+  final String text;
+  const _NewLine(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    final t = PintThemeProvider.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 18,
+          height: 18,
+          decoration: BoxDecoration(
+            color: t.goldSoft,
+            shape: BoxShape.circle,
+            border: Border.all(color: t.goldBorder),
+          ),
+          child: Center(
+            child: Icon(Icons.check_rounded, color: t.goldText, size: 10),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              color: t.text,
+              fontSize: 13.5,
+              letterSpacing: -0.14,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
