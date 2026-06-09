@@ -6,6 +6,8 @@ const PORT = 4000;
 const HOST = '0.0.0.0';
 const WEBSITE_DIR = __dirname;
 const ROOT_DIR = path.join(__dirname, '..');
+const BACKEND_HOST = process.env.BACKEND_HOST || 'localhost';
+const BACKEND_PORT = parseInt(process.env.BACKEND_PORT || '3000', 10);
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -39,6 +41,38 @@ const LEGAL_ROUTES = {
 const server = http.createServer((req, res) => {
   const urlPath = decodeURIComponent(req.url.split('?')[0]);
 
+  // POST /konto-loeschen — proxy deletion request to backend
+  if (req.method === 'POST' && urlPath === '/konto-loeschen') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      const jsonBody = body; // already JSON from the fetch in konto-loeschen.html
+      const options = {
+        hostname: BACKEND_HOST,
+        port: BACKEND_PORT,
+        path: '/auth/deletion-request',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(jsonBody),
+        },
+      };
+      const proxyReq = http.request(options, proxyRes => {
+        proxyRes.resume();
+        const ok = proxyRes.statusCode >= 200 && proxyRes.statusCode < 300;
+        res.writeHead(302, { Location: ok ? '/konto-loeschen?status=success' : '/konto-loeschen?status=error' });
+        res.end();
+      });
+      proxyReq.on('error', () => {
+        res.writeHead(302, { Location: '/konto-loeschen?status=error' });
+        res.end();
+      });
+      proxyReq.write(jsonBody);
+      proxyReq.end();
+    });
+    return;
+  }
+
   if (urlPath === '/') {
     serve(path.join(WEBSITE_DIR, 'Zapfen Website.html'), res);
     return;
@@ -46,6 +80,11 @@ const server = http.createServer((req, res) => {
 
   if (LEGAL_ROUTES[urlPath]) {
     serve(path.join(WEBSITE_DIR, LEGAL_ROUTES[urlPath]), res);
+    return;
+  }
+
+  if (urlPath === '/konto-loeschen') {
+    serve(path.join(WEBSITE_DIR, 'konto-loeschen.html'), res);
     return;
   }
 

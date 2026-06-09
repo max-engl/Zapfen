@@ -326,11 +326,19 @@ function Impressum() {
   );
 }
 
+const LEGAL_LINKS = {
+  "Impressum": "/impressum",
+  "Datenschutz": "/datenschutz",
+  "Nutzungsbedingungen": "/nutzungsbedingungen",
+  "Community-Regeln": "/community-regeln",
+  "Konto löschen": "/konto-loeschen",
+};
+
 function Footer() {
   const cols = [
     { h: "App", links: ["Der tägliche Biermoment", "Karte", "Serien", "Bier-Bingo", "Ranking"] },
     { h: "Unternehmen", links: ["Über uns", "Jobs", "Presse", "Verantwortungsvoll trinken"] },
-    { h: "Rechtliches", links: ["Impressum", "Datenschutz", "AGB", "Cookies", "Altersrichtlinie"] },
+    { h: "Rechtliches", links: ["Impressum", "Datenschutz", "Nutzungsbedingungen", "Community-Regeln", "Konto löschen"] },
   ];
   return (
     <footer style={{ borderTop: "1px solid var(--border)", padding: "64px 0 50px" }}>
@@ -348,7 +356,7 @@ function Footer() {
               <div className="kicker" style={{ fontSize: 11, marginBottom: 16 }}>{c.h}</div>
               <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 11 }}>
                 {c.links.map(l => (
-                  <li key={l}><a href={l === "Impressum" ? "#impressum" : "#top"} style={{ fontSize: 14.5, color: "var(--muted)" }}
+                  <li key={l}><a href={LEGAL_LINKS[l] || "#top"} style={{ fontSize: 14.5, color: "var(--muted)" }}
                     onMouseEnter={e => e.currentTarget.style.color = "#fff"}
                     onMouseLeave={e => e.currentTarget.style.color = "var(--muted)"}>{l}</a></li>
                 ))}

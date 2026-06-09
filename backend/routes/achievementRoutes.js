@@ -257,42 +257,7 @@ const ACHIEVEMENTS = [
         }),
     },
     ...LOCATION_ACHIEVEMENTS,
-    createOSMAchievement({
-        id: "airport",
-        icon: "globe",
-        name: "Abflughalle",
-        blurb: "Logge einen Drink an einem Flughafen.",
-        osmKey: "aeroway",
-        osmValue: "aerodrome",
-        radiusMeters: 2000,
-    }),
-    createOSMAchievement({
-        id: "riverside",
-        icon: "explorer",
-        name: "Am Fluss",
-        blurb: "Logge einen Drink direkt an einem Fluss.",
-        osmKey: "waterway",
-        osmValue: "river",
-        radiusMeters: 150,
-    }),
-    createOSMAchievement({
-        id: "beach",
-        icon: "explorer",
-        name: "Strandbar",
-        blurb: "Logge einen Drink am Strand.",
-        osmKey: "natural",
-        osmValue: "beach",
-        radiusMeters: 300,
-    }),
-    createOSMAchievement({
-        id: "stadium",
-        icon: "magnet",
-        name: "Stadionbier",
-        blurb: "Logge einen Drink in oder an einem Stadion.",
-        osmKey: "leisure",
-        osmValue: "stadium",
-        radiusMeters: 500,
-    }),
+
 ];
 
 const HIDDEN_ACHIEVEMENTS = [

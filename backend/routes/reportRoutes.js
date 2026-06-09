@@ -7,6 +7,11 @@ const Like = require("../models/Like");
 const Comment = require("../models/Comment");
 const PostReaction = require("../models/PostReaction");
 const CommentReaction = require("../models/CommentReaction");
+const Friend = require("../models/Friend");
+const Block = require("../models/Block");
+const AppNotification = require("../models/AppNotification");
+const Drink = require("../models/Drink");
+const DeletionRequest = require("../models/DeletionRequest");
 const r2 = require("../config/r2");
 const { DeleteObjectsCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
@@ -57,10 +62,11 @@ adminRouter.get("/stats", async (req, res) => {
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
 
-        const [totalUsers, totalPosts, pendingReports, users] = await Promise.all([
+        const [totalUsers, totalPosts, pendingReports, pendingDeletions, users] = await Promise.all([
             User.countDocuments(),
             Post.countDocuments(),
             Report.countDocuments({ status: "pending" }),
+            DeletionRequest.countDocuments({ status: "pending" }),
             User.find()
                 .select("username email role avatarColor avatarInitial createdAt")
                 .sort({ createdAt: -1 })
@@ -81,7 +87,7 @@ adminRouter.get("/stats", async (req, res) => {
             postCount: postCountMap[u._id.toString()] || 0,
         }));
 
-        res.json({ totalUsers, totalPosts, pendingReports, users: usersWithCounts, page, limit });
+        res.json({ totalUsers, totalPosts, pendingReports, pendingDeletions, users: usersWithCounts, page, limit });
     } catch (error) {
         res.status(500).json({ message: "Could not load stats", error: error.message });
     }
@@ -227,6 +233,114 @@ adminRouter.get("/users/:userId/export", async (req, res) => {
         await archive.finalize();
     } catch (error) {
         if (!res.headersSent) res.status(500).json({ message: "Export failed", error: error.message });
+    }
+});
+
+// ── User deletion helper ────────────────────────────────────────────────────
+
+async function deleteUserAccount(userId) {
+    const userPosts = await Post.find({ user: userId }).select("storagePath selfieStoragePath").lean();
+    const postIds = userPosts.map(p => p._id);
+
+    if (userPosts.length > 0) {
+        const pathsToDelete = [];
+        for (const post of userPosts) {
+            if (post.storagePath) pathsToDelete.push(post.storagePath);
+            if (post.selfieStoragePath) pathsToDelete.push(post.selfieStoragePath);
+        }
+        try {
+            await r2.send(new DeleteObjectsCommand({
+                Bucket: process.env.R2_POST_BUCKET,
+                Delete: { Objects: pathsToDelete.map(Key => ({ Key })), Quiet: true },
+            }));
+        } catch (r2Err) {
+            console.error("R2 post deletion error:", r2Err.message);
+        }
+    }
+
+    const commentIdsOnPosts = postIds.length > 0
+        ? await Comment.find({ post: { $in: postIds } }).distinct("_id")
+        : [];
+    const commentIdsByUser = await Comment.find({ user: userId }).distinct("_id");
+    const allCommentIds = [...new Set([
+        ...commentIdsOnPosts.map(String),
+        ...commentIdsByUser.map(String),
+    ])];
+
+    await Promise.all([
+        User.deleteOne({ _id: userId }),
+        Post.deleteMany({ user: userId }),
+        Like.deleteMany({ $or: [{ user: userId }, ...(postIds.length ? [{ post: { $in: postIds } }] : [])] }),
+        PostReaction.deleteMany({ $or: [{ user: userId }, ...(postIds.length ? [{ post: { $in: postIds } }] : [])] }),
+        Comment.deleteMany({ $or: [{ user: userId }, ...(postIds.length ? [{ post: { $in: postIds } }] : [])] }),
+        allCommentIds.length
+            ? CommentReaction.deleteMany({ comment: { $in: allCommentIds } })
+            : Promise.resolve(),
+        Friend.deleteMany({ $or: [{ requester: userId }, { recipient: userId }] }),
+        Block.deleteMany({ $or: [{ blocker: userId }, { blocked: userId }] }),
+        AppNotification.deleteMany({ $or: [{ recipient: userId }, { actorId: userId }] }),
+        Drink.deleteMany({ user: userId }),
+        Report.updateMany({ reportedUser: userId }, { status: "reviewed" }),
+    ]);
+}
+
+// ── Deletion request admin routes ───────────────────────────────────────────
+
+// GET /admin/deletion-requests — list pending requests
+adminRouter.get("/deletion-requests", async (req, res) => {
+    try {
+        const { status } = req.query;
+        const filter = status ? { status } : { status: "pending" };
+        const requests = await DeletionRequest.find(filter).sort({ createdAt: -1 }).lean();
+        res.json(requests);
+    } catch (error) {
+        res.status(500).json({ message: "Fehler beim Laden der Anfragen", error: error.message });
+    }
+});
+
+// POST /admin/deletion-requests/:id/execute — delete the user account and mark request done
+adminRouter.post("/deletion-requests/:id/execute", async (req, res) => {
+    try {
+        const request = await DeletionRequest.findById(req.params.id);
+        if (!request) return res.status(404).json({ message: "Anfrage nicht gefunden" });
+        if (request.status !== "pending") return res.status(400).json({ message: "Anfrage bereits bearbeitet" });
+
+        const user = await User.findOne({ email: request.email });
+        if (user) {
+            await deleteUserAccount(user._id);
+        }
+
+        await DeletionRequest.findByIdAndUpdate(req.params.id, { status: "completed" });
+        res.json({ message: "Nutzerkonto gelöscht", userFound: !!user });
+    } catch (error) {
+        res.status(500).json({ message: "Fehler beim Löschen", error: error.message });
+    }
+});
+
+// DELETE /admin/deletion-requests/:id — dismiss without deleting user
+adminRouter.delete("/deletion-requests/:id", async (req, res) => {
+    try {
+        const request = await DeletionRequest.findByIdAndUpdate(
+            req.params.id,
+            { status: "dismissed" },
+            { new: true }
+        );
+        if (!request) return res.status(404).json({ message: "Anfrage nicht gefunden" });
+        res.json({ message: "Anfrage abgelehnt" });
+    } catch (error) {
+        res.status(500).json({ message: "Fehler", error: error.message });
+    }
+});
+
+// DELETE /admin/users/:userId — admin force-delete a user account
+adminRouter.delete("/users/:userId", async (req, res) => {
+    try {
+        const user = await User.findById(req.params.userId);
+        if (!user) return res.status(404).json({ message: "Nutzer nicht gefunden" });
+        await deleteUserAccount(user._id);
+        res.json({ message: "Nutzerkonto gelöscht" });
+    } catch (error) {
+        res.status(500).json({ message: "Fehler beim Löschen", error: error.message });
     }
 });
 

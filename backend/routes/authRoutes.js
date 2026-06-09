@@ -3,15 +3,16 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
 const User = require("../models/User");
+const DeletionRequest = require("../models/DeletionRequest");
 const authMiddleware = require("../middleware/authMiddleware");
 const { generateAvatarColor, getAvatarInitial } = require("../utils/avatarUtil");
 
 const router = express.Router();
 
-const MIN_CLIENT_VERSION = '1.1';
+const MIN_CLIENT_VERSION = '1.2';
 
 const PATCH_NOTES = [
-    'Beer-Bingo mit deinem Freundeskreis',
+    'Bug fixes und co.',
 ];
 
 function parseVersion(v) {
@@ -205,6 +206,20 @@ router.put("/password", authMiddleware, async (req, res) => {
         res.json({ message: "Password updated successfully" });
     } catch (error) {
         res.status(500).json({ message: "Could not update password", error: error.message });
+    }
+});
+
+// POST /auth/deletion-request — public endpoint for account deletion requests
+router.post("/deletion-request", async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email || typeof email !== "string" || !email.includes("@")) {
+            return res.status(400).json({ message: "Gültige E-Mail-Adresse erforderlich" });
+        }
+        await DeletionRequest.create({ email: email.trim().toLowerCase() });
+        res.status(201).json({ message: "Anfrage erfolgreich eingereicht" });
+    } catch (error) {
+        res.status(500).json({ message: "Fehler beim Einreichen der Anfrage" });
     }
 });
 

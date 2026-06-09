@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Konto löschen – Zapfen.</title>
+<link rel="icon" type="image/png" href="app_icon.png" />
+<link rel="apple-touch-icon" href="app_icon.png" />
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --text: #ffffff;
+    --muted: rgba(255,255,255,0.56);
+    --faint: rgba(255,255,255,0.30);
+    --border: rgba(255,255,255,0.09);
+    --gold: #F6B733;
+    --goldInk: #3a1f02;
+    --goldText: #F6B733;
+    --goldSoft: rgba(246,183,51,0.15);
+    --goldBorder: rgba(246,183,51,0.30);
+    --red: #e05454;
+    --redSoft: rgba(224,84,84,0.12);
+    --green: #4caf72;
+    --greenSoft: rgba(76,175,114,0.12);
+    --maxw: 480px;
+    --font: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--goldText); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,10,10,0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+  }
+  .nav-inner {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    height: 52px;
+    gap: 20px;
+  }
+  .nav-brand { font-size: 17px; font-weight: 800; letter-spacing: -.3px; color: var(--text); text-decoration: none; }
+  .nav-brand span { color: var(--gold); }
+
+  main {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 56px 28px 80px;
+  }
+
+  .page-icon { font-size: 48px; margin-bottom: 20px; }
+  h1 { font-size: 28px; font-weight: 800; letter-spacing: -.5px; margin-bottom: 12px; }
+  .subtitle {
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--muted);
+    margin-bottom: 36px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 28px;
+    margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -.2px;
+    margin-bottom: 14px;
+    color: var(--text);
+  }
+
+  .field { margin-bottom: 16px; }
+  .field label {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+  .field input {
+    width: 100%;
+    background: #1e1e1e;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 13px 16px;
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+    transition: border-color .15s;
+    font-family: var(--font);
+  }
+  .field input:focus { border-color: var(--goldBorder); }
+  .field input::placeholder { color: var(--faint); }
+
+  .warning-box {
+    background: var(--redSoft);
+    border: 1px solid rgba(224,84,84,0.25);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: rgba(255,255,255,0.8);
+    margin-bottom: 20px;
+  }
+  .warning-box strong { color: var(--red); }
+
+  .btn-submit {
+    width: 100%;
+    background: var(--red);
+    color: #fff;
+    border: none;
+    border-radius: 13px;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: -.1px;
+    transition: opacity .15s;
+    font-family: var(--font);
+  }
+  .btn-submit:hover { opacity: .85; }
+  .btn-submit:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* Success / Error states */
+  .state-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 40px 28px;
+    text-align: center;
+    display: none;
+  }
+  .state-card.success { border-color: rgba(76,175,114,0.3); }
+  .state-card.error { border-color: rgba(224,84,84,0.3); }
+  .state-icon { font-size: 52px; margin-bottom: 16px; }
+  .state-title { font-size: 20px; font-weight: 800; margin-bottom: 10px; letter-spacing: -.3px; }
+  .state-body { font-size: 14px; line-height: 1.65; color: var(--muted); }
+
+  .back-link {
+    display: inline-block;
+    margin-top: 24px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .back-link:hover { color: var(--text); text-decoration: none; }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 28px;
+    text-align: center;
+  }
+  .footer-inner {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 16px;
+    font-size: 13px;
+    color: var(--faint);
+  }
+  .footer-inner a { color: var(--faint); }
+  .footer-inner a:hover { color: var(--muted); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a class="nav-brand" href="/">Zapfen<span>.</span></a>
+  </div>
+</nav>
+
+<main>
+  <!-- Default: form view -->
+  <div id="view-form">
+    <div class="page-icon">🗑️</div>
+    <h1>Konto löschen</h1>
+    <p class="subtitle">
+      Wenn du dein Konto und alle zugehörigen Daten löschen möchtest, gib hier deine E-Mail-Adresse ein. Wir bearbeiten deine Anfrage manuell und löschen dein Konto anschließend.
+    </p>
+
+    <div class="card">
+      <h2>Löschanfrage einreichen</h2>
+      <div class="warning-box">
+        <strong>Achtung:</strong> Das Löschen deines Kontos ist unwiderruflich. Alle deine Beiträge, Kommentare, Freundschaften und sonstige Daten werden dauerhaft entfernt.
+      </div>
+      <form id="deletion-form" onsubmit="submitRequest(event)">
+        <div class="field">
+          <label>E-Mail-Adresse des Kontos</label>
+          <input type="email" id="email-input" name="email" placeholder="deine@email.de" required autocomplete="email" />
+        </div>
+        <button type="submit" class="btn-submit" id="submit-btn">Löschanfrage senden</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Success state -->
+  <div class="state-card success" id="view-success">
+    <div class="state-icon">✅</div>
+    <div class="state-title">Anfrage eingegangen</div>
+    <div class="state-body">
+      Deine Löschanfrage wurde erfolgreich eingereicht. Wir bearbeiten sie so bald wie möglich und löschen dein Konto anschließend dauerhaft.
+    </div>
+    <a class="back-link" href="/">← Zurück zur Startseite</a>
+  </div>
+
+  <!-- Error state -->
+  <div class="state-card error" id="view-error">
+    <div class="state-icon">⚠️</div>
+    <div class="state-title">Fehler aufgetreten</div>
+    <div class="state-body">
+      Deine Anfrage konnte leider nicht eingereicht werden. Bitte versuche es später erneut oder kontaktiere uns direkt.
+    </div>
+    <a class="back-link" href="/konto-loeschen">← Erneut versuchen</a>
+  </div>
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <a href="/impressum">Impressum</a>
+    <a href="/datenschutz">Datenschutz</a>
+    <a href="/nutzungsbedingungen">Nutzungsbedingungen</a>
+    <a href="/community-regeln">Community-Regeln</a>
+  </div>
+</footer>
+
+<script>
+  (function() {
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get('status');
+    if (status === 'success') {
+      document.getElementById('view-form').style.display = 'none';
+      document.getElementById('view-success').style.display = 'block';
+    } else if (status === 'error') {
+      document.getElementById('view-form').style.display = 'none';
+      document.getElementById('view-error').style.display = 'block';
+    }
+  })();
+
+  async function submitRequest(e) {
+    e.preventDefault();
+    const email = document.getElementById('email-input').value.trim();
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.textContent = '…';
+    try {
+      const res = await fetch('/konto-loeschen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      if (res.ok) {
+        window.location.href = '/konto-loeschen?status=success';
+      } else {
+        window.location.href = '/konto-loeschen?status=error';
+      }
+    } catch {
+      window.location.href = '/konto-loeschen?status=error';
+    }
+  }
+</script>
+</body>
+</html>

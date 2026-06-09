@@ -182,6 +182,7 @@
     <button class="tab-btn active" onclick="showTab('overview')">Übersicht</button>
     <button class="tab-btn" onclick="showTab('reports')">Meldungen <span id="pending-badge" style="display:none"></span></button>
     <button class="tab-btn" onclick="showTab('users')">Nutzer</button>
+    <button class="tab-btn" onclick="showTab('deletions')">Löschanfragen <span id="deletions-badge" style="display:none"></span></button>
     <div class="spacer"></div>
     <button class="logout-btn" onclick="logout()">Abmelden</button>
   </div>
@@ -232,6 +233,20 @@
           </tbody>
         </table>
       </div>
+    </div>
+
+    <!-- Deletion requests -->
+    <div id="tab-deletions" style="display:none">
+      <div class="section-head">
+        <h2>Löschanfragen</h2>
+        <span class="badge red" id="deletions-count-badge">–</span>
+      </div>
+      <div class="filter-row">
+        <button class="filter-btn active" onclick="setDeletionFilter('pending', this)">Ausstehend</button>
+        <button class="filter-btn" onclick="setDeletionFilter('completed', this)">Erledigt</button>
+        <button class="filter-btn" onclick="setDeletionFilter('dismissed', this)">Abgelehnt</button>
+      </div>
+      <div id="deletions-list"><div class="loading-row"><span class="spinner"></span></div></div>
     </div>
   </div>
 </div>
@@ -333,14 +348,15 @@
   // ── Tabs ──────────────────────────────────────────────────────────────────
 
   function showTab(name) {
-    ['overview', 'reports', 'users'].forEach(t => {
+    ['overview', 'reports', 'users', 'deletions'].forEach(t => {
       document.getElementById(`tab-${t}`).style.display = t === name ? 'block' : 'none';
     });
     document.querySelectorAll('.tab-btn').forEach((b, i) => {
-      b.classList.toggle('active', ['overview', 'reports', 'users'][i] === name);
+      b.classList.toggle('active', ['overview', 'reports', 'users', 'deletions'][i] === name);
     });
     if (name === 'reports') loadReports();
     if (name === 'users') renderUsers();
+    if (name === 'deletions') loadDeletionRequests();
   }
 
   // ── Stats / Overview ──────────────────────────────────────────────────────
@@ -349,20 +365,16 @@
     try {
       _stats = await api('/admin/stats');
       renderOverview();
-      // Pre-fill users badge
       document.getElementById('users-count-badge').textContent = _stats.totalUsers;
-      // Pending badge in tab
       if (_stats.pendingReports > 0) {
         const b = document.getElementById('pending-badge');
         b.textContent = _stats.pendingReports;
-        b.style.display = 'inline';
-        b.style.background = '#e05454';
-        b.style.color = '#fff';
-        b.style.fontSize = '10px';
-        b.style.fontWeight = '700';
-        b.style.padding = '1px 7px';
-        b.style.borderRadius = '99px';
-        b.style.marginLeft = '6px';
+        b.style.cssText = 'display:inline;background:#e05454;color:#fff;font-size:10px;font-weight:700;padding:1px 7px;border-radius:99px;margin-left:6px';
+      }
+      if (_stats.pendingDeletions > 0) {
+        const b = document.getElementById('deletions-badge');
+        b.textContent = _stats.pendingDeletions;
+        b.style.cssText = 'display:inline;background:#e05454;color:#fff;font-size:10px;font-weight:700;padding:1px 7px;border-radius:99px;margin-left:6px';
       }
     } catch (e) {
       document.getElementById('stat-grid').innerHTML = `<div class="empty">Fehler beim Laden: ${e.message}</div>`;
@@ -383,6 +395,10 @@
       <div class="stat-card red">
         <div class="label">Ausstehende Meldungen</div>
         <div class="value">${s.pendingReports}</div>
+      </div>
+      <div class="stat-card red">
+        <div class="label">Löschanfragen</div>
+        <div class="value">${s.pendingDeletions ?? 0}</div>
       </div>
       <div class="stat-card">
         <div class="label">Ø Beiträge / Nutzer</div>
@@ -413,8 +429,9 @@
         <td style="text-align:right;font-weight:700">${u.postCount}</td>
         <td><span class="role-badge ${u.role}">${u.role === 'admin' ? 'Admin' : 'Nutzer'}</span></td>
         <td style="color:var(--muted)">${fmtDate(u.createdAt)}</td>
-        <td>
-          ${u.postCount > 0 ? `<button class="action-btn" onclick="exportPhotos('${u._id}','${esc(u.username)}',this)" title="Fotos als ZIP herunterladen">⬇ ZIP</button>` : '<span style="color:var(--faint);font-size:12px">–</span>'}
+        <td style="display:flex;gap:6px;align-items:center">
+          ${u.postCount > 0 ? `<button class="action-btn" onclick="exportPhotos('${u._id}','${esc(u.username)}',this)" title="Fotos als ZIP herunterladen">⬇ ZIP</button>` : ''}
+          ${u.role !== 'admin' ? `<button class="action-btn danger" onclick="deleteUser('${u._id}','${esc(u.username)}')">🗑 Löschen</button>` : '<span style="color:var(--faint);font-size:12px">–</span>'}
         </td>
       </tr>
     `).join('');
@@ -617,6 +634,106 @@
     if (!iso) return '–';
     const d = new Date(iso);
     return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+
+  // ── Delete user from users tab ────────────────────────────────────────────
+
+  async function deleteUser(userId, username) {
+    if (!confirm(`Konto von @${username} unwiderruflich löschen? Alle Beiträge, Kommentare und Daten werden entfernt.`)) return;
+    try {
+      await api(`/admin/users/${userId}`, { method: 'DELETE' });
+      showToast(`@${username} gelöscht`);
+      _stats = null;
+      loadStats();
+    } catch (e) {
+      showToast('Fehler: ' + e.message);
+    }
+  }
+
+  // ── Deletion requests tab ─────────────────────────────────────────────────
+
+  let _deletionFilter = 'pending';
+
+  function setDeletionFilter(f, btn) {
+    _deletionFilter = f;
+    document.querySelectorAll('#tab-deletions .filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    loadDeletionRequests();
+  }
+
+  async function loadDeletionRequests() {
+    const list = document.getElementById('deletions-list');
+    list.innerHTML = '<div class="loading-row"><span class="spinner"></span></div>';
+    try {
+      const requests = await api(`/admin/deletion-requests?status=${_deletionFilter}`);
+      document.getElementById('deletions-count-badge').textContent = requests.length;
+      renderDeletionRequests(requests);
+    } catch (e) {
+      list.innerHTML = `<div class="empty">Fehler: ${e.message}</div>`;
+    }
+  }
+
+  function renderDeletionRequests(requests) {
+    const list = document.getElementById('deletions-list');
+    if (requests.length === 0) {
+      list.innerHTML = '<div class="empty">Keine Anfragen in dieser Kategorie.</div>';
+      return;
+    }
+    list.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>E-Mail</th>
+              <th>Status</th>
+              <th>Eingereicht</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${requests.map(r => {
+              const statusLabel = { pending: 'Ausstehend', completed: 'Erledigt', dismissed: 'Abgelehnt' }[r.status] || r.status;
+              const statusColor = r.status === 'pending' ? 'var(--red)' : r.status === 'completed' ? 'var(--green)' : 'var(--faint)';
+              return `
+                <tr id="dr-${r._id}">
+                  <td style="font-weight:600">${esc(r.email)}</td>
+                  <td><span style="color:${statusColor};font-size:12px;font-weight:700">${statusLabel}</span></td>
+                  <td style="color:var(--muted)">${fmtDate(r.createdAt)}</td>
+                  <td style="display:flex;gap:6px">
+                    ${r.status === 'pending' ? `
+                      <button class="action-btn danger" onclick="executeDeletion('${r._id}','${esc(r.email)}')">🗑 Konto löschen</button>
+                      <button class="action-btn" onclick="dismissDeletion('${r._id}')">Ablehnen</button>
+                    ` : '–'}
+                  </td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  async function executeDeletion(requestId, email) {
+    if (!confirm(`Konto für ${email} unwiderruflich löschen? Alle Daten werden entfernt.`)) return;
+    try {
+      const result = await api(`/admin/deletion-requests/${requestId}/execute`, { method: 'POST' });
+      showToast(result.userFound ? 'Konto gelöscht' : 'Anfrage erledigt (kein passendes Konto gefunden)');
+      loadDeletionRequests();
+      loadStats();
+    } catch (e) {
+      showToast('Fehler: ' + e.message);
+    }
+  }
+
+  async function dismissDeletion(requestId) {
+    if (!confirm('Anfrage ablehnen?')) return;
+    try {
+      await api(`/admin/deletion-requests/${requestId}`, { method: 'DELETE' });
+      showToast('Anfrage abgelehnt');
+      loadDeletionRequests();
+      loadStats();
+    } catch (e) {
+      showToast('Fehler: ' + e.message);
+    }
   }
 
   let _toastTimer;
