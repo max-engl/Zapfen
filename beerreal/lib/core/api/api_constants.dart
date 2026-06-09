@@ -1,19 +1,20 @@
 class ApiConstants {
-  // Override at build time:
-  //   flutter run --dart-define=API_HOST=yourapp.com --dart-define=API_SCHEME=https --dart-define=API_PORT=443
+  // Defaults to production. Switch to local dev:
+  //   flutter run --dart-define=API_HOST=10.170.54.9 --dart-define=API_SCHEME=http --dart-define=API_PORT=3000
   static const String host = String.fromEnvironment(
     'API_HOST',
-    defaultValue: '10.170.54.9',
+    defaultValue: 'api.zapfenapp.de',
   );
   static const String scheme = String.fromEnvironment(
     'API_SCHEME',
-    defaultValue: 'http',
+    defaultValue: 'https',
   );
   static const String port = String.fromEnvironment(
     'API_PORT',
-    defaultValue: '3000',
+    defaultValue: '',
   );
-  static String get baseUrl => '$scheme://$host:$port';
+  static String get baseUrl =>
+      port.isEmpty ? '$scheme://$host' : '$scheme://$host:$port';
 
   // Auth
   static const String login = '/auth/login';
