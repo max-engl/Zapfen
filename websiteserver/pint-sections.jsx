@@ -298,11 +298,39 @@ function CTA() {
   );
 }
 
+function Impressum() {
+  return (
+    <section id="impressum" style={{ padding: "12px 0 72px" }}>
+      <div className="wrap">
+        <div className="reveal" style={{ maxWidth: 680, borderTop: "1px solid var(--border)", paddingTop: 34 }}>
+          <div className="kicker">Impressum</div>
+          <h2 style={{ marginTop: 14, fontSize: "clamp(28px, 4vw, 46px)", fontWeight: 800, letterSpacing: "-0.035em" }}>
+            Angaben gemäß § 5 TMG
+          </h2>
+          <div style={{ marginTop: 22, display: "grid", gap: 22, color: "var(--muted)", fontSize: 16, lineHeight: 1.6 }}>
+            <div>
+              <div style={{ color: "#fff", fontWeight: 700 }}>Maximilian Engl</div>
+              <div>Am Tennenbach, 26</div>
+              <div>Tennenbach</div>
+              <div>91080 Spardorf</div>
+            </div>
+            <div>
+              <div style={{ color: "#fff", fontWeight: 700 }}>Kontakt</div>
+              <div>Telefon: <a href="tel:+4915202913951" style={{ color: "var(--goldText)" }}>015202913951</a></div>
+              <div>E-Mail: <a href="mailto:engl.devmail@gmail.com" style={{ color: "var(--goldText)" }}>engl.devmail@gmail.com</a></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Footer() {
   const cols = [
     { h: "App", links: ["Der tägliche Biermoment", "Karte", "Serien", "Bier-Bingo", "Ranking"] },
     { h: "Unternehmen", links: ["Über uns", "Jobs", "Presse", "Verantwortungsvoll trinken"] },
-    { h: "Rechtliches", links: ["Datenschutz", "AGB", "Cookies", "Altersrichtlinie"] },
+    { h: "Rechtliches", links: ["Impressum", "Datenschutz", "AGB", "Cookies", "Altersrichtlinie"] },
   ];
   return (
     <footer style={{ borderTop: "1px solid var(--border)", padding: "64px 0 50px" }}>
@@ -320,7 +348,7 @@ function Footer() {
               <div className="kicker" style={{ fontSize: 11, marginBottom: 16 }}>{c.h}</div>
               <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 11 }}>
                 {c.links.map(l => (
-                  <li key={l}><a href="#top" style={{ fontSize: 14.5, color: "var(--muted)" }}
+                  <li key={l}><a href={l === "Impressum" ? "#impressum" : "#top"} style={{ fontSize: 14.5, color: "var(--muted)" }}
                     onMouseEnter={e => e.currentTarget.style.color = "#fff"}
                     onMouseLeave={e => e.currentTarget.style.color = "var(--muted)"}>{l}</a></li>
                 ))}
@@ -367,6 +395,7 @@ function SiteSections() {
       <BingoLeaderboard />
       <StatBand />
       <CTA />
+      <Impressum />
       <Footer />
     </React.Fragment>
   );

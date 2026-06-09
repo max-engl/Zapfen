@@ -310,7 +310,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
               const SizedBox(height: 16),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: t.surfaceWeak,
                   borderRadius: BorderRadius.circular(12),
@@ -318,7 +321,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.lock_outline_rounded, size: 16, color: t.textMuted),
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      size: 16,
+                      color: t.textMuted,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: TextField(
@@ -335,14 +342,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           contentPadding: EdgeInsets.zero,
                           border: InputBorder.none,
                           hintText: 'Passwort zur Bestätigung',
-                          hintStyle: TextStyle(color: t.textFaint, fontSize: 14),
+                          hintStyle: TextStyle(
+                            color: t.textFaint,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ),
                     GestureDetector(
                       onTap: () => setDialogState(() => showPw = !showPw),
                       child: Icon(
-                        showPw ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                        showPw
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
                         size: 16,
                         color: t.textMuted,
                       ),
@@ -357,14 +369,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               onPressed: () => Navigator.of(ctx).pop(false),
               child: Text(
                 'Abbrechen',
-                style: TextStyle(color: t.textMuted, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: t.textMuted,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(true),
               child: const Text(
                 'Löschen',
-                style: TextStyle(color: Color(0xFFC2511E), fontWeight: FontWeight.w800),
+                style: TextStyle(
+                  color: Color(0xFFC2511E),
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],
@@ -387,7 +405,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } on DioException catch (e) {
       if (!mounted) return;
       final data = e.response?.data;
-      final msg = (data is Map ? data['message'] as String? : null) ?? 'Konto konnte nicht gelöscht werden.';
+      final msg =
+          (data is Map ? data['message'] as String? : null) ??
+          'Konto konnte nicht gelöscht werden.';
       _showToast(msg);
     } finally {
       if (mounted) setState(() => _deletingAccount = false);
@@ -637,19 +657,33 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               onTap: _deletingAccount ? null : _deleteAccount,
                               child: Container(
                                 width: double.infinity,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFFDF2F0),
                                   borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: const Color(0xFFC2511E).withValues(alpha: 0.35)),
+                                  border: Border.all(
+                                    color: const Color(
+                                      0xFFC2511E,
+                                    ).withValues(alpha: 0.35),
+                                  ),
                                 ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     if (_deletingAccount)
-                                      PintDots(color: const Color(0xFFC2511E), dotSize: 5, spacing: 4)
+                                      PintDots(
+                                        color: const Color(0xFFC2511E),
+                                        dotSize: 5,
+                                        spacing: 4,
+                                      )
                                     else ...[
-                                      const Icon(Icons.delete_forever_rounded, size: 17, color: Color(0xFFC2511E)),
+                                      const Icon(
+                                        Icons.delete_forever_rounded,
+                                        size: 17,
+                                        color: Color(0xFFC2511E),
+                                      ),
                                       const SizedBox(width: 8),
                                       const Text(
                                         'Konto löschen',

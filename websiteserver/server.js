@@ -9,14 +9,14 @@ const ROOT_DIR = path.join(__dirname, '..');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
-  '.jsx':  'text/javascript; charset=utf-8',
-  '.js':   'text/javascript; charset=utf-8',
-  '.css':  'text/css; charset=utf-8',
-  '.png':  'image/png',
-  '.jpg':  'image/jpeg',
+  '.jsx': 'text/javascript; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
-  '.svg':  'image/svg+xml',
-  '.ico':  'image/x-icon',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
 };
 
 function serve(filePath, res) {
