@@ -8,7 +8,9 @@ const PostReaction = require("../models/PostReaction");
 const Comment = require("../models/Comment");
 const CommentReaction = require("../models/CommentReaction");
 const AppNotification = require("../models/AppNotification");
-const supabase = require("../config/supabase");
+const r2 = require("../config/r2");
+const { PutObjectCommand, DeleteObjectsCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const upload = require("../middleware/uploadMiddleware");
 const authMiddleware = require("../middleware/authMiddleware");
 const { sendToUsers, sendToUser, saveNotification, saveNotifications } = require("../services/notificationService");
@@ -25,15 +27,11 @@ function getFileExtension(filename) {
 }
 
 async function createSignedPostUrl(storagePath) {
-    const { data, error } = await supabase.storage
-        .from(process.env.SUPABASE_POST_BUCKET)
-        .createSignedUrl(storagePath, 60 * 60);
-
-    if (error) {
-        throw new Error(error.message);
-    }
-
-    return data.signedUrl;
+    return getSignedUrl(
+        r2,
+        new GetObjectCommand({ Bucket: process.env.R2_POST_BUCKET, Key: storagePath }),
+        { expiresIn: 3600 }
+    );
 }
 
 async function getLikedSet(userId, postIds) {
@@ -167,33 +165,27 @@ router.post(
             const storagePath = `${req.user._id}/${uuidv4()}.${imageExt}`;
             const selfieStoragePath = `${req.user._id}/selfie_${uuidv4()}.${selfieExt}`;
 
-            const [{ error: imageUploadError }, { error: selfieUploadError }] = await Promise.all([
-                supabase.storage
-                    .from(process.env.SUPABASE_POST_BUCKET)
-                    .upload(storagePath, imageFile.buffer, {
-                        contentType: imageFile.mimetype,
-                        upsert: false,
-                    }),
-                supabase.storage
-                    .from(process.env.SUPABASE_POST_BUCKET)
-                    .upload(selfieStoragePath, selfieFile.buffer, {
-                        contentType: selfieFile.mimetype,
-                        upsert: false,
-                    }),
-            ]);
-
-            if (imageUploadError) {
-                return res.status(500).json({
-                    message: "Post image upload to Supabase failed",
-                    error: imageUploadError.message,
-                });
-            }
-            if (selfieUploadError) {
-                await supabase.storage.from(process.env.SUPABASE_POST_BUCKET).remove([storagePath]);
-                return res.status(500).json({
-                    message: "Selfie upload to Supabase failed",
-                    error: selfieUploadError.message,
-                });
+            try {
+                await Promise.all([
+                    r2.send(new PutObjectCommand({
+                        Bucket: process.env.R2_POST_BUCKET,
+                        Key: storagePath,
+                        Body: imageFile.buffer,
+                        ContentType: imageFile.mimetype,
+                    })),
+                    r2.send(new PutObjectCommand({
+                        Bucket: process.env.R2_POST_BUCKET,
+                        Key: selfieStoragePath,
+                        Body: selfieFile.buffer,
+                        ContentType: selfieFile.mimetype,
+                    })),
+                ]);
+            } catch (uploadErr) {
+                await r2.send(new DeleteObjectsCommand({
+                    Bucket: process.env.R2_POST_BUCKET,
+                    Delete: { Objects: [{ Key: storagePath }, { Key: selfieStoragePath }], Quiet: true },
+                })).catch(() => {});
+                return res.status(500).json({ message: "Image upload failed", error: uploadErr.message });
             }
 
             const parsedLat = parseFloat(lat);
@@ -694,16 +686,10 @@ router.delete("/:id", authMiddleware, async (req, res) => {
         const pathsToDelete = [post.storagePath];
         if (post.selfieStoragePath) pathsToDelete.push(post.selfieStoragePath);
 
-        const { error: deleteError } = await supabase.storage
-            .from(process.env.SUPABASE_POST_BUCKET)
-            .remove(pathsToDelete);
-
-        if (deleteError) {
-            return res.status(500).json({
-                message: "Could not delete image(s) from storage",
-                error: deleteError.message,
-            });
-        }
+        await r2.send(new DeleteObjectsCommand({
+            Bucket: process.env.R2_POST_BUCKET,
+            Delete: { Objects: pathsToDelete.map((Key) => ({ Key })), Quiet: true },
+        }));
 
         const commentIds = await Comment.find({ post: post._id }).distinct("_id");
         await Promise.all([

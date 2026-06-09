@@ -11,7 +11,8 @@ require("dotenv").config({ path: require("path").resolve(__dirname, "../.env") }
 const mongoose = require("mongoose");
 const Post = require("../models/Post");
 const Like = require("../models/Like");
-const supabase = require("../config/supabase");
+const r2 = require("../config/r2");
+const { DeleteObjectsCommand } = require("@aws-sdk/client-s3");
 
 async function run() {
     await mongoose.connect(process.env.MONGODB_URI);
@@ -38,13 +39,14 @@ async function run() {
         .filter(Boolean);
 
     if (storagePaths.length > 0) {
-        const { error } = await supabase.storage
-            .from(process.env.SUPABASE_POST_BUCKET)
-            .remove(storagePaths);
-        if (error) {
-            console.error("Supabase removal error (continuing anyway):", error.message);
-        } else {
-            console.log(`Removed ${storagePaths.length} image(s) from Supabase`);
+        try {
+            await r2.send(new DeleteObjectsCommand({
+                Bucket: process.env.R2_POST_BUCKET,
+                Delete: { Objects: storagePaths.map((Key) => ({ Key })), Quiet: true },
+            }));
+            console.log(`Removed ${storagePaths.length} image(s) from R2`);
+        } catch (err) {
+            console.error("R2 removal error (continuing anyway):", err.message);
         }
     }
 

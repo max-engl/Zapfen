@@ -13,7 +13,8 @@ const AppNotification = require("../models/AppNotification");
 const Drink = require("../models/Drink");
 const Report = require("../models/Report");
 const Block = require("../models/Block");
-const supabase = require("../config/supabase");
+const r2 = require("../config/r2");
+const { PutObjectCommand, DeleteObjectsCommand } = require("@aws-sdk/client-s3");
 const upload = require("../middleware/uploadMiddleware");
 const authMiddleware = require("../middleware/authMiddleware");
 
@@ -141,32 +142,26 @@ router.patch(
 
             const storagePath = `${req.user._id}/${uuidv4()}.${extension}`;
 
-            const { error: uploadError } = await supabase.storage
-                .from(process.env.SUPABASE_AVATAR_BUCKET)
-                .upload(storagePath, req.file.buffer, {
-                    contentType: req.file.mimetype,
-                    upsert: false,
-                });
-
-            if (uploadError) {
+            try {
+                await r2.send(new PutObjectCommand({
+                    Bucket: process.env.R2_AVATAR_BUCKET,
+                    Key: storagePath,
+                    Body: req.file.buffer,
+                    ContentType: req.file.mimetype,
+                }));
+            } catch (uploadErr) {
                 return res.status(500).json({
                     message: "Avatar upload failed",
-                    error: uploadError.message,
+                    error: uploadErr.message,
                 });
             }
 
-            const { data } = supabase.storage
-                .from(process.env.SUPABASE_AVATAR_BUCKET)
-                .getPublicUrl(storagePath);
-
-            if (!data?.publicUrl) {
-                return res.status(500).json({ message: "Could not retrieve avatar URL from storage" });
-            }
+            const publicUrl = `${process.env.R2_AVATAR_PUBLIC_BASE_URL}/${storagePath}`;
 
             const user = await User.findByIdAndUpdate(
                 req.user._id,
                 {
-                    avatarUrl: data.publicUrl,
+                    avatarUrl: publicUrl,
                 },
                 {
                     new: true,
@@ -228,7 +223,6 @@ router.delete("/me", authMiddleware, async (req, res) => {
 
         const userId = user._id;
 
-        // Collect all post storage paths to delete from Supabase
         const posts = await Post.find({ user: userId }).select("storagePath selfieStoragePath");
         const postIds = posts.map((p) => p._id);
         const storagePaths = [];
@@ -237,14 +231,19 @@ router.delete("/me", authMiddleware, async (req, res) => {
             if (p.selfieStoragePath) storagePaths.push(p.selfieStoragePath);
         }
         if (storagePaths.length > 0) {
-            await supabase.storage.from(process.env.SUPABASE_POST_BUCKET).remove(storagePaths);
+            await r2.send(new DeleteObjectsCommand({
+                Bucket: process.env.R2_POST_BUCKET,
+                Delete: { Objects: storagePaths.map((Key) => ({ Key })), Quiet: true },
+            }));
         }
 
-        // Delete avatar from storage
         if (user.avatarUrl) {
-            const avatarPath = user.avatarUrl.split(`/${process.env.SUPABASE_AVATAR_BUCKET}/`)[1];
-            if (avatarPath) {
-                await supabase.storage.from(process.env.SUPABASE_AVATAR_BUCKET).remove([avatarPath]);
+            const avatarPath = user.avatarUrl.replace(`${process.env.R2_AVATAR_PUBLIC_BASE_URL}/`, "");
+            if (avatarPath && avatarPath !== user.avatarUrl) {
+                await r2.send(new DeleteObjectsCommand({
+                    Bucket: process.env.R2_AVATAR_BUCKET,
+                    Delete: { Objects: [{ Key: avatarPath }], Quiet: true },
+                }));
             }
         }
 

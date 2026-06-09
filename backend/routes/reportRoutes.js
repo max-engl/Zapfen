@@ -6,7 +6,9 @@ const Like = require("../models/Like");
 const Comment = require("../models/Comment");
 const PostReaction = require("../models/PostReaction");
 const CommentReaction = require("../models/CommentReaction");
-const supabase = require("../config/supabase");
+const r2 = require("../config/r2");
+const { DeleteObjectsCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
 
@@ -107,14 +109,13 @@ adminRouter.get("/reports", async (req, res) => {
                 try {
                     const paths = [r.post.storagePath];
                     if (r.post.selfieStoragePath) paths.push(r.post.selfieStoragePath);
-                    const { data } = await supabase.storage
-                        .from(process.env.SUPABASE_POST_BUCKET)
-                        .createSignedUrls(paths, 60 * 60);
-                    const urls = data ?? [];
+                    const signedUrls = await Promise.all(
+                        paths.map((p) => getSignedUrl(r2, new GetObjectCommand({ Bucket: process.env.R2_POST_BUCKET, Key: p }), { expiresIn: 3600 }))
+                    );
                     return {
                         ...r,
-                        postImageUrl: urls[0]?.signedUrl ?? null,
-                        postSelfieUrl: urls[1]?.signedUrl ?? null,
+                        postImageUrl: signedUrls[0] ?? null,
+                        postSelfieUrl: signedUrls[1] ?? null,
                     };
                 } catch {
                     return { ...r, postImageUrl: null, postSelfieUrl: null };
@@ -167,7 +168,10 @@ adminRouter.delete("/posts/:postId", async (req, res) => {
         const pathsToDelete = [post.storagePath];
         if (post.selfieStoragePath) pathsToDelete.push(post.selfieStoragePath);
 
-        await supabase.storage.from(process.env.SUPABASE_POST_BUCKET).remove(pathsToDelete);
+        await r2.send(new DeleteObjectsCommand({
+            Bucket: process.env.R2_POST_BUCKET,
+            Delete: { Objects: pathsToDelete.map((Key) => ({ Key })), Quiet: true },
+        }));
 
         const commentIds = await Comment.find({ post: post._id }).distinct("_id");
         await Promise.all([

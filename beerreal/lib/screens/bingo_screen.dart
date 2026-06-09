@@ -36,6 +36,8 @@ class BingoScreen extends StatefulWidget {
 }
 
 class _BingoScreenState extends State<BingoScreen> {
+  int? _selectedCellIndex;
+
   @override
   void initState() {
     super.initState();
@@ -210,7 +212,42 @@ class _BingoScreenState extends State<BingoScreen> {
                           const SizedBox(height: 14),
                         ],
                         // 5×5 grid
-                        _BingoGrid(card: card, t: t),
+                        _BingoGrid(
+                          card: card,
+                          t: t,
+                          selectedIndex: _selectedCellIndex,
+                          onCellTap: (i) => setState(() {
+                            _selectedCellIndex =
+                                _selectedCellIndex == i ? null : i;
+                          }),
+                        ),
+                        // Task detail panel
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 180),
+                          transitionBuilder: (child, anim) => FadeTransition(
+                            opacity: anim,
+                            child: SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(0, -0.25),
+                                end: Offset.zero,
+                              ).animate(CurvedAnimation(
+                                parent: anim,
+                                curve: Curves.easeOut,
+                              )),
+                              child: child,
+                            ),
+                          ),
+                          child: _selectedCellIndex == null
+                              ? const SizedBox.shrink(key: ValueKey('none'))
+                              : Padding(
+                                  key: ValueKey(_selectedCellIndex),
+                                  padding: const EdgeInsets.only(top: 10),
+                                  child: _BingoCellDetail(
+                                    cell: card.cells[_selectedCellIndex!],
+                                    t: t,
+                                  ),
+                                ),
+                        ),
                         // Footnote marginTop: 14
                         const SizedBox(height: 14),
                         Row(
@@ -461,8 +498,15 @@ class _LineBanner extends StatelessWidget {
 class _BingoGrid extends StatelessWidget {
   final BingoCard card;
   final PintTheme t;
+  final int? selectedIndex;
+  final ValueChanged<int>? onCellTap;
 
-  const _BingoGrid({required this.card, required this.t});
+  const _BingoGrid({
+    required this.card,
+    required this.t,
+    this.selectedIndex,
+    this.onCellTap,
+  });
 
   bool _isRowComplete(int row) =>
       [0, 1, 2, 3, 4].every((c) => card.cells[row * 5 + c].done);
@@ -494,8 +538,13 @@ class _BingoGrid extends StatelessWidget {
         childAspectRatio: 1.0,
       ),
       itemCount: 25,
-      itemBuilder: (_, i) =>
-          _BingoCell(cell: card.cells[i], inLine: _isInCompletedLine(i), t: t),
+      itemBuilder: (_, i) => _BingoCell(
+        cell: card.cells[i],
+        inLine: _isInCompletedLine(i),
+        t: t,
+        isSelected: selectedIndex == i,
+        onTap: onCellTap == null ? null : () => onCellTap!(i),
+      ),
     );
   }
 }
@@ -511,8 +560,16 @@ class _BingoCell extends StatelessWidget {
   final BingoCell cell;
   final bool inLine;
   final PintTheme t;
+  final bool isSelected;
+  final VoidCallback? onTap;
 
-  const _BingoCell({required this.cell, required this.inLine, required this.t});
+  const _BingoCell({
+    required this.cell,
+    required this.inLine,
+    required this.t,
+    this.isSelected = false,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -537,12 +594,16 @@ class _BingoCell extends StatelessWidget {
       labelColor = t.textFaint;
     }
 
-    return AnimatedContainer(
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor),
+        border: isSelected
+            ? Border.all(color: t.gold, width: 2)
+            : Border.all(color: borderColor),
         boxShadow: (done && inLine)
             ? [
                 BoxShadow(
@@ -651,6 +712,74 @@ class _BingoCell extends StatelessWidget {
                 ),
               ),
             ),
+        ],
+      ),
+    ),
+    );
+  }
+}
+
+// ── Bingo cell detail panel ───────────────────────────────────────────────────
+
+class _BingoCellDetail extends StatelessWidget {
+  final BingoCell cell;
+  final PintTheme t;
+
+  const _BingoCellDetail({required this.cell, required this.t});
+
+  @override
+  Widget build(BuildContext context) {
+    final done = cell.done;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: done ? t.goldSoft : t.surfaceWeak,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: done ? t.goldBorder : t.border),
+      ),
+      child: Row(
+        children: [
+          Text(cell.emoji, style: const TextStyle(fontSize: 36, height: 1)),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  cell.label,
+                  style: TextStyle(
+                    color: t.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
+                    height: 1.3,
+                  ),
+                ),
+                if (done) ...[
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 13,
+                        color: t.goldText,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Erledigt',
+                        style: TextStyle(
+                          color: t.goldText,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );

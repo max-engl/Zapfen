@@ -225,6 +225,22 @@ async function migrateInviteTokenIndex() {
   );
 }
 
+async function migrateAvatarUrlsToR2() {
+  if (!process.env.R2_AVATAR_PUBLIC_BASE_URL) return;
+  const User = require("./models/User");
+  const OLD_PREFIX = "https://rcrtfvuzckrrkcasouxw.supabase.co/storage/v1/object/public/avatars/";
+  const NEW_PREFIX = process.env.R2_AVATAR_PUBLIC_BASE_URL.replace(/\/$/, "") + "/";
+  const users = await User.find({ avatarUrl: { $regex: "rcrtfvuzckrrkcasouxw\\.supabase\\.co" } }).select("_id avatarUrl");
+  if (users.length === 0) return;
+  let updated = 0;
+  for (const user of users) {
+    if (!user.avatarUrl.startsWith(OLD_PREFIX)) continue;
+    await User.findByIdAndUpdate(user._id, { avatarUrl: NEW_PREFIX + user.avatarUrl.slice(OLD_PREFIX.length) });
+    updated++;
+  }
+  console.log(`Avatar URL migration: updated ${updated} user(s) to R2`);
+}
+
 async function syncAdminUser() {
   const User = require("./models/User");
   const {
@@ -299,6 +315,7 @@ async function startServer() {
 
     await syncDefaultDrinks();
     await migrateAvatarFields();
+    await migrateAvatarUrlsToR2();
     await migrateInviteTokenIndex();
     await syncAdminUser();
     scheduleNightRecap();

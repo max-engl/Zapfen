@@ -1,6 +1,8 @@
 const express = require('express');
 const AppNotification = require('../models/AppNotification');
-const supabase = require('../config/supabase');
+const r2 = require('../config/r2');
+const { GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -13,15 +15,15 @@ async function resolveThumbUrls(notifications) {
     if (!paths.length) return {};
 
     try {
-        const { data, error } = await supabase.storage
-            .from(process.env.SUPABASE_POST_BUCKET)
-            .createSignedUrls(paths, 60 * 60);
-
-        if (error || !data) return {};
-
+        const signedUrls = await Promise.all(
+            paths.map((p) =>
+                getSignedUrl(r2, new GetObjectCommand({ Bucket: process.env.R2_POST_BUCKET, Key: p }), { expiresIn: 3600 })
+                    .catch(() => null)
+            )
+        );
         const map = {};
-        for (const entry of data) {
-            if (entry.signedUrl) map[entry.path] = entry.signedUrl;
+        for (let i = 0; i < paths.length; i++) {
+            if (signedUrls[i]) map[paths[i]] = signedUrls[i];
         }
         return map;
     } catch {
