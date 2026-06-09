@@ -258,11 +258,12 @@ class _MapScreenState extends State<MapScreen> {
                       final isRecent =
                           DateTime.now().difference(post.createdAt).inHours <
                           24;
+                      final isSelected = _selected?.id == post.id;
                       return Marker(
                         point: ll.LatLng(post.lat!, post.lng!),
-                        width: isRecent ? 110 : 18,
-                        height: isRecent ? 44 : 18,
-                        alignment: isRecent
+                        width: (isRecent && isSelected) ? 110 : (isRecent ? 22 : 18),
+                        height: (isRecent && isSelected) ? 44 : (isRecent ? 22 : 18),
+                        alignment: (isRecent && isSelected)
                             ? Alignment.bottomCenter
                             : Alignment.center,
                         rotate: true,
@@ -283,12 +284,15 @@ class _MapScreenState extends State<MapScreen> {
                       );
                     }),
                 // Achievement locations
-                ..._achievementTargets.map(
-                  (target) => Marker(
+                ..._achievementTargets.map((target) {
+                  final isSelected = _selectedTarget?.id == target.id;
+                  return Marker(
                     point: ll.LatLng(target.latitude, target.longitude),
-                    width: 132,
-                    height: 54,
-                    alignment: Alignment.bottomCenter,
+                    width: isSelected ? 132 : 24,
+                    height: isSelected ? 54 : 24,
+                    alignment: isSelected
+                        ? Alignment.bottomCenter
+                        : Alignment.center,
                     rotate: true,
                     child: _AchievementPin(
                       target: target,
@@ -304,8 +308,8 @@ class _MapScreenState extends State<MapScreen> {
                         });
                       },
                     ),
-                  ),
-                ),
+                  );
+                }),
               ],
             ),
           ],
@@ -492,86 +496,77 @@ class _PostPin extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!isRecent) {
-      return GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: 18,
-          height: 18,
-          decoration: BoxDecoration(
-            color: selected ? t.gold : t.pinBg,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: selected ? Colors.white : t.gold,
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.22),
-                blurRadius: 4,
-                offset: const Offset(0, 1),
+    if (!isRecent || !selected) {
+      final size = isRecent ? 22.0 : 18.0;
+      return Opacity(
+        opacity: isRecent ? 1.0 : 0.4,
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              color: selected ? t.gold : t.pinBg,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: selected ? Colors.white : t.gold,
+                width: isRecent ? 2.0 : 1.5,
               ),
-            ],
-          ),
-          child: Icon(
-            Icons.sports_bar_outlined,
-            size: 9,
-            color: selected ? t.goldInk : t.gold,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.22),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.sports_bar_outlined,
+              size: isRecent ? 11.0 : 9.0,
+              color: selected ? t.goldInk : t.gold,
+            ),
           ),
         ),
       );
     }
 
-    final bg = selected ? t.gold : t.pinBg;
-    final fg = selected ? t.goldInk : Colors.white;
-    final borderColor = selected ? Colors.white : t.gold;
-    final arrowColor = selected ? Colors.white : t.gold;
-
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedOpacity(
-        opacity: selected ? 1.0 : 0.45,
-        duration: const Duration(milliseconds: 200),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.fromLTRB(6, 4, 10, 4),
-              decoration: BoxDecoration(
-                color: bg,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: borderColor, width: 2),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.sports_bar_outlined,
-                    size: 11,
-                    color: selected ? t.goldInk : t.gold,
-                  ),
-                  const SizedBox(width: 4),
-                  Flexible(
-                    child: Text(
-                      post.username,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: fg,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(6, 4, 10, 4),
+            decoration: BoxDecoration(
+              color: t.gold,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: Colors.white, width: 2),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.sports_bar_outlined, size: 11, color: t.goldInk),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    post.username,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: t.goldInk,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            CustomPaint(
-              size: const Size(10, 7),
-              painter: _Arrow(color: arrowColor),
-            ),
-          ],
-        ),
+          ),
+          CustomPaint(
+            size: const Size(10, 7),
+            painter: _Arrow(color: Colors.white),
+          ),
+        ],
       ),
     );
   }
@@ -592,64 +587,86 @@ class _AchievementPin extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = target.earned || selected ? t.gold : t.surface;
-    final fg = target.earned || selected ? t.goldInk : t.text;
-    final borderColor = target.earned || selected ? Colors.white : t.gold;
+    if (!selected) {
+      return GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: target.earned ? t.gold : t.surface,
+            shape: BoxShape.circle,
+            border: Border.all(color: t.gold, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.22),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Icon(
+            target.earned
+                ? Icons.check_circle_rounded
+                : Icons.emoji_events_outlined,
+            size: 12,
+            color: target.earned ? t.goldInk : t.goldText,
+          ),
+        ),
+      );
+    }
 
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedOpacity(
-        opacity: selected ? 1 : 0.88,
-        duration: const Duration(milliseconds: 180),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              constraints: const BoxConstraints(maxWidth: 122),
-              padding: const EdgeInsets.fromLTRB(7, 5, 10, 5),
-              decoration: BoxDecoration(
-                color: bg,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: borderColor, width: 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.18),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    target.earned
-                        ? Icons.check_circle_rounded
-                        : Icons.emoji_events_outlined,
-                    size: 13,
-                    color: target.earned || selected ? t.goldInk : t.goldText,
-                  ),
-                  const SizedBox(width: 5),
-                  Flexible(
-                    child: Text(
-                      target.name,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: fg,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            constraints: const BoxConstraints(maxWidth: 122),
+            padding: const EdgeInsets.fromLTRB(7, 5, 10, 5),
+            decoration: BoxDecoration(
+              color: target.earned ? t.gold : t.surface,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.18),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  target.earned
+                      ? Icons.check_circle_rounded
+                      : Icons.emoji_events_outlined,
+                  size: 13,
+                  color: target.earned ? t.goldInk : t.goldText,
+                ),
+                const SizedBox(width: 5),
+                Flexible(
+                  child: Text(
+                    target.name,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: target.earned ? t.goldInk : t.text,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            CustomPaint(
-              size: const Size(10, 7),
-              painter: _Arrow(color: borderColor),
-            ),
-          ],
-        ),
+          ),
+          CustomPaint(
+            size: const Size(10, 7),
+            painter: _Arrow(color: Colors.white),
+          ),
+        ],
       ),
     );
   }

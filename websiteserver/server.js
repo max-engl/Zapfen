@@ -29,11 +29,23 @@ function serve(filePath, res) {
   });
 }
 
+const LEGAL_ROUTES = {
+  '/impressum': 'impressum.html',
+  '/datenschutz': 'datenschutz.html',
+  '/nutzungsbedingungen': 'nutzungsbedingungen.html',
+  '/community-regeln': 'community-regeln.html',
+};
+
 const server = http.createServer((req, res) => {
   const urlPath = decodeURIComponent(req.url.split('?')[0]);
 
   if (urlPath === '/') {
     serve(path.join(WEBSITE_DIR, 'Zapfen Website.html'), res);
+    return;
+  }
+
+  if (LEGAL_ROUTES[urlPath]) {
+    serve(path.join(WEBSITE_DIR, LEGAL_ROUTES[urlPath]), res);
     return;
   }
 

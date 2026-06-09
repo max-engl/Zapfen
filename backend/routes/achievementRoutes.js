@@ -1,9 +1,116 @@
 const express = require("express");
+const fs = require("fs");
+const path = require("path");
 const Post = require("../models/Post");
 const PostReaction = require("../models/PostReaction");
 const authMiddleware = require("../middleware/authMiddleware");
 
 const router = express.Router();
+
+// Overpass API cache: cacheKey -> { result: boolean, expiresAt: number }
+const OSM_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const OSM_CACHE_FILE = path.join(__dirname, "../cache/osm_cache.json");
+
+function loadOsmCache() {
+    try {
+        const raw = fs.readFileSync(OSM_CACHE_FILE, "utf8");
+        const entries = JSON.parse(raw);
+        const map = new Map();
+        const now = Date.now();
+        for (const [k, v] of Object.entries(entries)) {
+            if (v.expiresAt > now) map.set(k, v);
+        }
+        return map;
+    } catch {
+        return new Map();
+    }
+}
+
+function saveOsmCache(map) {
+    try {
+        fs.mkdirSync(path.dirname(OSM_CACHE_FILE), { recursive: true });
+        const obj = Object.fromEntries(map);
+        fs.writeFileSync(OSM_CACHE_FILE, JSON.stringify(obj), "utf8");
+    } catch (err) {
+        console.error("OSM cache write failed:", err.message);
+    }
+}
+
+const osmCache = loadOsmCache();
+const osmInflight = new Map(); // in-flight promise deduplication
+
+async function isNearOSMFeature(lat, lng, osmKey, osmValue, radiusMeters) {
+    const cacheKey = `${lat.toFixed(3)},${lng.toFixed(3)},${osmKey},${osmValue},${radiusMeters}`;
+    const cached = osmCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.result;
+
+    // Reuse an already-in-flight request for the same key
+    if (osmInflight.has(cacheKey)) return osmInflight.get(cacheKey);
+
+    const filter = osmValue ? `["${osmKey}"="${osmValue}"]` : `["${osmKey}"]`;
+    const query = [
+        `[out:json][timeout:10];`,
+        `(`,
+        `  node${filter}(around:${radiusMeters},${lat},${lng});`,
+        `  way${filter}(around:${radiusMeters},${lat},${lng});`,
+        `  relation${filter}(around:${radiusMeters},${lat},${lng});`,
+        `);`,
+        `out count;`,
+    ].join("");
+
+    const promise = (async () => {
+        try {
+            const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+            const response = await fetch(url, {
+                signal: AbortSignal.timeout(15000),
+                headers: { "Accept": "application/json" },
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            const result = parseInt(data.elements?.[0]?.tags?.total ?? "0", 10) > 0;
+            osmCache.set(cacheKey, { result, expiresAt: Date.now() + OSM_CACHE_TTL_MS });
+            saveOsmCache(osmCache);
+            return result;
+        } catch (err) {
+            console.error(`OSM query failed (${lat},${lng}):`, err.message);
+            // Cache the failure for 1 hour so we don't hammer Overpass while blocked
+            osmCache.set(cacheKey, { result: false, expiresAt: Date.now() + 60 * 60 * 1000 });
+            saveOsmCache(osmCache);
+            return false;
+        } finally {
+            osmInflight.delete(cacheKey);
+        }
+    })();
+
+    osmInflight.set(cacheKey, promise);
+    return promise;
+}
+
+function createOSMAchievement({ id, icon, name, blurb, osmKey, osmValue, radiusMeters = 500, goal = 1 }) {
+    return {
+        id,
+        icon,
+        name,
+        blurb,
+        getProgress: async (posts) => {
+            const located = posts.filter((p) => p.location?.coordinates?.length === 2);
+            const matches = [];
+            for (const post of located) {
+                if (matches.length >= goal) break;
+                const [lng, lat] = post.location.coordinates;
+                if (await isNearOSMFeature(lat, lng, osmKey, osmValue, radiusMeters)) {
+                    matches.push(post);
+                }
+            }
+            return {
+                earned: matches.length >= goal,
+                have: Math.min(matches.length, goal),
+                goal,
+                date: matches.length > 0 ? matches[matches.length - 1].createdAt : null,
+            };
+        },
+    };
+}
 
 const LOCATION_ACHIEVEMENTS = [
 
@@ -150,6 +257,42 @@ const ACHIEVEMENTS = [
         }),
     },
     ...LOCATION_ACHIEVEMENTS,
+    createOSMAchievement({
+        id: "airport",
+        icon: "globe",
+        name: "Abflughalle",
+        blurb: "Logge einen Drink an einem Flughafen.",
+        osmKey: "aeroway",
+        osmValue: "aerodrome",
+        radiusMeters: 2000,
+    }),
+    createOSMAchievement({
+        id: "riverside",
+        icon: "explorer",
+        name: "Am Fluss",
+        blurb: "Logge einen Drink direkt an einem Fluss.",
+        osmKey: "waterway",
+        osmValue: "river",
+        radiusMeters: 150,
+    }),
+    createOSMAchievement({
+        id: "beach",
+        icon: "explorer",
+        name: "Strandbar",
+        blurb: "Logge einen Drink am Strand.",
+        osmKey: "natural",
+        osmValue: "beach",
+        radiusMeters: 300,
+    }),
+    createOSMAchievement({
+        id: "stadium",
+        icon: "magnet",
+        name: "Stadionbier",
+        blurb: "Logge einen Drink in oder an einem Stadion.",
+        osmKey: "leisure",
+        osmValue: "stadium",
+        radiusMeters: 500,
+    }),
 ];
 
 const HIDDEN_ACHIEVEMENTS = [
@@ -371,8 +514,8 @@ router.get("/location-targets", authMiddleware, async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
-        const targets = LOCATION_ACHIEVEMENTS.map((a) => {
-            const progress = a.getProgress(posts);
+        const targets = await Promise.all(LOCATION_ACHIEVEMENTS.map(async (a) => {
+            const progress = await a.getProgress(posts);
             const target = {
                 id: a.id,
                 icon: a.icon,
@@ -387,7 +530,7 @@ router.get("/location-targets", authMiddleware, async (req, res) => {
             };
             target.statusLabel = buildStatusLabel(target, progress.date);
             return target;
-        });
+        }));
 
         res.json({ targets });
     } catch (error) {
@@ -407,8 +550,9 @@ router.get("/me", authMiddleware, async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
-        const results = ACHIEVEMENTS.map((a) => {
-            const progress = a.getProgress(posts);
+        const results = [];
+        for (const a of ACHIEVEMENTS) {
+            const progress = await a.getProgress(posts);
             const achievement = {
                 id: a.id,
                 icon: a.icon,
@@ -419,16 +563,14 @@ router.get("/me", authMiddleware, async (req, res) => {
                 goal: progress.goal || 1,
             };
             achievement.statusLabel = buildStatusLabel(achievement, progress.date);
-
             if (progress.earned && progress.date) {
                 achievement.earnedDate = progress.date;
             }
+            results.push(achievement);
+        }
 
-            return achievement;
-        });
-
-        const hiddenResults = HIDDEN_ACHIEVEMENTS.map((a) => {
-            const progress = a.getProgress(posts);
+        const hiddenResults = await Promise.all(HIDDEN_ACHIEVEMENTS.map(async (a) => {
+            const progress = await a.getProgress(posts);
             if (!progress.earned) {
                 return {
                     id: a.id,
@@ -453,7 +595,7 @@ router.get("/me", authMiddleware, async (req, res) => {
                 goal: 1,
                 statusLabel: buildStatusLabel({ earned: true, have: 1, goal: 1 }, null),
             };
-        });
+        }));
 
         res.json({ achievements: [...results, ...hiddenResults] });
     } catch (error) {
@@ -500,8 +642,9 @@ router.get("/user/:userId", authMiddleware, async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
-        const results = ACHIEVEMENTS.map((a) => {
-            const progress = a.getProgress(posts);
+        const results = [];
+        for (const a of ACHIEVEMENTS) {
+            const progress = await a.getProgress(posts);
             const achievement = {
                 id: a.id,
                 icon: a.icon,
@@ -515,8 +658,8 @@ router.get("/user/:userId", authMiddleware, async (req, res) => {
             if (progress.earned && progress.date) {
                 achievement.earnedDate = progress.date;
             }
-            return achievement;
-        });
+            results.push(achievement);
+        }
 
         res.json({ achievements: results });
     } catch (error) {

@@ -4,7 +4,6 @@ import '../core/app_cache_manager.dart';
 import '../core/avatar_color_util.dart';
 import '../theme.dart';
 import 'img_placeholder.dart';
-import 'shimmer_box.dart';
 
 class PintAvatar extends StatelessWidget {
   final ImgTone tone;
@@ -40,8 +39,8 @@ class PintAvatar extends StatelessWidget {
                 imageUrl: imageUrl!,
                 cacheManager: AppCacheManager.instance,
                 fit: BoxFit.cover,
+                fadeInDuration: Duration.zero,
                 errorWidget: (_, __, ___) => _buildColoredAvatar(),
-                placeholder: (_, __) => const ShimmerBox.circle(),
               )
             : _buildColoredAvatar(),
       ),

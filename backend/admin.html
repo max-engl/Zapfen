@@ -224,10 +224,11 @@
               <th style="text-align:right">Beiträge</th>
               <th>Rolle</th>
               <th>Registriert</th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="users-tbody">
-            <tr><td colspan="5" class="loading-row"><span class="spinner"></span></td></tr>
+            <tr><td colspan="6" class="loading-row"><span class="spinner"></span></td></tr>
           </tbody>
         </table>
       </div>
@@ -412,6 +413,9 @@
         <td style="text-align:right;font-weight:700">${u.postCount}</td>
         <td><span class="role-badge ${u.role}">${u.role === 'admin' ? 'Admin' : 'Nutzer'}</span></td>
         <td style="color:var(--muted)">${fmtDate(u.createdAt)}</td>
+        <td>
+          ${u.postCount > 0 ? `<button class="action-btn" onclick="exportPhotos('${u._id}','${esc(u.username)}',this)" title="Fotos als ZIP herunterladen">⬇ ZIP</button>` : '<span style="color:var(--faint);font-size:12px">–</span>'}
+        </td>
       </tr>
     `).join('');
   }
@@ -552,6 +556,36 @@
       loadStats();
     } catch (e) {
       showToast('Fehler: ' + e.message);
+    }
+  }
+
+  // ── Photo export ─────────────────────────────────────────────────────────
+
+  async function exportPhotos(userId, username, btn) {
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '…';
+    try {
+      const res = await fetch(`${HOST}/admin/users/${userId}/export`, {
+        headers: { Authorization: `Bearer ${TOKEN}` },
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.message || `HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${username}_photos.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast(`ZIP für @${username} heruntergeladen`);
+    } catch (e) {
+      showToast('Fehler: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = orig;
     }
   }
 

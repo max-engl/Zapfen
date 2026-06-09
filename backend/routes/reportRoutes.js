@@ -1,4 +1,5 @@
 const express = require("express");
+const archiver = require("archiver");
 const Post = require("../models/Post");
 const Report = require("../models/Report");
 const User = require("../models/User");
@@ -186,6 +187,46 @@ adminRouter.delete("/posts/:postId", async (req, res) => {
         res.json({ message: "Post deleted by admin" });
     } catch (error) {
         res.status(500).json({ message: "Could not delete post", error: error.message });
+    }
+});
+
+// GET /admin/users/:userId/export — stream all photos + selfies as a ZIP
+adminRouter.get("/users/:userId/export", async (req, res) => {
+    try {
+        const user = await User.findById(req.params.userId).select("username").lean();
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        const posts = await Post.find({ user: req.params.userId })
+            .select("storagePath selfieStoragePath createdAt")
+            .sort({ createdAt: 1 })
+            .lean();
+
+        const safeUsername = (user.username || req.params.userId).replace(/[^a-z0-9_-]/gi, "_");
+        res.setHeader("Content-Type", "application/zip");
+        res.setHeader("Content-Disposition", `attachment; filename="${safeUsername}_photos.zip"`);
+
+        const archive = archiver("zip", { zlib: { level: 1 } });
+        archive.on("error", (err) => { if (!res.headersSent) res.status(500).end(); console.error("ZIP error:", err); });
+        archive.pipe(res);
+
+        for (let i = 0; i < posts.length; i++) {
+            const post = posts[i];
+            const dateStr = new Date(post.createdAt).toISOString().slice(0, 10);
+            const n = String(i + 1).padStart(3, "0");
+            const ext = (s) => (s?.split(".").pop()?.split("?")[0] || "jpg").toLowerCase();
+
+            const photoRes = await r2.send(new GetObjectCommand({ Bucket: process.env.R2_POST_BUCKET, Key: post.storagePath }));
+            archive.append(photoRes.Body, { name: `${n}_${dateStr}_photo.${ext(post.storagePath)}` });
+
+            if (post.selfieStoragePath) {
+                const selfieRes = await r2.send(new GetObjectCommand({ Bucket: process.env.R2_POST_BUCKET, Key: post.selfieStoragePath }));
+                archive.append(selfieRes.Body, { name: `${n}_${dateStr}_selfie.${ext(post.selfieStoragePath)}` });
+            }
+        }
+
+        await archive.finalize();
+    } catch (error) {
+        if (!res.headersSent) res.status(500).json({ message: "Export failed", error: error.message });
     }
 });
 

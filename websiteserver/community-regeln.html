@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Community-Regeln – Zapfen.</title>
+<link rel="icon" type="image/png" href="app_icon.png" />
+<link rel="apple-touch-icon" href="app_icon.png" />
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --text: #ffffff;
+    --muted: rgba(255,255,255,0.56);
+    --faint: rgba(255,255,255,0.30);
+    --border: rgba(255,255,255,0.09);
+    --gold: #F6B733;
+    --goldInk: #3a1f02;
+    --goldText: #F6B733;
+    --goldSoft: rgba(246,183,51,0.15);
+    --goldBorder: rgba(246,183,51,0.30);
+    --maxw: 720px;
+    --font: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Monaco, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: var(--goldText); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  ::selection { background: var(--gold); color: var(--goldInk); }
+
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,10,10,0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+  }
+  .nav-inner {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .back-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 14px; font-weight: 600; color: var(--muted);
+    transition: color .15s;
+  }
+  .back-btn:hover { color: var(--text); text-decoration: none; }
+  .back-btn svg { flex: none; }
+  .nav-title {
+    font-size: 15px; font-weight: 700; letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .nav-sep { color: var(--faint); font-size: 13px; }
+
+  main {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 48px 28px 80px;
+  }
+  .page-kicker {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--goldText);
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  h1 {
+    margin: 0 0 40px;
+    font-size: clamp(28px, 5vw, 42px);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+  }
+
+  .section { margin-bottom: 28px; }
+  .section h2 {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    margin: 0 0 8px;
+  }
+  .section p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--muted);
+    white-space: pre-line;
+  }
+
+  .divider { height: 1px; background: var(--border); margin: 32px 0; }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 28px;
+    text-align: center;
+  }
+  .footer-inner {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 20px;
+    font-size: 13px;
+    color: var(--faint);
+  }
+  .footer-inner a { color: var(--faint); }
+  .footer-inner a:hover { color: var(--muted); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a class="back-btn" href="/">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Zapfen.
+    </a>
+    <span class="nav-sep">/</span>
+    <span class="nav-title">Community-Regeln</span>
+  </div>
+</nav>
+
+<main>
+  <div class="page-kicker">Rechtliches</div>
+  <h1>Community-Regeln</h1>
+
+  <div class="section">
+    <p>Stand: Juni 2026
+
+Zapfen ist eine Community für volljährige Nutzerinnen und Nutzer, die sich über Bier und Bierkultur austauschen möchten. Damit die App für alle sicher und angenehm bleibt, gelten diese Community-Regeln.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>1. Mindestalter</h2>
+    <p>Zapfen ist ausschließlich für Personen ab 18 Jahren bestimmt. Konten minderjähriger Nutzer sind nicht erlaubt und können gelöscht werden.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>2. Respektvoller Umgang</h2>
+    <p>Behandle andere Nutzer respektvoll. Beleidigungen, Belästigungen, Drohungen, Mobbing oder gezielte Provokationen sind nicht erlaubt.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>3. Kein Hass und keine Diskriminierung</h2>
+    <p>Inhalte, die Personen oder Gruppen aufgrund von Herkunft, Nationalität, Religion, Geschlecht, sexueller Orientierung, Behinderung, Alter oder anderer Merkmale herabwürdigen oder angreifen, sind verboten.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>4. Verantwortungsbewusster Umgang mit Alkohol</h2>
+    <p>Zapfen dient dem Austausch über Bier und Bierkultur. Inhalte, die gefährlichen, exzessiven oder verantwortungslosen Alkoholkonsum fördern, verherrlichen oder andere zum Trinken drängen, sind nicht erlaubt.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>5. Schutz Minderjähriger</h2>
+    <p>Inhalte, die Minderjährige im Zusammenhang mit Alkohol zeigen, ansprechen oder gefährden, sind nicht erlaubt. Dies gilt insbesondere für Bilder, Kommentare oder Beiträge, die Minderjährige beim Konsum oder in einem alkoholbezogenen Kontext darstellen.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>6. Keine illegalen Inhalte</h2>
+    <p>Veröffentliche keine Inhalte, die gegen geltendes Recht verstoßen. Dazu gehören insbesondere Gewaltverherrlichung, Volksverhetzung, illegale Substanzen, Betrug, Drohungen oder rechtswidrige Aufforderungen.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>7. Keine unangemessenen Bilder</h2>
+    <p>Sexuell explizite, stark anstößige, gewaltvolle oder entwürdigende Bilder sind nicht erlaubt. Beiträge sollen thematisch zur Community passen.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>8. Rechte Dritter beachten</h2>
+    <p>Lade nur Inhalte hoch, an denen du die nötigen Rechte besitzt. Achte insbesondere auf Urheberrechte, Markenrechte und Persönlichkeitsrechte anderer Personen.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>9. Keine Täuschung</h2>
+    <p>Gib dich nicht als eine andere Person, Marke oder Organisation aus. Fake-Accounts, betrügerische Inhalte und absichtliche Irreführung sind nicht erlaubt.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>10. Kein Spam</h2>
+    <p>Spam, massenhafte Freundschaftsanfragen, automatisierte Aktionen, Werbung ohne Genehmigung und störendes Verhalten sind nicht erlaubt.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>11. Melden und Blockieren</h2>
+    <p>Wenn du Inhalte siehst, die gegen diese Regeln verstoßen, kannst du sie direkt in der App melden. Du kannst außerdem Nutzer blockieren, mit denen du nicht interagieren möchtest.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>12. Folgen bei Verstößen</h2>
+    <p>Bei Verstößen gegen diese Regeln können Inhalte entfernt, Funktionen eingeschränkt, Nutzerkonten gesperrt oder dauerhaft gelöscht werden.</p>
+  </div>
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <span>© 2026 Maximilian Engl</span>
+    <a href="/impressum">Impressum</a>
+    <a href="/datenschutz">Datenschutz</a>
+    <a href="/nutzungsbedingungen">Nutzungsbedingungen</a>
+    <a href="/community-regeln">Community-Regeln</a>
+  </div>
+</footer>
+
+</body>
+</html>

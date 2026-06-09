@@ -12,11 +12,6 @@ import '../features/posts/models/post_reaction.dart';
 import '../features/posts/services/post_service.dart';
 import 'avatar.dart';
 import 'report_post_sheet.dart';
-import 'shimmer_box.dart';
-
-// Keys of images that have been rendered at least once this session.
-// Used to skip the shimmer placeholder on scroll-back.
-final _renderedImageKeys = <String>{};
 
 class PostCard extends StatelessWidget {
   final FeedPost post;
@@ -347,16 +342,7 @@ class _PhotoState extends State<_Photo> with SingleTickerProviderStateMixin {
             cacheKey: mainKey,
             cacheManager: AppCacheManager.instance,
             fit: BoxFit.cover,
-            fadeInDuration: _renderedImageKeys.contains(mainKey)
-                ? Duration.zero
-                : const Duration(milliseconds: 200),
-            placeholder: _renderedImageKeys.contains(mainKey)
-                ? null
-                : (_, __) => const ShimmerBox(),
-            imageBuilder: (_, imageProvider) {
-              _renderedImageKeys.add(mainKey);
-              return Image(image: imageProvider, fit: BoxFit.cover);
-            },
+            fadeInDuration: Duration.zero,
             errorWidget: (_, __, ___) => Container(color: t.surfaceWeak),
           )
         : Container(color: t.surfaceWeak);
@@ -497,12 +483,7 @@ class _PhotoState extends State<_Photo> with SingleTickerProviderStateMixin {
                                       cacheKey: overlayKey,
                                       cacheManager: AppCacheManager.instance,
                                       fit: BoxFit.cover,
-                                      progressIndicatorBuilder: (_, __, ___) =>
-                                          ShimmerBox(
-                                            borderRadius: BorderRadius.circular(
-                                              10,
-                                            ),
-                                          ),
+                                      fadeInDuration: Duration.zero,
                                       errorWidget: (_, __, ___) =>
                                           Container(color: t.surfaceWeak),
                                     )
