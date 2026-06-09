@@ -1,4 +1,4 @@
-// site-sections.jsx — Pint. landing: how-it-works, features, bingo, CTA, footer
+// site-sections.jsx — Zapfen landing: how-it-works, features, bingo, CTA, footer
 const { Phone, StoreButtons, Wordmark, Mark, BoltGlyph } = window;
 
 // small glyphs (reuse app icon set where possible)
@@ -13,17 +13,17 @@ function Glyph({ name, s = 26, c = "currentColor" }) {
 // ─────────────────────────────────────────────
 function HowItWorks() {
   const steps = [
-    { ico: "bolt", n: "01", title: "A prompt drops", body: "Once a day, at a random moment, Pint buzzes everyone at the same time. No schedule to game. When it lands, you've got a short window to pour." },
-    { ico: "cam", n: "02", title: "Capture your pour", body: "Front and back camera fire together — your glass and your face, exactly where you are. A line about what's in the glass, and you're in." },
-    { ico: "cheers", n: "03", title: "Cheers your circle", body: "See every friend's pour for today in one honest feed. React, drop a comment, and clink glasses across town — or across the world." },
+    { ico: "bolt", n: "01", title: "Der Prompt kommt", body: "Einmal am Tag, zu einem zufälligen Moment, vibriert Zapfen bei allen gleichzeitig. Kein Planen, kein Tricksen. Wenn er landet, hast du ein kurzes Zeitfenster zum Zapfen." },
+    { ico: "cam", n: "02", title: "Halte dein Bier fest", body: "Front- und Rückkamera lösen gemeinsam aus: dein Glas und dein Gesicht, genau dort, wo du bist. Noch eine Zeile dazu, was im Glas ist, und du bist dabei." },
+    { ico: "cheers", n: "03", title: "Stoß mit deinem Kreis an", body: "Sieh alle heutigen Biermomente deiner Freunde in einem ehrlichen Feed. Reagiere, kommentiere und stoße quer durch die Stadt oder um die Welt an." },
   ];
   return (
     <section id="how" style={{ padding: "120px 0 100px" }}>
       <div className="wrap">
         <div style={{ textAlign: "center", maxWidth: 720, margin: "0 auto 64px" }}>
-          <div className="kicker reveal">How Pint works</div>
+          <div className="kicker reveal">So funktioniert Zapfen</div>
           <h2 className="h2 reveal" style={{ marginTop: 18, transitionDelay: ".05s" }}>
-            Three taps from thirsty<br/>to <span className="gold-text">together.</span>
+            Drei Taps von durstig<br/>zu <span className="gold-text">zusammen.</span>
           </h2>
         </div>
         <div className="how-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 22 }}>
@@ -103,13 +103,13 @@ function Features() {
         <div className="wrap">
           <FeatureRow
             cream
-            kicker="See the night unfold"
-            title={<span>A live map of<br/>who's pouring.</span>}
-            body="Every friend who's poured today drops a golden pin where they are. Tap one to see what's in their glass, get directions, or send a cheers before you even arrive."
+            kicker="Sieh, wie der Abend entsteht"
+            title={<span>Eine Live-Karte,<br/>wer gerade zapft.</span>}
+            body="Jeder Freund, der heute gezapft hat, erscheint mit einem goldenen Pin auf der Karte. Tippe darauf, um zu sehen, was im Glas ist, dir den Weg zeigen zu lassen oder schon vor dem Ankommen anzustoßen."
             bullets={[
-              { h: "Real-time pins —", t: "your circle lights up the map as the prompt rolls around the world." },
-              { h: "Tap to join —", t: "directions in one tap, so the next round is already on its way." },
-              { h: "Private by default —", t: "only your friends ever see your spot, only for the day." },
+              { h: "Pins in Echtzeit -", t: "dein Kreis lässt die Karte aufleuchten, sobald der Prompt um die Welt geht." },
+              { h: "Tippen und dazukommen -", t: "Wegbeschreibung mit einem Tap, damit die nächste Runde schon unterwegs ist." },
+              { h: "Privat von Anfang an -", t: "nur deine Freunde sehen deinen Ort, und nur für diesen Tag." },
             ]}
             phone={<Phone screen="map" posted theme="light" scale={0.72} />}
           />
@@ -122,13 +122,13 @@ function Features() {
           <div className="wrap">
             <FeatureRow
               flip
-              kicker="Built to keep the round going"
-              title={<span>Streaks, badges,<br/>bragging rights.</span>}
-              body="Pour day after day and your streak climbs. Earn medallions for late nights, new cities, and centuries of pints — all on a profile your friends actually check."
+              kicker="Gebaut, damit die Runde weitergeht"
+              title={<span>Serien, Abzeichen<br/>und Ruhm.</span>}
+              body="Zapf Tag für Tag und deine Serie wächst. Verdiene Medaillen für lange Nächte, neue Städte und hundert Biermomente - alles auf einem Profil, das deine Freunde wirklich anschauen."
               bullets={[
-                { h: "Daily streaks —", t: "a 12-week heat-map that rewards showing up." },
-                { h: "Achievements —", t: "from First Round to Globetrotter, there's always a next one." },
-                { h: "Your wall —", t: "every pour you've logged, in one warm grid." },
+                { h: "Tägliche Serien -", t: "eine 12-Wochen-Heatmap, die Dranbleiben belohnt." },
+                { h: "Erfolge -", t: "von der Ersten Runde bis zum Weltenbummler wartet immer das nächste Ziel." },
+                { h: "Deine Wand -", t: "jeder Biermoment, den du geloggt hast, in einem warmen Raster." },
               ]}
               phone={<Phone screen="profile" posted theme="dark" scale={0.72} />}
             />
@@ -168,7 +168,7 @@ const LEADERS = [
   { r: 1, name: "Jonas Lindqvist", h: "@jlind", pts: 412, tone: "#3a2a1a" },
   { r: 2, name: "Theo Park", h: "@theop", pts: 388, tone: "#4a3a2a" },
   { r: 3, name: "Maya Calderón", h: "@mayac", pts: 351, tone: "#6a4a2a" },
-  { r: 4, name: "You", h: "@you", pts: 312, tone: "#5a3a1a", you: true },
+  { r: 4, name: "Du", h: "@du", pts: 312, tone: "#5a3a1a", you: true },
   { r: 5, name: "Priya Anand", h: "@priyaa", pts: 286, tone: "#3a2410" },
 ];
 
@@ -177,13 +177,13 @@ function BingoLeaderboard() {
     <section id="bingo" style={{ padding: "118px 0" }}>
       <div className="wrap">
         <div style={{ textAlign: "center", maxWidth: 720, margin: "0 auto 60px" }}>
-          <div className="kicker reveal">Make a game of it</div>
+          <div className="kicker reveal">Mach ein Spiel daraus</div>
           <h2 className="h2 reveal" style={{ marginTop: 18, transitionDelay: ".05s" }}>
-            Bier-Bingo &amp; a weekly<br/><span className="gold-text">race to the top.</span>
+            Bier-Bingo und ein wöchentliches<br/><span className="gold-text">Rennen nach oben.</span>
           </h2>
           <p className="lede reveal" style={{ margin: "20px auto 0", maxWidth: 560, transitionDelay: ".1s" }}>
-            A fresh card every month. A live leaderboard every week. Pint turns your
-            ordinary pints into squares to fill and friends to beat.
+            Jeden Monat eine neue Karte. Jede Woche ein Live-Ranking. Zapfen macht aus
+            deinen normalen Biermomenten Felder zum Füllen und Freunde zum Überholen.
           </p>
         </div>
 
@@ -196,7 +196,7 @@ function BingoLeaderboard() {
                 <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em" }}>Bier-Bingo</div>
                 <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>Juni 2026 · 16 / 25 erledigt</div>
               </div>
-              <span className="pill pill-gold"><BoltGlyph /> 2 lines</span>
+              <span className="pill pill-gold"><BoltGlyph /> 2 Zeilen</span>
             </div>
             <div style={{ position: "relative", display: "flex", justifyContent: "center" }}>
               <BingoCardMini />
@@ -207,8 +207,8 @@ function BingoLeaderboard() {
           <div className="reveal" style={{ position: "relative", padding: "34px 30px 30px", borderRadius: 24, background: "linear-gradient(180deg, var(--surface2), var(--surface))", border: "1px solid var(--border)", transitionDelay: ".08s" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
               <div>
-                <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em" }}>This week's circle</div>
-                <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>Cheers earned · resets Sunday</div>
+                <div style={{ fontSize: 19, fontWeight: 800, letterSpacing: "-0.02em" }}>Dein Kreis diese Woche</div>
+                <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 2 }}>Prost gesammelt · Reset am Sonntag</div>
               </div>
               <span className="pill pill-outline"><Glyph name="cheers" s={14} c="var(--goldText)" /> Top 5</span>
             </div>
@@ -243,20 +243,20 @@ function BingoLeaderboard() {
 // ─────────────────────────────────────────────
 function StatBand() {
   const stats = [
-    { v: "1", l: "prompt a day" },
-    { v: "40k+", l: "pours logged daily" },
-    { v: "4.9★", l: "App Store rating" },
-    { v: "0", l: "infinite scroll" },
+    { v: "1", l: "Prompt pro Tag" },
+    { v: "40k+", l: "Biermomente täglich" },
+    { v: "4,9★", l: "App-Store-Bewertung" },
+    { v: "0", l: "Endlos-Scrollen" },
   ];
   return (
     <section style={{ padding: "10px 0 70px" }}>
       <div className="wrap">
         <div className="reveal" style={{ borderRadius: 28, padding: "54px 40px", background: "linear-gradient(135deg, rgba(246,183,51,0.10), rgba(246,183,51,0.03))", border: "1px solid var(--goldBorder)", textAlign: "center" }}>
           <p style={{ fontSize: "clamp(24px, 3.2vw, 38px)", fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1.18, maxWidth: 860, margin: "0 auto" }}>
-            “It's the one app I actually look forward to. The prompt hits, I show my pint,
-            and suddenly I know <span className="gold-text">exactly</span> who to call for a round.”
+            „Das ist die eine App, auf die ich mich wirklich freue. Der Prompt kommt, ich zeige mein Bier
+            und weiß plötzlich <span className="gold-text">genau</span>, wen ich auf eine Runde anrufe.“
           </p>
-          <div style={{ marginTop: 22, fontSize: 14, color: "var(--muted)", fontFamily: "var(--mono)", letterSpacing: "0.08em", textTransform: "uppercase" }}>— Maya C., poured 312 days straight</div>
+          <div style={{ marginTop: 22, fontSize: 14, color: "var(--muted)", fontFamily: "var(--mono)", letterSpacing: "0.08em", textTransform: "uppercase" }}>- Maya C., 312 Tage am Stück gezapft</div>
           <div className="stat-row" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, marginTop: 48, paddingTop: 40, borderTop: "1px solid var(--goldBorder)" }}>
             {stats.map((s, i) => (
               <div key={i}>
@@ -283,10 +283,10 @@ function CTA() {
           <div style={{ position: "relative" }}>
             <div style={{ display: "inline-flex", marginBottom: 26 }}><Mark size={56} /></div>
             <h2 style={{ fontSize: "clamp(40px, 6.5vw, 84px)", fontWeight: 800, letterSpacing: "-0.045em", lineHeight: 0.95 }}>
-              It's nearly time<br/>to pour.
+              Gleich ist es Zeit<br/>zu zapfen.
             </h2>
             <p style={{ fontSize: 19, lineHeight: 1.5, margin: "22px auto 0", maxWidth: 480, color: "rgba(58,31,2,0.78)", fontWeight: 500 }}>
-              Free to join. One prompt a day. Bring the friends you'd actually share a round with.
+              Kostenlos dabei sein. Ein Prompt pro Tag. Bring die Freunde mit, mit denen du wirklich eine Runde teilen würdest.
             </p>
             <div style={{ display: "flex", justifyContent: "center", marginTop: 34 }}>
               <StoreButtons />
@@ -300,9 +300,9 @@ function CTA() {
 
 function Footer() {
   const cols = [
-    { h: "App", links: ["The daily pour", "The Map", "Streaks", "Bier-Bingo", "Leaderboard"] },
-    { h: "Company", links: ["About", "Careers", "Press", "Drink responsibly"] },
-    { h: "Legal", links: ["Privacy", "Terms", "Cookies", "Age policy"] },
+    { h: "App", links: ["Der tägliche Biermoment", "Karte", "Serien", "Bier-Bingo", "Ranking"] },
+    { h: "Unternehmen", links: ["Über uns", "Jobs", "Presse", "Verantwortungsvoll trinken"] },
+    { h: "Rechtliches", links: ["Datenschutz", "AGB", "Cookies", "Altersrichtlinie"] },
   ];
   return (
     <footer style={{ borderTop: "1px solid var(--border)", padding: "64px 0 50px" }}>
@@ -311,7 +311,7 @@ function Footer() {
           <div>
             <Wordmark size={32} fs={25} />
             <p style={{ marginTop: 18, fontSize: 14.5, lineHeight: 1.55, color: "var(--muted)", maxWidth: 280 }}>
-              The once-a-day beer moment you share with your closest circle.
+              Der einmal tägliche Biermoment, den du mit deinem engsten Kreis teilst.
             </p>
             <div style={{ marginTop: 22 }}><StoreButtons small /></div>
           </div>
@@ -329,8 +329,8 @@ function Footer() {
           ))}
         </div>
         <div style={{ marginTop: 54, paddingTop: 26, borderTop: "1px solid var(--borderWeak)", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <div style={{ fontSize: 13, color: "var(--faint)" }}>© 2026 Pint. — Please enjoy responsibly. 21+ / 18+ where applicable.</div>
-          <div style={{ fontSize: 13, color: "var(--faint)", fontFamily: "var(--mono)", letterSpacing: "0.1em" }}>MADE FOR PEOPLE WHO STILL CALL THEIR FRIENDS</div>
+          <div style={{ fontSize: 13, color: "var(--faint)" }}>© 2026 Zapfen. - Bitte verantwortungsvoll genießen. 21+ / 18+ wo zutreffend.</div>
+          <div style={{ fontSize: 13, color: "var(--faint)", fontFamily: "var(--mono)", letterSpacing: "0.1em" }}>GEMACHT FÜR MENSCHEN, DIE IHRE FREUNDE NOCH ANRUFEN</div>
         </div>
       </div>
     </footer>

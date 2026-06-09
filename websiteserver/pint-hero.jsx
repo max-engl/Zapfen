@@ -1,14 +1,11 @@
-// site-hero.jsx — Pint. landing: shared atoms + nav + hero
+// site-hero.jsx — Zapfen landing: shared atoms + nav + hero
 const { useState, useEffect, useRef } = React;
 
-// ── Brand wordmark / mark (CSS version, matches app) ──
+// ── Brand wordmark / mark ──
 function Mark({ size = 30 }) {
   return (
     <span className="bmark" style={{ width: size, height: size }}>
-      <span className="b" style={{ fontSize: size * 0.95, paddingBottom: size * 0.02 }}>B</span>
-      <span className="foam" style={{ left: "38%", top: "10%", width: size*0.11, height: size*0.11, background:"#fff" }} />
-      <span className="foam" style={{ left: "55%", top: "6%",  width: size*0.075, height: size*0.075, background:"#fff" }} />
-      <span className="foam" style={{ left: "66%", top: "14%", width: size*0.056, height: size*0.056, background:"#f0ebde" }} />
+      <img src="app_icon.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
     </span>
   );
 }
@@ -18,7 +15,7 @@ function Wordmark({ size = 30, fs = 23 }) {
     <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
       <Mark size={size} />
       <span style={{ fontWeight: 800, fontSize: fs, letterSpacing: "-0.03em" }}>
-        Pint<span className="gold-text">.</span>
+        Zapfen<span className="gold-text">.</span>
       </span>
     </span>
   );
@@ -30,17 +27,17 @@ function StoreButtons({ small = false }) {
     <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
       <a className="store-btn" href="#get" style={small ? { padding: "10px 16px 10px 14px" } : {}}>
         <svg width="22" height="26" viewBox="0 0 24 28" fill="#0a0a0a"><path d="M17.5 14.9c0-2.7 2.2-4 2.3-4.1-1.3-1.8-3.2-2.1-3.9-2.1-1.6-.2-3.2 1-4 1-.8 0-2.1-1-3.5-.9-1.8 0-3.4 1-4.3 2.6-1.9 3.2-.5 8 1.3 10.6.9 1.3 1.9 2.7 3.3 2.6 1.3-.1 1.8-.8 3.4-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.2-2.6.7-1 1-1.5 1.5-2.6-3.9-1.5-4.4-6.9-.7-9.1zM15 6.9c.7-.9 1.2-2.1 1.1-3.3-1 0-2.3.7-3 1.6-.7.8-1.3 2-1.1 3.2 1.1.1 2.3-.6 3-1.5z"/></svg>
-        <span><span className="sb-sub">Download on the</span><span className="sb-main">App Store</span></span>
+        <span><span className="sb-sub">Laden im</span><span className="sb-main">App Store</span></span>
       </a>
       <a className="store-btn" href="#get" style={small ? { padding: "10px 16px 10px 14px" } : {}}>
         <svg width="22" height="24" viewBox="0 0 22 24" fill="none"><path d="M2 1.5 13 12 2 22.5c-.5-.2-.8-.7-.8-1.4V2.9c0-.7.3-1.2.8-1.4z" fill="#0a0a0a"/><path d="M2 1.5 13 12 2 22.5" stroke="#0a0a0a" strokeWidth="0.4"/></svg>
-        <span><span className="sb-sub">Get it on</span><span className="sb-main">Google Play</span></span>
+        <span><span className="sb-sub">Jetzt bei</span><span className="sb-main">Google Play</span></span>
       </a>
     </div>
   );
 }
 
-// ── Phone embed: a real PintApp screen, scaled ──
+// ── Phone embed: a real Zapfen app screen, scaled ──
 function Phone({ screen = "feed", posted = false, theme = "dark", scale = 1, demoReact = false, style = {} }) {
   const W = 402, H = 874;
   const { PintApp } = window;
@@ -62,9 +59,9 @@ function Nav() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
   const links = [
-    { label: "How it works", href: "#how" },
-    { label: "Features", href: "#features" },
-    { label: "The Map", href: "#map" },
+    { label: "So funktioniert's", href: "#how" },
+    { label: "Funktionen", href: "#features" },
+    { label: "Karte", href: "#map" },
     { label: "Bingo", href: "#bingo" },
   ];
   return (
@@ -85,7 +82,7 @@ function Nav() {
               onMouseLeave={e => e.currentTarget.style.color = "var(--muted)"}>{l.label}</a>
           ))}
         </div>
-        <a className="btn btn-gold" href="#get" style={{ padding: "11px 20px", fontSize: 14.5 }}>Get Pint</a>
+        <a className="btn btn-gold" href="#get" style={{ padding: "11px 20px", fontSize: 14.5 }}>Zapfen holen</a>
       </div>
     </div>
   );
@@ -108,14 +105,14 @@ function Hero() {
         {/* Left: copy */}
         <div>
           <div className="reveal pill pill-gold" style={{ marginBottom: 26 }}>
-            <BoltGlyph /> One prompt a day. No scrolling forever.
+            <BoltGlyph /> Ein Prompt pro Tag. Kein endloses Scrollen.
           </div>
           <h1 className="display reveal" style={{ transitionDelay: ".05s" }}>
-            Pour with<br/>your <span className="beer-clip">people.</span>
+            Zapf mit<br/>deinen <span className="beer-clip">Leuten.</span>
           </h1>
           <p className="lede reveal" style={{ marginTop: 26, maxWidth: 480, transitionDelay: ".12s" }}>
-            Pint sends one surprise prompt a day. Snap your glass and a quick selfie,
-            see what your circle is drinking right now, and cheers them from anywhere.
+            Zapfen schickt dir einmal am Tag einen überraschenden Prompt. Fotografiere dein Glas und ein kurzes Selfie,
+            sieh, was dein Kreis gerade trinkt, und stoße von überall mit ihnen an.
           </p>
           <div className="reveal" style={{ marginTop: 32, transitionDelay: ".18s" }}>
             <StoreButtons />
@@ -132,8 +129,8 @@ function Hero() {
               ))}
             </div>
             <div style={{ fontSize: 13.5, color: "var(--muted)", lineHeight: 1.35 }}>
-              <strong style={{ color: "#fff" }}>40,000+</strong> friends poured today<br/>
-              <span style={{ color: "var(--goldText)" }}>★★★★★</span> 4.9 · loved on the App Store
+              <strong style={{ color: "#fff" }}>40.000+</strong> Freunde haben heute gezapft<br/>
+              <span style={{ color: "var(--goldText)" }}>★★★★★</span> 4,9 · beliebt im App Store
             </div>
           </div>
         </div>
@@ -158,7 +155,7 @@ function BoltGlyph({ s = 12, c = "currentColor" }) {
 }
 
 function Marquee() {
-  const items = ["Snap your pour", "•", "See your circle", "•", "Cheers from anywhere", "•", "Keep your streak", "•", "Climb the leaderboard", "•", "Play Bier-Bingo", "•"];
+  const items = ["Fotografiere dein Bier", "•", "Sieh deinen Kreis", "•", "Stoße von überall an", "•", "Halte deine Serie", "•", "Steig im Ranking", "•", "Spiel Bier-Bingo", "•"];
   const run = [...items, ...items];
   return (
     <div style={{ marginTop: 88, borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)", padding: "18px 0", overflow: "hidden", position: "relative", maskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)" }}>

@@ -1,4 +1,4 @@
-// Bier-Bingo — monthly 5×5 challenge card for the Pint. app.
+// Bier-Bingo — monthly 5×5 challenge card for the Zapfen app.
 // One shared card per month; cells auto-complete from the user's logged posts.
 // Complete a row / column / diagonal → a "Zeile". All 25 → "Blackout".
 //

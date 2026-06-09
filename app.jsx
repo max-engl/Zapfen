@@ -1,5 +1,4 @@
-// Pint. — A daily beer-moment social app
-// Brand: golden monogram "B" on black, warm gold accents.
+// Zapfen — A daily beer-moment social app
 // Supports light + dark themes via T tokens.
 
 const { useState, useEffect, useRef, useContext, createContext } = React;
@@ -92,10 +91,9 @@ const ThemeContext = createContext(THEMES.dark);
 const useT = () => useContext(ThemeContext);
 
 // ───────────────────────────────────────────
-// Brand mark (the golden B with foam dots) — same on both themes
+// Brand mark — same on both themes
 // ───────────────────────────────────────────
 function BrandMark({ size = 28 }) {
-  const f = size / 32;
   return (
     <div style={{
       width: size, height: size, position: "relative",
@@ -107,23 +105,7 @@ function BrandMark({ size = 28 }) {
         borderRadius: size * 0.2237,
         overflow: "hidden",
       }}>
-        <div style={{
-          position: "absolute", inset: 0,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontFamily: '-apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif',
-          fontWeight: 900,
-          fontSize: size * 0.95,
-          lineHeight: 0.82,
-          letterSpacing: "-0.06em",
-          background: "linear-gradient(180deg, #ffe89a 0%, #f6b733 30%, #d98a14 65%, #7a3f06 100%)",
-          WebkitBackgroundClip: "text",
-          backgroundClip: "text",
-          color: "transparent",
-          paddingBottom: size * 0.02,
-        }}>B</div>
-        <span style={{ position: "absolute", left: "38%", top: "10%", width: 3.5*f, height: 3.5*f, borderRadius: "50%", background: "#fff" }} />
-        <span style={{ position: "absolute", left: "55%", top: "6%",  width: 2.4*f, height: 2.4*f, borderRadius: "50%", background: "#fff" }} />
-        <span style={{ position: "absolute", left: "66%", top: "14%", width: 1.8*f, height: 1.8*f, borderRadius: "50%", background: "#f0ebde" }} />
+        <img src="app_icon.png" alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
       </div>
     </div>
   );
@@ -132,7 +114,7 @@ function BrandMark({ size = 28 }) {
 // ───────────────────────────────────────────
 // Placeholder image — visual content, stays the same across themes
 // ───────────────────────────────────────────
-function ImgPH({ tone = "beer", label = "drink photo", style = {} }) {
+function ImgPH({ tone = "beer", label = "Bierfoto", style = {} }) {
   const tones = {
     beer:    "repeating-linear-gradient(135deg, #c98014 0 10px, #b87509 10px 20px), linear-gradient(180deg, #ffd97a, #6a3a05)",
     night:   "repeating-linear-gradient(135deg, #1a1a22 0 10px, #15151c 10px 20px)",
@@ -251,42 +233,42 @@ const FRIENDS_FEED = [
   {
     id: "p1", name: "Maya Calderón", handle: "@mayac", time: "12m",
     place: "The Goose & Crown · SE15", drink: "Hazy Pale · 5.2%",
-    caption: "first one after the marathon. earned.",
+    caption: "das erste nach dem Marathon. verdient.",
     cheers: 24, comments: 6, mine: false,
     tone: "beer", selfieTone: "selfie", late: false,
   },
   {
     id: "p2", name: "Theo Park", handle: "@theop", time: "31m",
     place: "Allagash Taproom · Portland", drink: "Triple Belgian · 9.5%",
-    caption: "research purposes.",
+    caption: "zu Forschungszwecken.",
     cheers: 41, comments: 12, mine: false,
     tone: "bar", selfieTone: "selfie", late: false,
   },
   {
     id: "p3", name: "Priya Anand", handle: "@priyaa", time: "1h 02m",
-    place: "Home · Brooklyn", drink: "Pilsner Urquell",
-    caption: "tuesday. you know how it is.",
+    place: "Zuhause · Brooklyn", drink: "Pilsner Urquell",
+    caption: "Dienstag. du kennst es.",
     cheers: 18, comments: 3, mine: false,
     tone: "sky", selfieTone: "selfie", late: true,
   },
   {
     id: "p4", name: "Jonas Lindqvist", handle: "@jlind", time: "1h 47m",
     place: "Mikkeller · Reykjavík", drink: "Imperial Stout · 11%",
-    caption: "the menu has 87 entries. i have all night.",
+    caption: "die Karte hat 87 Einträge. ich habe die ganze Nacht.",
     cheers: 67, comments: 21, mine: false,
     tone: "night", selfieTone: "selfie", late: true,
   },
 ];
 
 const FRIENDS_LIST = [
-  { name: "Maya Calderón", status: "Poured · 12m ago", on: true,  tone: "avatar" },
-  { name: "Theo Park",      status: "Poured · 31m ago", on: true,  tone: "selfie" },
-  { name: "Priya Anand",    status: "Poured · 1h ago",  on: false, tone: "avatar" },
-  { name: "Jonas Lindqvist", status: "Poured · 1h ago",  on: true,  tone: "selfie" },
-  { name: "Sam Okafor",     status: "Waiting for prompt", on: true, tone: "avatar" },
-  { name: "Hana Tsuji",     status: "Waiting for prompt", on: false, tone: "selfie" },
-  { name: "Rafael Costa",   status: "Last poured · yesterday", on: false, tone: "avatar" },
-  { name: "Lena Bauer",     status: "Last poured · 2d ago", on: true, tone: "selfie" },
+  { name: "Maya Calderón", status: "Gezapft · vor 12m", on: true,  tone: "avatar" },
+  { name: "Theo Park",      status: "Gezapft · vor 31m", on: true,  tone: "selfie" },
+  { name: "Priya Anand",    status: "Gezapft · vor 1h",  on: false, tone: "avatar" },
+  { name: "Jonas Lindqvist", status: "Gezapft · vor 1h",  on: true,  tone: "selfie" },
+  { name: "Sam Okafor",     status: "Wartet auf Prompt", on: true, tone: "avatar" },
+  { name: "Hana Tsuji",     status: "Wartet auf Prompt", on: false, tone: "selfie" },
+  { name: "Rafael Costa",   status: "Zuletzt gezapft · gestern", on: false, tone: "avatar" },
+  { name: "Lena Bauer",     status: "Zuletzt gezapft · vor 2 Tagen", on: true, tone: "selfie" },
 ];
 
 const MAP_PINS = [
@@ -294,7 +276,7 @@ const MAP_PINS = [
   { x: 62, y: 28, label: "Theo", drink: "Triple" },
   { x: 78, y: 58, label: "Priya", drink: "Pilsner" },
   { x: 35, y: 62, label: "Jonas", drink: "Stout" },
-  { x: 52, y: 75, label: "you",   drink: "—", you: true },
+  { x: 52, y: 75, label: "du",   drink: "-", you: true },
 ];
 
 const STREAK_GRID = (() => {
@@ -359,12 +341,12 @@ function TopBar({ streak, onBell }) {
         <BrandMark size={30} />
         <div style={{
           fontWeight: 800, fontSize: 22, letterSpacing: "-0.03em", color: T.text,
-        }}>Pint<span style={{ color: T.goldText }}>.</span></div>
+        }}>Zapfen<span style={{ color: T.goldText }}>.</span></div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <GoldPill style={{ padding: "5px 10px", fontSize: 12 }}>
           <span style={{ display: "inline-flex" }}>{Ico.bolt(11, T.goldInk)}</span>
-          {streak}-day streak
+          {streak}-Tage-Serie
         </GoldPill>
         <button onClick={onBell} style={{
           width: 36, height: 36, borderRadius: "50%",
@@ -397,9 +379,9 @@ function PromptBanner({ minsLeft, onCapture, posted }) {
           display: "grid", placeItems: "center", color: T.goldText,
         }}>{Ico.cheers(18, T.goldText)}</div>
         <div style={{ flex: 1 }}>
-          <div style={{ color: T.text, fontWeight: 600, fontSize: 14 }}>You poured today.</div>
+          <div style={{ color: T.text, fontWeight: 600, fontSize: 14 }}>Du hast heute gezapft.</div>
           <div style={{ color: T.textMuted, fontSize: 12, marginTop: 2 }}>
-            Next prompt drops tomorrow, random time.
+            Der nächste Prompt kommt morgen zu einer zufälligen Zeit.
           </div>
         </div>
       </div>
@@ -420,14 +402,14 @@ function PromptBanner({ minsLeft, onCapture, posted }) {
             letterSpacing: "0.14em", textTransform: "uppercase",
             display: "flex", alignItems: "center", gap: 6,
           }}>
-            {Ico.bolt(10, T.goldText)} Time to pour
+            {Ico.bolt(10, T.goldText)} Zeit zu zapfen
           </div>
           <div style={{
             color: T.text, fontWeight: 700, fontSize: 19,
             letterSpacing: "-0.02em", marginTop: 4,
-          }}>Show your friends what's<br/>in your glass.</div>
+          }}>Zeig deinen Freunden,<br/>was in deinem Glas ist.</div>
           <div style={{ color: T.textMuted, fontSize: 12, marginTop: 6 }}>
-            {minsLeft}m left · post late and it'll show.
+            Noch {minsLeft} Min. · später posten wird markiert.
           </div>
         </div>
         <button onClick={onCapture} style={{
@@ -465,7 +447,7 @@ function Post({ p, onCheers, cheered, onOpen }) {
               color: "#c2511e", fontSize: 10, fontWeight: 700,
               padding: "1px 6px", borderRadius: 4,
               background: "rgba(194,81,30,0.12)", letterSpacing: "0.04em",
-            }}>LATE</span>}
+            }}>SPÄT</span>}
           </div>
         </div>
         <button style={{
@@ -490,7 +472,7 @@ function Post({ p, onCheers, cheered, onOpen }) {
           border: `2px solid ${T.selfieBorder}`,
           outline: `1px solid ${T.selfieOutline}`,
         }}>
-          <ImgPH tone={p.selfieTone} label="selfie" style={{ width: "100%", height: "100%" }} />
+          <ImgPH tone={p.selfieTone} label="Selfie" style={{ width: "100%", height: "100%" }} />
         </div>
         <div style={{
           position: "absolute", left: 12, bottom: 12,
@@ -570,7 +552,7 @@ function FeedScreen({ minsLeft, posted, onCapture, cheersSet, toggleCheer, myPos
         <div style={{
           color: T.textMuted, fontSize: 11,
           fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase",
-        }}>Friends · today</div>
+        }}>Freunde · heute</div>
         <div style={{ flex: 1, height: 1, background: T.border }} />
         <div style={{ color: T.textMuted, fontSize: 12 }}>{FRIENDS_FEED.length}</div>
       </div>
@@ -614,7 +596,7 @@ function CaptureScreen({ onClose, onCapture }) {
           display: "inline-flex", alignItems: "center", gap: 6,
           color: T.gold, fontSize: 11, fontWeight: 700,
           letterSpacing: "0.14em", textTransform: "uppercase",
-        }}>{Ico.bolt(10, T.gold)} pour now</div>
+        }}>{Ico.bolt(10, T.gold)} jetzt zapfen</div>
         <button style={{
           width: 38, height: 38, borderRadius: "50%",
           background: "rgba(255,255,255,0.1)",
@@ -630,7 +612,7 @@ function CaptureScreen({ onClose, onCapture }) {
           borderRadius: 28, overflow: "hidden",
           background: "#000",
         }}>
-          <ImgPH tone="pour" label="point at your drink" style={{ position: "absolute", inset: 0 }} />
+          <ImgPH tone="pour" label="auf dein Getränk halten" style={{ position: "absolute", inset: 0 }} />
           <div style={{
             position: "absolute", inset: 28,
             border: "1.5px dashed rgba(255,255,255,0.35)",
@@ -655,7 +637,7 @@ function CaptureScreen({ onClose, onCapture }) {
             border: "2px solid #000",
             outline: "1px solid rgba(255,255,255,0.18)",
           }}>
-            <ImgPH tone="selfie" label="you" style={{ width: "100%", height: "100%" }} />
+            <ImgPH tone="selfie" label="du" style={{ width: "100%", height: "100%" }} />
           </div>
 
           {stage === "flash" && (
@@ -675,7 +657,7 @@ function CaptureScreen({ onClose, onCapture }) {
               <input
                 value={caption}
                 onChange={e => setCaption(e.target.value)}
-                placeholder="What are you drinking?"
+                placeholder="Was trinkst du?"
                 style={{
                   width: "100%", background: "transparent", border: "none",
                   color: "#fff", outline: "none", fontSize: 14,
@@ -704,7 +686,7 @@ function CaptureScreen({ onClose, onCapture }) {
             border: "none", color: T.goldInk,
             fontWeight: 800, fontSize: 16, letterSpacing: "-0.01em",
             cursor: "pointer",
-          }}>Pour it</button>
+          }}>Zapfen</button>
         ) : (
           <button onClick={shutter} style={{
             width: 84, height: 84, borderRadius: "50%",
@@ -785,13 +767,13 @@ function MapScreen() {
         <div style={{
           color: T.textMuted, fontSize: 11, fontWeight: 700,
           letterSpacing: "0.14em", textTransform: "uppercase",
-        }}>Selected pin</div>
+        }}>Ausgewählter Pin</div>
         <div style={{
           color: T.text, fontSize: 22, fontWeight: 700, marginTop: 4,
           letterSpacing: "-0.02em",
-        }}>{selected.label}{selected.you ? " (you)" : ""}</div>
+        }}>{selected.label}{selected.you ? " (du)" : ""}</div>
         <div style={{ color: T.goldText, fontSize: 13, fontWeight: 600, marginTop: 2 }}>
-          {selected.drink === "—" ? "haven't poured yet today" : `pouring ${selected.drink}`}
+          {selected.drink === "-" ? "heute noch nicht gezapft" : `zapft ${selected.drink}`}
         </div>
         <div style={{
           marginTop: 12, display: "flex", gap: 8,
@@ -800,12 +782,12 @@ function MapScreen() {
             flex: 1, padding: "10px 12px", borderRadius: 12,
             background: T.surfaceWeak, border: `1px solid ${T.border}`,
             color: T.text, fontSize: 13, fontWeight: 600, cursor: "pointer",
-          }}>Directions</button>
+          }}>Route</button>
           <button style={{
             flex: 1, padding: "10px 12px", borderRadius: 12,
             background: T.gold, border: "none", color: T.goldInk,
             fontSize: 13, fontWeight: 700, cursor: "pointer",
-          }}>Cheers 🍻</button>
+          }}>Prost 🍻</button>
         </div>
       </div>
     </div>
@@ -825,17 +807,17 @@ function FriendsScreen() {
           background: T.surfaceWeak,
           border: `1px solid ${T.border}`,
           color: T.textMuted, fontSize: 14,
-        }}>Search by name or @handle</div>
+        }}>Nach Name oder @handle suchen</div>
       </div>
 
       <div style={{
         padding: "0 18px 8px",
         color: T.textMuted, fontSize: 11, fontWeight: 700,
         letterSpacing: "0.16em", textTransform: "uppercase",
-      }}>Your circle · 8</div>
+      }}>Dein Kreis · 8</div>
 
       {FRIENDS_LIST.map((f, i) => {
-        const poured = f.status.startsWith("Poured");
+        const poured = f.status.startsWith("Gezapft");
         return (
           <div key={i} style={{
             display: "flex", alignItems: "center", gap: 12,
@@ -863,7 +845,7 @@ function FriendsScreen() {
               border: `1px solid ${poured ? T.goldBorder : T.border}`,
               color: poured ? T.goldText : T.text,
               fontSize: 12, fontWeight: 600, cursor: "pointer",
-            }}>{poured ? "Cheers" : "Nudge"}</button>
+            }}>{poured ? "Prost" : "Anstupsen"}</button>
           </div>
         );
       })}
@@ -874,7 +856,7 @@ function FriendsScreen() {
           background: "transparent",
           border: `1.5px dashed ${T.goldBorderStrong}`,
           color: T.goldText, fontSize: 14, fontWeight: 700, cursor: "pointer",
-        }}>+ Invite a friend</button>
+        }}>+ Freund einladen</button>
       </div>
     </div>
   );
@@ -891,16 +873,16 @@ function ProfileScreen({ streak, totalPints, posted, myPost, onOpenPost }) {
       <div style={{ padding: "0 18px", display: "flex", gap: 14, alignItems: "center" }}>
         <Avatar tone="selfie" size={72} ring />
         <div style={{ flex: 1 }}>
-          <div style={{ color: T.text, fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em" }}>You</div>
-          <div style={{ color: T.textMuted, fontSize: 13 }}>@you · joined 14w ago</div>
+          <div style={{ color: T.text, fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em" }}>Du</div>
+          <div style={{ color: T.textMuted, fontSize: 13 }}>@du · seit 14 Wochen dabei</div>
         </div>
       </div>
 
       <div style={{ padding: "18px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
         {[
-          { v: streak, l: "streak", gold: true },
-          { v: totalPints, l: "pints" },
-          { v: 14, l: "spots" },
+          { v: streak, l: "Serie", gold: true },
+          { v: totalPints, l: "Biere" },
+          { v: 14, l: "Orte" },
         ].map((s, i) => (
           <div key={i} style={{
             padding: "14px 12px", borderRadius: 14,
@@ -924,11 +906,11 @@ function ProfileScreen({ streak, totalPints, posted, myPost, onOpenPost }) {
           <div style={{
             color: T.textMuted, fontSize: 11, fontWeight: 700,
             letterSpacing: "0.16em", textTransform: "uppercase",
-          }}>12 weeks</div>
+          }}>12 Wochen</div>
           <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: T.textMuted }}>
-            less {[0,1,2,3].map(v => (
+            weniger {[0,1,2,3].map(v => (
               <div key={v} style={{ width: 10, height: 10, background: colorFor(v), borderRadius: 2 }} />
-            ))} more
+            ))} mehr
           </div>
         </div>
         <div style={{
@@ -955,14 +937,14 @@ function ProfileScreen({ streak, totalPints, posted, myPost, onOpenPost }) {
         <div style={{
           color: T.textMuted, fontSize: 11, fontWeight: 700,
           letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 10,
-        }}>Recent pours</div>
+        }}>Letzte Biermomente</div>
         <div style={{
           display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6,
         }}>
           {(posted && myPost ? [myPost] : []).concat(Array(11).fill(0).map((_, i) => ({
             id: `profile-grid-${i}`,
-            name: "You", handle: "@you", time: `${i + 1}d ago`,
-            place: "Home · Brooklyn", drink: ["IPA", "Stout", "Lager", "Sour", "Pils", "Hazy"][i % 6],
+            name: "Du", handle: "@du", time: `vor ${i + 1} Tagen`,
+            place: "Zuhause · Brooklyn", drink: ["IPA", "Stout", "Lager", "Sour", "Pils", "Hazy"][i % 6],
             caption: "", cheers: 0, comments: 0,
             tone: ["beer", "bar", "night", "sky"][i % 4], selfieTone: "selfie", late: false, views: 0,
           }))).slice(0, 12).map((p, i) => (
@@ -977,7 +959,7 @@ function ProfileScreen({ streak, totalPints, posted, myPost, onOpenPost }) {
                   padding: "2px 6px", borderRadius: 4,
                   background: T.gold, color: T.goldInk,
                   fontSize: 9, fontWeight: 800, letterSpacing: "0.08em",
-                }}>TODAY</div>
+                }}>HEUTE</div>
               )}
             </div>
           ))}
@@ -994,10 +976,10 @@ function BottomNav({ screen, setScreen, onCapture, posted }) {
   const T = useT();
   const tabs = [
     { id: "feed", icon: Ico.feed, label: "Feed" },
-    { id: "map",  icon: Ico.map,  label: "Map" },
-    { id: "cam",  icon: Ico.cam,  label: "Pour", center: true },
-    { id: "friends", icon: Ico.friends, label: "Friends" },
-    { id: "profile", icon: Ico.user, label: "You" },
+    { id: "map",  icon: Ico.map,  label: "Karte" },
+    { id: "cam",  icon: Ico.cam,  label: "Zapfen", center: true },
+    { id: "friends", icon: Ico.friends, label: "Freunde" },
+    { id: "profile", icon: Ico.user, label: "Du" },
   ];
   return (
     <div style={{
@@ -1071,9 +1053,9 @@ function PintApp({ initialScreen = "feed", initialPosted = false, theme = "dark"
     setCaptureOpen(false);
     setPosted(true);
     setMyPost({
-      id: "me", name: "You", handle: "@you", time: "just now",
-      place: "Home · Brooklyn", drink: "Half Acre Daisy Cutter",
-      caption: caption || "first one of the day.",
+      id: "me", name: "Du", handle: "@du", time: "gerade eben",
+      place: "Zuhause · Brooklyn", drink: "Half Acre Daisy Cutter",
+      caption: caption || "das erste des Tages.",
       cheers: 0, comments: 0, mine: true,
       tone: "beer", selfieTone: "selfie",
     });
@@ -1083,7 +1065,7 @@ function PintApp({ initialScreen = "feed", initialPosted = false, theme = "dark"
   return (
     <ThemeContext.Provider value={T}>
       <IOSDevice width={402} height={874} dark={T.iosDark}>
-        <div data-screen-label={`Pint App · ${theme} · ${screen}`} style={{
+        <div data-screen-label={`Zapfen App · ${theme} · ${screen}`} style={{
           height: "100%",
           background: T.bg,
           color: T.text,

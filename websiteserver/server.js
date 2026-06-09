@@ -33,7 +33,7 @@ const server = http.createServer((req, res) => {
   const urlPath = decodeURIComponent(req.url.split('?')[0]);
 
   if (urlPath === '/') {
-    serve(path.join(WEBSITE_DIR, 'Pint Website (1).html'), res);
+    serve(path.join(WEBSITE_DIR, 'Zapfen Website.html'), res);
     return;
   }
 
