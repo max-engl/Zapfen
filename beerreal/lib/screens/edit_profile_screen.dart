@@ -138,7 +138,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _evictAvatar(String? url) async {
     if (url == null || url.isEmpty) return;
-    await AppCacheManager.instance.removeFile(url);
+    try {
+      await AppCacheManager.instance.removeFile(url);
+    } catch (_) {}
     PaintingBinding.instance.imageCache.evict(NetworkImage(url));
   }
 
@@ -203,11 +205,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final oldUrl = context.read<AuthProvider>().user?.avatarUrl;
       final user = await widget.profileService.uploadAvatar(_pendingAvatar!);
       if (!mounted) return;
-      await _evictAvatar(oldUrl);
-      if (!mounted) return;
       context.read<AuthProvider>().updateUser(user);
       setState(() => _pendingAvatar = null);
       _showToast('Foto aktualisiert');
+      _evictAvatar(oldUrl); // fire-and-forget cleanup of old cached file
     } on DioException {
       if (!mounted) return;
       setState(() => _pendingAvatar = null);

@@ -48,6 +48,14 @@ const userSchema = new mongoose.Schema(
     inviteToken: {
       type: String,
     },
+    bingoLineCount: {
+      type: Number,
+      default: 0,
+    },
+    bingoThisMonth: {
+      month: { type: String, default: '' },
+      lines: { type: Number, default: 0 },
+    },
   },
   { timestamps: true },
 );

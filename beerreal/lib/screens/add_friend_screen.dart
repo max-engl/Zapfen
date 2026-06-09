@@ -677,44 +677,11 @@ class _SearchResultRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          GestureDetector(
-            onTap: requested ? null : onAdd,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: requested ? t.surfaceWeak : t.goldSoft,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: requested ? t.border : t.goldBorder),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: requested
-                    ? [
-                        Icon(Icons.check, size: 13, color: t.textMuted),
-                        const SizedBox(width: 4),
-                        Text(
-                          isFriend ? 'Befreundet' : 'Angefragt',
-                          style: TextStyle(
-                            color: t.textMuted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ]
-                    : [
-                        Icon(Icons.add, size: 13, color: t.goldText),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Hinzufügen',
-                          style: TextStyle(
-                            color: t.goldText,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-              ),
-            ),
+          _AddButton(
+            requested: requested,
+            isFriend: isFriend,
+            t: t,
+            onAdd: onAdd,
           ),
         ],
       ),
@@ -782,46 +749,144 @@ class _RecommendationRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          GestureDetector(
-            onTap: requested ? null : onAdd,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: requested ? t.surfaceWeak : t.goldSoft,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: requested ? t.border : t.goldBorder),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: requested
-                    ? [
-                        Icon(Icons.check, size: 13, color: t.textMuted),
-                        const SizedBox(width: 4),
-                        Text(
-                          isFriend ? 'Befreundet' : 'Angefragt',
-                          style: TextStyle(
-                            color: t.textMuted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ]
-                    : [
-                        Icon(Icons.add, size: 13, color: t.goldText),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Hinzufügen',
-                          style: TextStyle(
-                            color: t.goldText,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-              ),
-            ),
+          _AddButton(
+            requested: requested,
+            isFriend: isFriend,
+            t: t,
+            onAdd: onAdd,
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Animated add button ───────────────────────────────────────────────────
+
+class _AddButton extends StatefulWidget {
+  final bool requested;
+  final bool isFriend;
+  final PintTheme t;
+  final VoidCallback onAdd;
+
+  const _AddButton({
+    required this.requested,
+    required this.isFriend,
+    required this.t,
+    required this.onAdd,
+  });
+
+  @override
+  State<_AddButton> createState() => _AddButtonState();
+}
+
+class _AddButtonState extends State<_AddButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _scale = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 1.0, end: 0.82)
+            .chain(CurveTween(curve: Curves.easeIn)),
+        weight: 15,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 0.82, end: 1.18)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 30,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 1.18, end: 1.0)
+            .chain(CurveTween(curve: Curves.elasticOut)),
+        weight: 55,
+      ),
+    ]).animate(_ctrl);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    HapticFeedback.lightImpact();
+    _ctrl.forward(from: 0);
+    widget.onAdd();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.t;
+    return GestureDetector(
+      onTap: widget.requested ? null : _handleTap,
+      child: ScaleTransition(
+        scale: _scale,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: widget.requested ? t.surfaceWeak : t.goldSoft,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: widget.requested ? t.border : t.goldBorder,
+            ),
+          ),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOutBack,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: Tween(begin: 0.55, end: 1.0).animate(animation),
+                child: child,
+              ),
+            ),
+            child: widget.requested
+                ? Row(
+                    key: const ValueKey('done'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check, size: 13, color: t.textMuted),
+                      const SizedBox(width: 4),
+                      Text(
+                        widget.isFriend ? 'Befreundet' : 'Angefragt',
+                        style: TextStyle(
+                          color: t.textMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    key: const ValueKey('add'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add, size: 13, color: t.goldText),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Hinzufügen',
+                        style: TextStyle(
+                          color: t.goldText,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
       ),
     );
   }

@@ -2,10 +2,13 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../features/blocks/providers/block_provider.dart';
 import '../features/posts/models/feed_post.dart';
 import '../features/reports/services/report_service.dart';
 import '../theme.dart';
 import 'pint_dialogs.dart';
+
+// ── Post options sheet (delete / report / block) ───────────────────────────
 
 Future<void> showPostOptionsSheet(
   BuildContext context, {
@@ -61,6 +64,11 @@ Future<void> showPostOptionsSheet(
                   }
                 },
               ),
+              // Only show block option for other users' posts
+              if (onDelete == null) ...[
+                const SizedBox(height: 8),
+                _BlockUserButton(t: t, post: post, sheetContext: sheetContext),
+              ],
               const SizedBox(height: 8),
               _PostOptionButton(
                 t: t,
@@ -77,6 +85,57 @@ Future<void> showPostOptionsSheet(
   );
 }
 
+// ── Block user button inside post options ──────────────────────────────────
+
+class _BlockUserButton extends StatelessWidget {
+  final PintTheme t;
+  final FeedPost post;
+  final BuildContext sheetContext;
+
+  const _BlockUserButton({
+    required this.t,
+    required this.post,
+    required this.sheetContext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final blockProvider = context.watch<BlockProvider>();
+    final isBlocked = blockProvider.isBlocked(post.userId);
+    return _PostOptionButton(
+      t: t,
+      icon: isBlocked ? Icons.person_add_outlined : Icons.block,
+      title: isBlocked ? 'Blockierung aufheben' : 'Nutzer blockieren',
+      subtitle: isBlocked
+          ? '@${post.username} wird wieder sichtbar.'
+          : 'Beiträge von @${post.username} ausblenden.',
+      destructive: !isBlocked,
+      onTap: () async {
+        Navigator.of(sheetContext).pop();
+        try {
+          if (isBlocked) {
+            await blockProvider.unblockUser(post.userId);
+            if (context.mounted) {
+              showPintSnackBar(context, '@${post.username} wurde entsperrt.');
+            }
+          } else {
+            await blockProvider.blockUser(post.userId);
+            if (context.mounted) {
+              showPintSnackBar(context, '@${post.username} wurde blockiert.');
+            }
+          }
+        } catch (_) {
+          if (context.mounted) {
+            showPintSnackBar(context, 'Aktion fehlgeschlagen.', isError: true);
+          }
+        }
+      },
+    );
+  }
+}
+
+// ── Report reason sheet ────────────────────────────────────────────────────
+
 Future<void> showReportPostReasonSheet(
   BuildContext context, {
   required FeedPost post,
@@ -90,6 +149,14 @@ Future<void> showReportPostReasonSheet(
   );
 }
 
+const _kReportReasons = [
+  (label: 'Spam', icon: Icons.campaign_outlined),
+  (label: 'Beleidigung oder Hassrede', icon: Icons.sentiment_very_dissatisfied_outlined),
+  (label: 'Unangemessenes Bild', icon: Icons.no_photography_outlined),
+  (label: 'Gewalt oder Bedrohung', icon: Icons.warning_amber_outlined),
+  (label: 'Anderes', icon: Icons.more_horiz),
+];
+
 class _ReportPostReasonSheet extends StatefulWidget {
   final FeedPost post;
 
@@ -100,13 +167,13 @@ class _ReportPostReasonSheet extends StatefulWidget {
 }
 
 class _ReportPostReasonSheetState extends State<_ReportPostReasonSheet> {
-  final _reasonController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
+  String? _selectedReason;
+  final _detailController = TextEditingController();
   bool _submitting = false;
 
   @override
   void dispose() {
-    _reasonController.dispose();
+    _detailController.dispose();
     super.dispose();
   }
 
@@ -115,13 +182,20 @@ class _ReportPostReasonSheetState extends State<_ReportPostReasonSheet> {
     Navigator.of(context).pop();
   }
 
+  bool get _canSubmit =>
+      _selectedReason != null &&
+      (_selectedReason != 'Anderes' || _detailController.text.trim().length >= 5);
+
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate() || _submitting) return;
+    if (!_canSubmit || _submitting) return;
+    final reason = _selectedReason == 'Anderes'
+        ? _detailController.text.trim()
+        : _selectedReason!;
     setState(() => _submitting = true);
     try {
       await context.read<ReportService>().reportPost(
         postId: widget.post.id,
-        reason: _reasonController.text.trim(),
+        reason: reason,
       );
       if (!mounted) return;
       _close();
@@ -129,8 +203,8 @@ class _ReportPostReasonSheetState extends State<_ReportPostReasonSheet> {
     } catch (error) {
       final message = error is DioException
           ? (error.response?.data is Map
-                ? error.response?.data['message']?.toString()
-                : null)
+              ? error.response?.data['message']?.toString()
+              : null)
           : null;
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -167,58 +241,104 @@ class _ReportPostReasonSheetState extends State<_ReportPostReasonSheet> {
               ),
             ],
           ),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(child: _SheetHandle(t: t)),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Beitrag melden',
-                        style: TextStyle(
-                          color: t.text,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: _SheetHandle(t: t)),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Beitrag melden',
+                      style: TextStyle(
+                        color: t.text,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _submitting ? null : _close,
+                    icon: Icon(Icons.close, color: t.textMuted),
+                    style: IconButton.styleFrom(
+                      backgroundColor: t.surfaceWeak,
+                      side: BorderSide(color: t.border),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Warum meldest du den Beitrag von @${widget.post.username}?',
+                style: TextStyle(color: t.textMuted, fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              // Reason chips
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _kReportReasons.map((r) {
+                  final selected = _selectedReason == r.label;
+                  return GestureDetector(
+                    onTap: _submitting
+                        ? null
+                        : () => setState(() => _selectedReason = r.label),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 140),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: selected ? t.goldSoft : t.surfaceWeak,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: selected ? t.goldBorder : t.border,
                         ),
                       ),
-                    ),
-                    IconButton(
-                      onPressed: _submitting ? null : _close,
-                      icon: Icon(Icons.close, color: t.textMuted),
-                      style: IconButton.styleFrom(
-                        backgroundColor: t.surfaceWeak,
-                        side: BorderSide(color: t.border),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            r.icon,
+                            size: 15,
+                            color: selected ? t.goldText : t.textMuted,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            r.label,
+                            style: TextStyle(
+                              color: selected ? t.goldText : t.text,
+                              fontSize: 13,
+                              fontWeight: selected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Warum meldest du den Beitrag von @${widget.post.username}?',
-                  style: TextStyle(color: t.textMuted, fontSize: 13),
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: _reasonController,
-                  minLines: 3,
-                  maxLines: 5,
-                  maxLength: 500,
+                  );
+                }).toList(),
+              ),
+              // Extra detail field for "Anderes"
+              if (_selectedReason == 'Anderes') ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _detailController,
+                  minLines: 2,
+                  maxLines: 4,
+                  maxLength: 300,
                   autofocus: true,
+                  onChanged: (_) => setState(() {}),
                   style: TextStyle(color: t.text),
                   cursorColor: t.gold,
                   decoration: InputDecoration(
-                    hintText: 'Grund eingeben...',
+                    hintText: 'Beschreibe das Problem kurz...',
                     hintStyle: TextStyle(color: t.textFaint),
                     counterStyle: TextStyle(color: t.textFaint),
-                    errorStyle: const TextStyle(
-                      color: Color(0xFFE05454),
-                      fontWeight: FontWeight.w600,
-                    ),
                     filled: true,
                     fillColor: t.surfaceWeak,
                     contentPadding: const EdgeInsets.all(14),
@@ -231,62 +351,54 @@ class _ReportPostReasonSheetState extends State<_ReportPostReasonSheet> {
                       borderSide: BorderSide(color: t.goldBorder),
                     ),
                   ),
-                  validator: (value) {
-                    final trimmed = value?.trim() ?? '';
-                    if (trimmed.isEmpty) {
-                      return 'Bitte gib einen Grund an.';
-                    }
-                    if (trimmed.length < 5) {
-                      return 'Bitte etwas genauer beschreiben.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _submitting ? null : _close,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: t.text,
-                          side: BorderSide(color: t.border),
-                          backgroundColor: t.surfaceWeak,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: const Text('Abbrechen'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: _submitting ? null : _submit,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: t.gold,
-                          foregroundColor: t.goldInk,
-                          disabledBackgroundColor: t.goldSoft,
-                          disabledForegroundColor: t.textMuted,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        child: Text(_submitting ? 'Sendet...' : 'Senden'),
-                      ),
-                    ),
-                  ],
                 ),
               ],
-            ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _submitting ? null : _close,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: t.text,
+                        side: BorderSide(color: t.border),
+                        backgroundColor: t.surfaceWeak,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text('Abbrechen'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: (_canSubmit && !_submitting) ? _submit : null,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: t.gold,
+                        foregroundColor: t.goldInk,
+                        disabledBackgroundColor: t.goldSoft,
+                        disabledForegroundColor: t.textMuted,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: Text(_submitting ? 'Sendet...' : 'Senden'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 }
+
+// ── Shared sheet widgets ───────────────────────────────────────────────────
 
 class _SheetHandle extends StatelessWidget {
   final PintTheme t;

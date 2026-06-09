@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/feed_post.dart';
 import '../services/post_service.dart';
 import '../../../core/feed_database.dart';
+import '../../../core/geocoding_service.dart';
 
 class ProfilePostsProvider extends ChangeNotifier {
   final PostService _postService;
@@ -40,12 +41,37 @@ class ProfilePostsProvider extends ChangeNotifier {
     return count;
   }
 
-  int get spots {
-    return _posts
-        .where((p) => p.lat != null && p.lng != null)
-        .map((p) => '${(p.lat! * 100).round()},${(p.lng! * 100).round()}')
-        .toSet()
-        .length;
+  List<String> get countries {
+    final set = <String>{};
+    for (final p in _posts) {
+      if (p.country != null && p.country!.isNotEmpty) set.add(p.country!);
+    }
+    return set.toList()..sort();
+  }
+
+  Future<void> _geocodeMissingCountries() async {
+    final missing = _posts
+        .where((p) => (p.country == null || p.country!.isEmpty) && p.lat != null && p.lng != null)
+        .toList();
+    if (missing.isEmpty) return;
+
+    var updated = List<FeedPost>.from(_posts);
+    var changed = false;
+    for (final post in missing) {
+      final c = await GeocodingService.countryName(post.lat!, post.lng!);
+      if (c != null && c.isNotEmpty) {
+        final idx = updated.indexWhere((p) => p.id == post.id);
+        if (idx >= 0) {
+          updated[idx] = updated[idx].copyWith(country: c);
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      _posts = updated;
+      notifyListeners();
+      _db.saveProfilePosts(_posts);
+    }
   }
 
   /// Reads the SQLite cache into [_posts] without a network call.
@@ -56,6 +82,7 @@ class ProfilePostsProvider extends ChangeNotifier {
       _posts = cached;
       notifyListeners();
     }
+    _geocodeMissingCountries();
   }
 
   Future<void> load() async {
@@ -81,6 +108,7 @@ class ProfilePostsProvider extends ChangeNotifier {
       _loading = false;
       notifyListeners();
     }
+    _geocodeMissingCountries();
   }
 
   void prepend(FeedPost post) {

@@ -31,7 +31,8 @@ class FeedDatabase {
   reactions TEXT NOT NULL,
   created_at TEXT NOT NULL,
   lat REAL,
-  lng REAL
+  lng REAL,
+  country TEXT
 ''';
 
   static const _kCreateSql = 'CREATE TABLE posts ($_kPostSchema)';
@@ -47,7 +48,7 @@ class FeedDatabase {
     final dir = await getDatabasesPath();
     return openDatabase(
       '$dir/pint_feed.db',
-      version: 7,
+      version: 8,
       onCreate: (db, _) async {
         await db.execute(_kCreateSql);
         await db.execute(_kCreateProfileSql);

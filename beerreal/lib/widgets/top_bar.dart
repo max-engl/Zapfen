@@ -56,8 +56,8 @@ class PintTopBar extends StatelessWidget {
           _IconBtn(
             icon: Icons.emoji_events_rounded,
             color: t.goldText,
-            bg: t.goldFaint,
-            border: t.goldBorder,
+            bg: t.surfaceWeak,
+            border: t.border,
             onTap: onLeaderboard,
           ),
           const SizedBox(width: 8),

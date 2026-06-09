@@ -1,11 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../theme.dart';
 import '../widgets/brand_mark.dart';
-import '../widgets/img_placeholder.dart';
 import '../widgets/pint_dialogs.dart';
 import '../widgets/pint_loading.dart';
 import '../features/auth/providers/auth_provider.dart';
+import '../features/profile/services/profile_service.dart';
+import 'legal_screen.dart';
 
 enum _Step { welcome, credentials, handle, done }
 
@@ -24,6 +27,18 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _signIn = false;
   String _regEmail = '';
   String _regPw = '';
+  bool _imagesPrecached = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_imagesPrecached) {
+      _imagesPrecached = true;
+      precacheImage(const AssetImage('assets/start_pictures/IMG_1367.png'), context);
+      precacheImage(const AssetImage('assets/start_pictures/IMG_1510.png'), context);
+      precacheImage(const AssetImage('assets/start_pictures/IMG_1515.png'), context);
+    }
+  }
 
   static int _depth(_Step s) => switch (s) {
     _Step.welcome => 0,
@@ -418,17 +433,17 @@ class _WelcomeStep extends StatelessWidget {
                       Positioned(
                         left: 0,
                         top: 24,
-                        child: _PhotoCard(ImgTone.beer, 'Hazy Pale', t.bg, -10),
+                        child: _PhotoCard('assets/start_pictures/IMG_1367.png', t.bg, -10),
                       ),
                       Positioned(
                         left: 80,
                         top: 8,
-                        child: _PhotoCard(ImgTone.bar, 'Triple', t.bg, 10),
+                        child: _PhotoCard('assets/start_pictures/IMG_1510.png', t.bg, 10),
                       ),
                       Positioned(
                         left: 40,
                         top: 56,
-                        child: _PhotoCard(ImgTone.night, 'Stout', t.bg, -2),
+                        child: _PhotoCard('assets/start_pictures/IMG_1515.png', t.bg, -2),
                       ),
                       Positioned(
                         right: -8,
@@ -510,11 +525,7 @@ class _WelcomeStep extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
-              Text(
-                'Mit dem Fortfahren stimmst du unseren Bedingungen zu. Nur ab 18 Jahren.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: t.textFaint, fontSize: 11, height: 1.4),
-              ),
+              _LegalFooter(t: t),
             ],
           ),
         ],
@@ -523,13 +534,42 @@ class _WelcomeStep extends StatelessWidget {
   }
 }
 
+class _LegalFooter extends StatelessWidget {
+  final PintTheme t;
+  const _LegalFooter({required this.t});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => showLegalSheet(context),
+      child: RichText(
+        textAlign: TextAlign.center,
+        text: TextSpan(
+          style: TextStyle(color: t.textFaint, fontSize: 11, height: 1.4),
+          children: [
+            const TextSpan(text: 'Mit dem Fortfahren stimmst du unseren '),
+            TextSpan(
+              text: 'Nutzungsbedingungen',
+              style: TextStyle(
+                color: t.goldText,
+                decoration: TextDecoration.underline,
+                decorationColor: t.goldText,
+              ),
+            ),
+            const TextSpan(text: ' zu. Nur ab 18 Jahren.'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PhotoCard extends StatelessWidget {
-  final ImgTone tone;
-  final String label;
+  final String assetPath;
   final Color borderColor;
   final double degrees;
 
-  const _PhotoCard(this.tone, this.label, this.borderColor, this.degrees);
+  const _PhotoCard(this.assetPath, this.borderColor, this.degrees);
 
   @override
   Widget build(BuildContext context) {
@@ -551,7 +591,7 @@ class _PhotoCard extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: ImgPlaceholder(tone: tone, label: label),
+          child: Image.asset(assetPath, fit: BoxFit.cover),
         ),
       ),
     );
@@ -811,11 +851,70 @@ class _HandleStepState extends State<_HandleStep> {
   String _name = '';
   String _handle = '';
   bool _loading = false;
+  File? _pendingAvatar;
+
+  Future<void> _pickAvatar() async {
+    final t = PintThemeProvider.of(context);
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: t.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: t.border,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              _AvatarOptionTile(
+                t: t,
+                icon: Icons.photo_camera_rounded,
+                label: 'Kamera',
+                sub: 'Neues Profilbild aufnehmen',
+                onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+              ),
+              const SizedBox(height: 8),
+              _AvatarOptionTile(
+                t: t,
+                icon: Icons.photo_library_rounded,
+                label: 'Galerie',
+                sub: 'Bild aus deiner Galerie wählen',
+                onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: 85,
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _pendingAvatar = File(picked.path));
+  }
 
   Future<void> _submit() async {
     if (!_valid) return;
     setState(() => _loading = true);
-    final ok = await context.read<AuthProvider>().register(
+
+    // Capture refs before any await — context may be stale after register notifies
+    final authProvider = context.read<AuthProvider>();
+    final profileService = context.read<ProfileService>();
+    final avatarToUpload = _pendingAvatar;
+
+    final ok = await authProvider.register(
       username: _handle,
       email: widget.regEmail,
       password: widget.regPw,
@@ -825,10 +924,17 @@ class _HandleStepState extends State<_HandleStep> {
       setState(() => _loading = false);
       showPintSnackBar(
         context,
-        context.read<AuthProvider>().errorMessage ??
-            'Registrierung fehlgeschlagen.',
+        authProvider.errorMessage ?? 'Registrierung fehlgeschlagen.',
         isError: true,
       );
+      return;
+    }
+    // Upload avatar in the background — app navigates on auth state change
+    if (avatarToUpload != null) {
+      profileService
+          .uploadAvatar(avatarToUpload)
+          .then((user) => authProvider.updateUser(user))
+          .catchError((_) {});
     }
   }
 
@@ -864,8 +970,9 @@ class _HandleStepState extends State<_HandleStep> {
 
     String statusText() {
       if (status == 'ok') return '@$_handle gehört dir.';
-      if (status == 'taken')
+      if (status == 'taken') {
         return '@$_handle ist vergeben. Versuch ${_handle}_42';
+      }
       if (status == 'short') return 'Mindestens 3 Zeichen.';
       if (status == 'long') return 'Maximal 16 Zeichen.';
       if (status == 'chars') return 'Nur Buchstaben, Zahlen und Unterstriche.';
@@ -909,50 +1016,91 @@ class _HandleStepState extends State<_HandleStep> {
                   const SizedBox(height: 18),
                   Row(
                     children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: t.goldFaint,
-                          border: Border.all(
-                            color: t.goldBorderStrong,
-                            width: 2,
-                          ),
-                        ),
-                        child: Center(
-                          child: Text(
-                            (_name.isNotEmpty
-                                    ? _name[0]
-                                    : _handle.isNotEmpty
-                                    ? _handle[0]
-                                    : '?')
-                                .toUpperCase(),
-                            style: TextStyle(
-                              color: t.goldText,
-                              fontSize: 26,
-                              fontWeight: FontWeight.w800,
+                      GestureDetector(
+                        onTap: _pickAvatar,
+                        child: Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: t.goldFaint,
+                            border: Border.all(
+                              color: t.goldBorderStrong,
+                              width: 2,
                             ),
+                          ),
+                          child: ClipOval(
+                            child: _pendingAvatar != null
+                                ? Image.file(
+                                    _pendingAvatar!,
+                                    fit: BoxFit.cover,
+                                    width: 64,
+                                    height: 64,
+                                  )
+                                : Center(
+                                    child: Text(
+                                      (_name.isNotEmpty
+                                              ? _name[0]
+                                              : _handle.isNotEmpty
+                                              ? _handle[0]
+                                              : '?')
+                                          .toUpperCase(),
+                                      style: TextStyle(
+                                        color: t.goldText,
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 14),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: t.surfaceWeak,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: t.border),
-                        ),
-                        child: Text(
-                          'Selfie hochladen',
-                          style: TextStyle(
-                            color: t.text,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                      GestureDetector(
+                        onTap: _pickAvatar,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _pendingAvatar != null
+                                ? t.goldSoft
+                                : t.surfaceWeak,
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: _pendingAvatar != null
+                                  ? t.goldBorder
+                                  : t.border,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _pendingAvatar != null
+                                    ? Icons.check_rounded
+                                    : Icons.photo_camera_rounded,
+                                size: 14,
+                                color: _pendingAvatar != null
+                                    ? t.goldText
+                                    : t.text,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                _pendingAvatar != null
+                                    ? 'Foto ausgewählt'
+                                    : 'Selfie hochladen',
+                                style: TextStyle(
+                                  color: _pendingAvatar != null
+                                      ? t.goldText
+                                      : t.text,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -1088,52 +1236,6 @@ class _HandleStepState extends State<_HandleStep> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: t.goldFaint,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: t.goldBorder),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            color: t.gold,
-                            borderRadius: BorderRadius.circular(7),
-                          ),
-                          child: Icon(Icons.check, size: 14, color: t.goldInk),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: RichText(
-                            text: TextSpan(
-                              style: TextStyle(
-                                color: t.text,
-                                fontSize: 12,
-                                height: 1.45,
-                              ),
-                              children: [
-                                const TextSpan(
-                                  text: 'Schick mir den täglichen Prompt. ',
-                                  style: TextStyle(fontWeight: FontWeight.w700),
-                                ),
-                                TextSpan(
-                                  text:
-                                      'Eine Push-Nachricht pro Tag. Zufällige Zeit. Verpasst du sie, wird dein Bier trotzdem angezeigt.',
-                                  style: TextStyle(color: t.textMuted),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
                 ],
               ),
             ),
@@ -1150,6 +1252,76 @@ class _HandleStepState extends State<_HandleStep> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Avatar option tile (used in registration photo picker sheet) ──────────
+
+class _AvatarOptionTile extends StatelessWidget {
+  final PintTheme t;
+  final IconData icon;
+  final String label;
+  final String sub;
+  final VoidCallback onTap;
+
+  const _AvatarOptionTile({
+    required this.t,
+    required this.icon,
+    required this.label,
+    required this.sub,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: t.surfaceWeak,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: t.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: t.goldSoft,
+                shape: BoxShape.circle,
+                border: Border.all(color: t.goldBorder),
+              ),
+              child: Icon(icon, size: 18, color: t.goldText),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: t.text,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.15,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    sub,
+                    style: TextStyle(color: t.textMuted, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, size: 18, color: t.textMuted),
+          ],
+        ),
       ),
     );
   }

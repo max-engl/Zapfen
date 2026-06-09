@@ -12,6 +12,7 @@ class FriendProvider extends ChangeNotifier {
 
   List<ApiFriend> _friends = [];
   List<ApiFriendRequest> _requests = [];
+  List<ApiSentFriendRequest> _sentRequests = [];
   List<FriendRecommendation> _recommendations = [];
   bool _loading = false;
   bool _recommendationsLoading = false;
@@ -22,6 +23,7 @@ class FriendProvider extends ChangeNotifier {
 
   List<ApiFriend> get friends => _friends;
   List<ApiFriendRequest> get requests => _requests;
+  List<ApiSentFriendRequest> get sentRequests => _sentRequests;
   List<FriendRecommendation> get recommendations => _recommendations;
   bool get loading => _loading;
   bool get recommendationsLoading => _recommendationsLoading;
@@ -54,20 +56,26 @@ class FriendProvider extends ChangeNotifier {
       final results = await Future.wait([
         _friendService.getFriends(),
         _friendService.getFriendRequests(),
+        _friendService.getSentFriendRequests(),
       ]);
       final newFriends = results[0] as List<ApiFriend>;
       final newRequests = results[1] as List<ApiFriendRequest>;
+      final newSentRequests = results[2] as List<ApiSentFriendRequest>;
 
       final freshFriendIds = newFriends.map((f) => f.id).toSet();
       final currentFriendIds = _friends.map((f) => f.id).toSet();
       final freshRequestIds = newRequests.map((r) => r.id).toSet();
       final currentRequestIds = _requests.map((r) => r.id).toSet();
+      final freshSentIds = newSentRequests.map((r) => r.id).toSet();
+      final currentSentIds = _sentRequests.map((r) => r.id).toSet();
       dirty = !setEquals(freshFriendIds, currentFriendIds) ||
-              !setEquals(freshRequestIds, currentRequestIds);
+              !setEquals(freshRequestIds, currentRequestIds) ||
+              !setEquals(freshSentIds, currentSentIds);
 
       if (dirty) {
         _friends = newFriends;
         _requests = newRequests;
+        _sentRequests = newSentRequests;
         _db.saveFriends(_friends);
         _db.saveRequests(_requests);
       }
@@ -121,6 +129,18 @@ class FriendProvider extends ChangeNotifier {
       await _friendService.removeFriend(userId);
       _requests.removeWhere((r) => r.from.id == userId);
       _db.saveRequests(_requests);
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> cancelSentRequest(String userId) async {
+    try {
+      await _friendService.removeFriend(userId);
+      _sentRequests.removeWhere((r) => r.to.id == userId);
+      _userActions[userId] = 'removed';
       notifyListeners();
       return true;
     } catch (_) {

@@ -17,6 +17,7 @@ import '../widgets/shimmer_box.dart';
 import '../widgets/stagger_item.dart';
 import 'bingo_screen.dart';
 import 'edit_profile_screen.dart';
+import 'legal_screen.dart';
 import 'post_detail_screen.dart';
 
 // Total cells shown in the activity heatmap (12 weeks × 7 days)
@@ -78,6 +79,112 @@ class _ProfileScreenState extends State<ProfileScreen>
   void dispose() {
     _entranceCtrl.dispose();
     super.dispose();
+  }
+
+  void _showCountries(BuildContext context, List<String> countries, PintTheme t) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: t.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => SafeArea(
+        top: false,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.55,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 36, height: 4,
+                decoration: BoxDecoration(
+                  color: t.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: t.goldFaint,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: t.goldBorder),
+                      ),
+                      child: Icon(Icons.public_rounded, color: t.goldText, size: 16),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${countries.length} ${countries.length == 1 ? 'Land' : 'Länder'}',
+                          style: TextStyle(
+                            color: t.text, fontSize: 16,
+                            fontWeight: FontWeight.w700, letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Länder, in denen du getrunken hast',
+                          style: TextStyle(color: t.textMuted, fontSize: 12, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                  itemCount: countries.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 6),
+                  itemBuilder: (_, i) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                    decoration: BoxDecoration(
+                      color: t.surfaceWeak,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: t.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 28, height: 28,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: t.surfaceWeaker,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: t.border),
+                          ),
+                          child: Text(
+                            '${i + 1}',
+                            style: TextStyle(
+                              color: t.textMuted, fontSize: 12, fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          countries[i],
+                          style: TextStyle(color: t.text, fontSize: 15, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Animation<double> _statAnim(int index) {
@@ -227,7 +334,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                 Expanded(
                   child: _AnimatedTile(
                     animation: _statAnim(2),
-                    child: _StatTile(value: pp.spots, label: 'Orte', t: t),
+                    child: GestureDetector(
+                      onTap: pp.countries.isEmpty ? null : () => _showCountries(context, pp.countries, t),
+                      child: _StatTile(value: pp.countries.length, label: 'Länder', t: t),
+                    ),
                   ),
                 ),
               ],
@@ -421,6 +531,46 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ],
                 );
               },
+            ),
+          ),
+          const SizedBox(height: 24),
+          // ── Legal ──
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: GestureDetector(
+              onTap: () => showLegalSheet(context),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: t.surfaceWeaker,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: t.borderWeak),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 18, color: t.textMuted),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Datenschutz · Impressum · Nutzungsbedingungen',
+                        style: TextStyle(
+                          color: t.textMuted,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 18,
+                      color: t.textFaint,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],

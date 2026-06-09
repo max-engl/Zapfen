@@ -27,6 +27,7 @@ class FeedPost {
   final DateTime createdAt;
   final double? lat;
   final double? lng;
+  final String? country;
 
   const FeedPost({
     required this.id,
@@ -54,6 +55,7 @@ class FeedPost {
     required this.createdAt,
     this.lat,
     this.lng,
+    this.country,
   });
 
   String get drinkLabel {
@@ -98,6 +100,7 @@ class FeedPost {
       createdAt: DateTime.parse(json['createdAt'] as String),
       lat: (json['lat'] as num?)?.toDouble(),
       lng: (json['lng'] as num?)?.toDouble(),
+      country: json['country'] as String?,
     );
   }
 
@@ -137,6 +140,7 @@ class FeedPost {
       createdAt: DateTime.parse(row['created_at'] as String),
       lat: row['lat'] as double?,
       lng: row['lng'] as double?,
+      country: row['country'] as String?,
     );
   }
 
@@ -169,6 +173,7 @@ class FeedPost {
     'created_at': createdAt.toIso8601String(),
     'lat': lat,
     'lng': lng,
+    'country': country,
   };
 
   FeedPost copyWith({
@@ -180,6 +185,7 @@ class FeedPost {
     bool clearMyReaction = false,
     int? comments,
     int? views,
+    String? country,
   }) => FeedPost(
     id: id,
     userId: userId,
@@ -206,6 +212,7 @@ class FeedPost {
     createdAt: createdAt,
     lat: lat,
     lng: lng,
+    country: country ?? this.country,
   );
 
   String get timeAgo {

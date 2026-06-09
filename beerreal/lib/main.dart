@@ -32,6 +32,8 @@ import 'features/leaderboard/providers/leaderboard_provider.dart';
 import 'features/stats/services/stats_service.dart';
 import 'features/stats/providers/stats_provider.dart';
 import 'features/reports/services/report_service.dart';
+import 'features/blocks/services/block_service.dart';
+import 'features/blocks/providers/block_provider.dart';
 import 'features/notifications/services/notification_api_service.dart';
 import 'features/notifications/providers/notification_provider.dart';
 import 'features/achievements/services/achievement_service.dart';
@@ -119,6 +121,7 @@ Future<void> _main() async {
   final leaderboardService = LeaderboardService(apiClient);
   final statsService = StatsService(apiClient);
   final reportService = ReportService(apiClient);
+  final blockService = BlockService(apiClient);
   final recapService = RecapService(apiClient);
   final bingoService = BingoService(apiClient);
   final notificationApiService = NotificationApiService(apiClient);
@@ -140,6 +143,7 @@ Future<void> _main() async {
         Provider<ProfileService>.value(value: profileService),
         Provider<PostCacheManager>.value(value: postCacheManager),
         Provider<ReportService>.value(value: reportService),
+        Provider<BlockService>.value(value: blockService),
         Provider<RecapService>.value(value: recapService),
         Provider<BingoService>.value(value: bingoService),
         Provider<AchievementService>.value(value: achievementService),
@@ -172,6 +176,9 @@ Future<void> _main() async {
         ),
         ChangeNotifierProvider<BingoProvider>(
           create: (_) => BingoProvider(bingoService),
+        ),
+        ChangeNotifierProvider<BlockProvider>(
+          create: (_) => BlockProvider(blockService),
         ),
       ],
       child: const PintRoot(),
@@ -427,6 +434,7 @@ class _PintAppState extends State<PintApp> {
     _setupNotificationTapHandlers();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<NotificationProvider>().load();
+      context.read<BlockProvider>().load();
     });
   }
 

@@ -19,7 +19,8 @@ import '../features/posts/providers/profile_posts_provider.dart';
 import '../features/posts/services/comment_service.dart';
 import '../features/posts/services/post_service.dart';
 import '../widgets/avatar.dart';
-import '../widgets/post_card.dart' show ReactorsSheet;
+import '../widgets/post_card.dart'
+    show BounceTap, CheersButton, ReactButton, ReactorsSheet;
 import '../widgets/report_post_sheet.dart';
 import '../widgets/shimmer_box.dart';
 
@@ -146,6 +147,7 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
                     child: _ZoomablePhoto(
                       post: _post,
                       heroTagPrefix: widget.heroTagPrefix,
+                      onDoubleTap: () => _onReact('🍺'),
                     ),
                   ),
                 ),
@@ -599,14 +601,71 @@ class _PostAppBar extends StatelessWidget implements PreferredSizeWidget {
 class _ZoomablePhoto extends StatefulWidget {
   final FeedPost post;
   final String heroTagPrefix;
-  const _ZoomablePhoto({required this.post, this.heroTagPrefix = ''});
+  final VoidCallback? onDoubleTap;
+  const _ZoomablePhoto({
+    required this.post,
+    this.heroTagPrefix = '',
+    this.onDoubleTap,
+  });
 
   @override
   State<_ZoomablePhoto> createState() => _ZoomablePhotoState();
 }
 
-class _ZoomablePhotoState extends State<_ZoomablePhoto> {
+class _ZoomablePhotoState extends State<_ZoomablePhoto>
+    with SingleTickerProviderStateMixin {
   bool _swapped = false;
+  bool _cheersBurst = false;
+  late final AnimationController _cheersCtrl;
+  late final Animation<double> _cheersScale;
+  late final Animation<double> _cheersOpacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _cheersCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _cheersScale = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 0.3, end: 2.2)
+            .chain(CurveTween(curve: Curves.elasticOut)),
+        weight: 45,
+      ),
+      TweenSequenceItem(tween: ConstantTween(2.2), weight: 20),
+      TweenSequenceItem(
+        tween: Tween(begin: 2.2, end: 1.6)
+            .chain(CurveTween(curve: Curves.easeIn)),
+        weight: 35,
+      ),
+    ]).animate(_cheersCtrl);
+    _cheersOpacity = Tween(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _cheersCtrl,
+        curve: const Interval(0.6, 1.0, curve: Curves.easeOut),
+      ),
+    );
+    _cheersCtrl.addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted) {
+        setState(() => _cheersBurst = false);
+        _cheersCtrl.reset();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _cheersCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onDoubleTap() {
+    widget.onDoubleTap?.call();
+    setState(() => _cheersBurst = true);
+    _cheersCtrl.forward(from: 0);
+    HapticFeedback.heavyImpact();
+  }
 
   static const _overlayW = 88.0;
   static const _overlayH = 116.0;
@@ -655,6 +714,7 @@ class _ZoomablePhotoState extends State<_ZoomablePhoto> {
       onTap: () {
         if (mainUrl.isNotEmpty) _openFullscreen(context, mainUrl, mainKey);
       },
+      onDoubleTap: widget.onDoubleTap != null ? _onDoubleTap : null,
       child: Container(
         color: Colors.black,
         child: LayoutBuilder(
@@ -800,6 +860,30 @@ class _ZoomablePhotoState extends State<_ZoomablePhoto> {
                       ),
                     ),
                   ),
+                if (_cheersBurst)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Center(
+                        child: FadeTransition(
+                          opacity: _cheersOpacity,
+                          child: ScaleTransition(
+                            scale: _cheersScale,
+                            child: Opacity(
+                              opacity: 0.85,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(22),
+                                child: Image.asset(
+                                  'assets/icons/app_icon.png',
+                                  width: 80,
+                                  height: 80,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             );
           },
@@ -842,61 +926,84 @@ class _ReactionBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = PintThemeProvider.of(context);
     final totalReactions = reactions.fold(0, (sum, r) => sum + r.count);
+    final cheersCount = reactions
+        .firstWhere(
+          (r) => r.emoji == '🍺',
+          orElse: () => const PostReaction(emoji: '🍺', count: 0),
+        )
+        .count;
 
-    final Map<String, int> countMap = {
-      for (final r in reactions) r.emoji: r.count,
-    };
+    final activePills = <Widget>[];
+    for (final emoji in kReactionEmojis.skip(1)) {
+      final r = reactions.firstWhere(
+        (r) => r.emoji == emoji,
+        orElse: () => PostReaction(emoji: emoji, count: 0),
+      );
+      if (r.count == 0) continue;
+      final isMine = myReaction == emoji;
+      activePills
+        ..add(const SizedBox(width: 8))
+        ..add(
+          BounceTap(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onReact(emoji);
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              decoration: BoxDecoration(
+                color: isMine ? t.goldSoft : t.surfaceWeak,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: isMine ? t.goldBorderStrong : t.border,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(emoji, style: const TextStyle(fontSize: 15)),
+                  const SizedBox(width: 5),
+                  Text(
+                    '${r.count}',
+                    style: TextStyle(
+                      color: isMine ? t.goldText : t.textMuted,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+    }
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          ...kReactionEmojis.map((emoji) {
-            final count = countMap[emoji] ?? 0;
-            final isMine = myReaction == emoji;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: GestureDetector(
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  onReact(emoji);
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 9,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isMine ? t.goldSoft : t.surfaceWeak,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: isMine ? t.goldBorderStrong : t.border,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(emoji, style: const TextStyle(fontSize: 16)),
-                      if (count > 0) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          '$count',
-                          style: TextStyle(
-                            color: isMine ? t.goldText : t.text,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
-          if (totalReactions > 0)
+          CheersButton(
+            count: cheersCount,
+            isSelected: myReaction == '🍺',
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onReact('🍺');
+            },
+            t: t,
+          ),
+          ...activePills,
+          if (myReaction == null) ...[
+            const SizedBox(width: 8),
+            ReactButton(
+              emojis: kReactionEmojis.skip(1).toList(),
+              myReaction: myReaction,
+              onReact: onReact,
+              t: t,
+            ),
+          ],
+          if (totalReactions > 0) ...[
+            const SizedBox(width: 8),
             GestureDetector(
               onTap: () => _showReactors(context),
               child: Container(
@@ -923,6 +1030,7 @@ class _ReactionBar extends StatelessWidget {
                 ),
               ),
             ),
+          ],
         ],
       ),
     );

@@ -177,6 +177,7 @@ router.get("/me", authMiddleware, async (req, res) => {
             avatarColor: req.user.avatarColor,
             avatarInitial: req.user.avatarInitial,
             createdAt: req.user.createdAt,
+            bingoLineCount: req.user.bingoLineCount ?? 0,
         },
     });
 });

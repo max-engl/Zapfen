@@ -70,6 +70,26 @@ class UserSearchResult {
   }
 }
 
+class ApiSentFriendRequest {
+  final String id;
+  final ApiFriend to;
+  final DateTime sentAt;
+
+  const ApiSentFriendRequest({
+    required this.id,
+    required this.to,
+    required this.sentAt,
+  });
+
+  factory ApiSentFriendRequest.fromJson(Map<String, dynamic> json) {
+    return ApiSentFriendRequest(
+      id: (json['id'] ?? json['_id'] ?? '') as String,
+      to: ApiFriend.fromJson(json['to'] as Map<String, dynamic>),
+      sentAt: DateTime.parse(json['sentAt'] as String),
+    );
+  }
+}
+
 class FriendRecommendation {
   final String id;
   final String username;

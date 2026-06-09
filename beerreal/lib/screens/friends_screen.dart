@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme.dart';
+import '../features/blocks/providers/block_provider.dart';
 import '../features/friends/models/api_friend.dart';
 import '../features/friends/providers/friend_provider.dart';
 import '../widgets/avatar.dart';
@@ -30,13 +31,31 @@ class _FriendsScreenState extends State<FriendsScreen> {
     final fp = context.read<FriendProvider>();
     Navigator.of(context)
         .push(
-          MaterialPageRoute(
-            builder: (_) => ChangeNotifierProvider.value(
+          PageRouteBuilder(
+            transitionDuration: const Duration(milliseconds: 380),
+            reverseTransitionDuration: const Duration(milliseconds: 280),
+            pageBuilder: (_, __, ___) => ChangeNotifierProvider.value(
               value: fp,
               child: AddFriendScreen(
                 onClose: () => Navigator.of(context).pop(),
               ),
             ),
+            transitionsBuilder: (_, animation, __, child) {
+              final slide = Tween<Offset>(
+                begin: const Offset(0, 0.06),
+                end: Offset.zero,
+              ).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+              );
+              final fade = CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOut,
+              );
+              return FadeTransition(
+                opacity: fade,
+                child: SlideTransition(position: slide, child: child),
+              );
+            },
           ),
         )
         .then((_) {
@@ -79,6 +98,11 @@ class _FriendsScreenState extends State<FriendsScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 18),
+        ],
+
+        if (fp.sentRequests.isNotEmpty) ...[
+          _SentRequestsSection(sentRequests: fp.sentRequests, t: t, fp: fp),
           const SizedBox(height: 18),
         ],
 
@@ -315,6 +339,7 @@ class _FriendRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isBlocked = context.watch<BlockProvider>().isBlocked(friend.id);
     return GestureDetector(
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => FriendProfileScreen(friend: friend)),
@@ -338,14 +363,43 @@ class _FriendRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    friend.username,
-                    style: TextStyle(
-                      color: t.text,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.15,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        friend.username,
+                        style: TextStyle(
+                          color: isBlocked ? t.textMuted : t.text,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.15,
+                        ),
+                      ),
+                      if (isBlocked) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE05454).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: const Color(0xFFE05454).withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: const Text(
+                            'Blockiert',
+                            style: TextStyle(
+                              color: Color(0xFFE05454),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -432,6 +486,164 @@ class _ShimmerFriendRow extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SentRequestsSection extends StatefulWidget {
+  final List<ApiSentFriendRequest> sentRequests;
+  final PintTheme t;
+  final FriendProvider fp;
+
+  const _SentRequestsSection({
+    required this.sentRequests,
+    required this.t,
+    required this.fp,
+  });
+
+  @override
+  State<_SentRequestsSection> createState() => _SentRequestsSectionState();
+}
+
+class _SentRequestsSectionState extends State<_SentRequestsSection> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () => setState(() => _expanded = !_expanded),
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
+            child: Row(
+              children: [
+                Text(
+                  'GESENDETE ANFRAGEN',
+                  style: TextStyle(
+                    color: widget.t.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.8,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(child: Container(height: 1, color: widget.t.border)),
+                const SizedBox(width: 8),
+                Text(
+                  '${widget.sentRequests.length} ausstehend',
+                  style: TextStyle(color: widget.t.textMuted, fontSize: 12),
+                ),
+                const SizedBox(width: 6),
+                AnimatedRotation(
+                  turns: _expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: widget.t.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeInOut,
+          child: _expanded
+              ? Column(
+                  children: widget.sentRequests
+                      .map(
+                        (r) => _SentRequestRow(
+                          request: r,
+                          t: widget.t,
+                          onCancel: () => widget.fp.cancelSentRequest(r.to.id),
+                        ),
+                      )
+                      .toList(),
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+}
+
+class _SentRequestRow extends StatelessWidget {
+  final ApiSentFriendRequest request;
+  final PintTheme t;
+  final VoidCallback onCancel;
+
+  const _SentRequestRow({
+    required this.request,
+    required this.t,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: t.surfaceWeaker,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: t.border),
+      ),
+      child: Row(
+        children: [
+          PintAvatar(
+            size: 46,
+            imageUrl: request.to.avatarUrl,
+            avatarColor: request.to.avatarColor,
+            initials: request.to.avatarInitial,
+            ring: false,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '@${request.to.username}',
+                  style: TextStyle(
+                    color: t.text,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.15,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Anfrage ausstehend',
+                  style: TextStyle(color: t.textMuted, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: onCancel,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: t.surfaceWeak,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: t.border),
+              ),
+              child: Text(
+                'Zurückziehen',
+                style: TextStyle(
+                  color: t.text,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],

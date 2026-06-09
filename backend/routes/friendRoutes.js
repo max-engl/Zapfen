@@ -172,6 +172,26 @@ router.get("/", authMiddleware, async (req, res) => {
     }
 });
 
+// GET /friends/sent-requests  —  list outgoing pending requests sent by the current user
+router.get("/sent-requests", authMiddleware, async (req, res) => {
+    try {
+        const requests = await Friend.find({
+            requester: req.user._id,
+            status: "pending",
+        }).populate("recipient", "username avatarUrl avatarColor avatarInitial");
+
+        const outgoing = requests.map((r) => ({
+            id: r._id,
+            to: r.recipient,
+            sentAt: r.createdAt,
+        }));
+
+        res.json({ requests: outgoing });
+    } catch (error) {
+        res.status(500).json({ message: "Could not fetch sent requests", error: error.message });
+    }
+});
+
 // GET /friends/requests  —  list incoming pending requests
 router.get("/requests", authMiddleware, async (req, res) => {
     try {

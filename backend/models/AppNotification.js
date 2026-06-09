@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const appNotificationSchema = new mongoose.Schema({
   recipient:      { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  type:           { type: String, enum: ['poured', 'cheers', 'comment', 'request', 'accepted', 'group_active'], required: true },
+  type:           { type: String, enum: ['poured', 'cheers', 'comment', 'request', 'accepted', 'group_active', 'bingo_line'], required: true },
   actorId:        { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   actorUsername:  { type: String, default: null },
   actorAvatarUrl:     { type: String, default: null },

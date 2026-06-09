@@ -29,4 +29,25 @@ class GeocodingService {
       return null;
     }
   }
+
+  /// Returns the country name for the given coordinates.
+  /// Uses 1-decimal precision so nearby points share a cache entry.
+  static Future<String?> countryName(double lat, double lng) async {
+    final key = 'country:${lat.toStringAsFixed(1)},${lng.toStringAsFixed(1)}';
+    if (_cache.containsKey(key)) return _cache[key];
+
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(
+        'https://nominatim.openstreetmap.org/reverse',
+        queryParameters: {'lat': lat, 'lon': lng, 'format': 'json'},
+        options: Options(headers: {'User-Agent': 'Zapfen/1.0'}),
+      );
+      final address = (res.data?['address'] as Map<String, dynamic>?) ?? {};
+      final country = address['country'] as String?;
+      if (country != null) _cache[key] = country;
+      return country;
+    } catch (_) {
+      return null;
+    }
+  }
 }

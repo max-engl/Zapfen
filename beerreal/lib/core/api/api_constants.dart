@@ -3,7 +3,7 @@ class ApiConstants {
   //   flutter run --dart-define=API_HOST=yourapp.com --dart-define=API_SCHEME=https --dart-define=API_PORT=443
   static const String host = String.fromEnvironment(
     'API_HOST',
-    defaultValue: '10.250.2.19',
+    defaultValue: '10.170.54.9',
   );
   static const String scheme = String.fromEnvironment(
     'API_SCHEME',
@@ -34,6 +34,7 @@ class ApiConstants {
   // Friends
   static const String friends = '/friends';
   static const String friendRequests = '/friends/requests';
+  static const String friendSentRequests = '/friends/sent-requests';
   static String sendFriendRequest(String userId) => '/friends/request/$userId';
   static String acceptFriendRequest(String userId) => '/friends/accept/$userId';
   static String removeFriend(String userId) => '/friends/$userId';
@@ -71,6 +72,10 @@ class ApiConstants {
 
   // Reports
   static String reportPost(String postId) => '/reports/posts/$postId';
+
+  // Blocks
+  static const String blocks = '/blocks';
+  static String blockUser(String userId) => '/blocks/$userId';
 
   // Achievements
   static const String achievementsMe = '/achievements/me';

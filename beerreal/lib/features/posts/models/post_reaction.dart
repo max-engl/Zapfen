@@ -25,7 +25,7 @@ class PostReaction {
   );
 }
 
-const List<String> kReactionEmojis = ['🍺', '🔥', '😍', '💀'];
+const List<String> kReactionEmojis = ['🍺', '🔥', '😍', '💀', '😂'];
 
 class ReactionActor {
   final String emoji;

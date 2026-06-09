@@ -691,6 +691,8 @@ _BadgeData _badge(String type, PintTheme t) {
       return _BadgeData(icon: Icons.person_add_outlined, bg: t.goldSoft, fg: t.goldText);
     case 'accepted':
       return _BadgeData(icon: Icons.check_rounded, bg: t.goldSoft, fg: t.goldText);
+    case 'bingo_line':
+      return _BadgeData(icon: Icons.grid_on_rounded, bg: t.goldSoft, fg: t.goldText);
     case 'poured':
     default:
       return _BadgeData(icon: Icons.sports_bar_outlined, bg: t.surfaceWeak, fg: t.text);
@@ -704,6 +706,7 @@ String _body(String type) {
     case 'request': return 'möchte mit dir befreundet sein.';
     case 'accepted': return 'hat deine Freundschaftsanfrage angenommen.';
     case 'poured': return 'hat gerade gezapft!';
+    case 'bingo_line': return 'hat eine Bingo-Zeile komplett! 🎰';
     default: return '';
   }
 }

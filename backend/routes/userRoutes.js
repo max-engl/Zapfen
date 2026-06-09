@@ -12,6 +12,7 @@ const Friend = require("../models/Friend");
 const AppNotification = require("../models/AppNotification");
 const Drink = require("../models/Drink");
 const Report = require("../models/Report");
+const Block = require("../models/Block");
 const supabase = require("../config/supabase");
 const upload = require("../middleware/uploadMiddleware");
 const authMiddleware = require("../middleware/authMiddleware");
@@ -95,9 +96,16 @@ router.get("/search", authMiddleware, async (req, res) => {
             return res.json({ users: [] });
         }
         const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+        const [blockedByMe, blockedMe] = await Promise.all([
+            Block.find({ blocker: req.user._id }).distinct("blocked"),
+            Block.find({ blocked: req.user._id }).distinct("blocker"),
+        ]);
+        const hiddenIds = [...new Set([...blockedByMe.map(String), ...blockedMe.map(String)])];
+
         const users = await User.find({
             username: { $regex: `^${escaped}`, $options: "i" },
-            _id: { $ne: req.user._id },
+            _id: { $ne: req.user._id, $nin: hiddenIds },
         })
             .select("_id username avatarUrl avatarColor avatarInitial")
             .limit(20);

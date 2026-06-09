@@ -4,16 +4,19 @@ import 'package:fullscreen_image_viewer/fullscreen_image_viewer.dart'
     show FullscreenImageViewer;
 import 'package:provider/provider.dart';
 import '../core/app_cache_manager.dart';
+import '../core/geocoding_service.dart';
 import '../theme.dart';
 import '../features/achievements/models/achievement.dart';
 import '../features/achievements/services/achievement_service.dart';
 import '../features/bingo/services/bingo_service.dart';
+import '../features/blocks/providers/block_provider.dart';
 import '../features/friends/models/api_friend.dart';
 import '../features/posts/models/feed_post.dart';
 import '../features/posts/services/post_service.dart';
 import '../features/posts/providers/feed_provider.dart';
 import '../widgets/achievement_strip.dart';
 import '../widgets/avatar.dart';
+import '../widgets/pint_dialogs.dart';
 import '../widgets/post_card.dart';
 import '../widgets/shimmer_box.dart';
 import '../widgets/stagger_item.dart';
@@ -127,11 +130,119 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
     return count;
   }
 
-  int get _spots => _posts
-      .where((p) => p.lat != null && p.lng != null)
-      .map((p) => '${(p.lat! * 100).round()},${(p.lng! * 100).round()}')
-      .toSet()
-      .length;
+  List<String> get _countries {
+    final set = <String>{};
+    for (final p in _posts) {
+      if (p.country != null && p.country!.isNotEmpty) set.add(p.country!);
+    }
+    return set.toList()..sort();
+  }
+
+  void _showCountries(BuildContext context, List<String> countries, PintTheme t) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: t.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => SafeArea(
+        top: false,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.55,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 36, height: 4,
+                decoration: BoxDecoration(
+                  color: t.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: t.goldFaint,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: t.goldBorder),
+                      ),
+                      child: Icon(Icons.public_rounded, color: t.goldText, size: 16),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${countries.length} ${countries.length == 1 ? 'Land' : 'Länder'}',
+                          style: TextStyle(
+                            color: t.text, fontSize: 16,
+                            fontWeight: FontWeight.w700, letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Länder, in denen ${widget.friend.username} getrunken hat',
+                          style: TextStyle(color: t.textMuted, fontSize: 12, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                  itemCount: countries.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 6),
+                  itemBuilder: (_, i) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                    decoration: BoxDecoration(
+                      color: t.surfaceWeak,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: t.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 28, height: 28,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: t.surfaceWeaker,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: t.border),
+                          ),
+                          child: Text(
+                            '${i + 1}',
+                            style: TextStyle(
+                              color: t.textMuted, fontSize: 12, fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          countries[i],
+                          style: TextStyle(color: t.text, fontSize: 15, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Future<void> _loadPosts() async {
     try {
@@ -139,10 +250,32 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
         widget.friend.id,
       );
       if (mounted) setState(() => _posts = posts);
+      _geocodeMissingCountries();
     } catch (_) {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _geocodeMissingCountries() async {
+    final missing = _posts
+        .where((p) => (p.country == null || p.country!.isEmpty) && p.lat != null && p.lng != null)
+        .toList();
+    if (missing.isEmpty) return;
+
+    var updated = List<FeedPost>.from(_posts);
+    var changed = false;
+    for (final post in missing) {
+      final c = await GeocodingService.countryName(post.lat!, post.lng!);
+      if (c != null && c.isNotEmpty) {
+        final idx = updated.indexWhere((p) => p.id == post.id);
+        if (idx >= 0) {
+          updated[idx] = updated[idx].copyWith(country: c);
+          changed = true;
+        }
+      }
+    }
+    if (changed && mounted) setState(() => _posts = updated);
   }
 
   Future<void> _loadAchievements() async {
@@ -188,7 +321,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
             children: [
               // ── Top bar ──
               Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 18, 0),
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
                 child: Row(
                   children: [
                     IconButton(
@@ -200,6 +333,7 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                     const Spacer(),
+                    _BlockMenuButton(userId: widget.friend.id, username: widget.friend.username, t: t),
                   ],
                 ),
               ),
@@ -286,7 +420,10 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
                     Expanded(
                       child: _AnimatedTile(
                         animation: _statAnim(2),
-                        child: _StatTile(value: _spots, label: 'Orte', t: t),
+                        child: GestureDetector(
+                          onTap: _countries.isEmpty ? null : () => _showCountries(context, _countries, t),
+                          child: _StatTile(value: _countries.length, label: 'Länder', t: t),
+                        ),
                       ),
                     ),
                   ],
@@ -538,6 +675,197 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Block menu button ─────────────────────────────────────────────────────
+
+class _BlockMenuButton extends StatelessWidget {
+  final String userId;
+  final String username;
+  final PintTheme t;
+
+  const _BlockMenuButton({
+    required this.userId,
+    required this.username,
+    required this.t,
+  });
+
+  Future<void> _showSheet(BuildContext context) async {
+    final blockProvider = context.read<BlockProvider>();
+    final isBlocked = blockProvider.isBlocked(userId);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+              decoration: BoxDecoration(
+                color: t.surface,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: t.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: t.isDark ? 0.45 : 0.12),
+                    blurRadius: 28,
+                    offset: const Offset(0, 14),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: t.textFaint,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _OptionTile(
+                    t: t,
+                    icon: isBlocked ? Icons.person_add_outlined : Icons.block,
+                    title: isBlocked ? 'Blockierung aufheben' : 'Nutzer blockieren',
+                    subtitle: isBlocked
+                        ? '@$username wird wieder sichtbar.'
+                        : 'Beiträge von @$username ausblenden.',
+                    destructive: !isBlocked,
+                    onTap: () async {
+                      Navigator.of(sheetCtx).pop();
+                      try {
+                        if (isBlocked) {
+                          await blockProvider.unblockUser(userId);
+                          if (context.mounted) showPintSnackBar(context, '@$username wurde entsperrt.');
+                        } else {
+                          await blockProvider.blockUser(userId);
+                          if (context.mounted) {
+                            showPintSnackBar(context, '@$username wurde blockiert.');
+                            Navigator.of(context).pop();
+                          }
+                        }
+                      } catch (_) {
+                        if (context.mounted) {
+                          showPintSnackBar(context, 'Aktion fehlgeschlagen.', isError: true);
+                        }
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _OptionTile(
+                    t: t,
+                    icon: Icons.close,
+                    title: 'Schließen',
+                    subtitle: 'Zurück zum Profil.',
+                    onTap: () => Navigator.of(sheetCtx).pop(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: Icon(Icons.more_horiz, color: t.textMuted, size: 22),
+      style: IconButton.styleFrom(
+        backgroundColor: t.surfaceWeak,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: t.border),
+        ),
+      ),
+      onPressed: () => _showSheet(context),
+    );
+  }
+}
+
+class _OptionTile extends StatelessWidget {
+  final PintTheme t;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool destructive;
+  final VoidCallback onTap;
+
+  const _OptionTile({
+    required this.t,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.destructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = destructive ? const Color(0xFFE05454) : t.text;
+    final bg = destructive
+        ? const Color(0xFFE05454).withValues(alpha: 0.12)
+        : t.surfaceWeak;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: destructive ? color.withValues(alpha: 0.25) : t.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: destructive ? color.withValues(alpha: 0.12) : t.goldSoft,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: destructive ? color : t.goldText,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(color: t.textMuted, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

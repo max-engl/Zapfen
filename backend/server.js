@@ -23,6 +23,7 @@ const achievementRoutes = require("./routes/achievementRoutes");
 const { reportRouter, adminRouter } = require("./routes/reportRoutes");
 const { router: recapRouter, scheduleNightRecap } = require("./routes/recapRoutes");
 const bingoRouter = require("./routes/bingoRoutes");
+const blockRoutes = require("./routes/blockRoutes");
 
 // Edit this list to change the default drinks shown to all users.
 const DEFAULT_DRINKS = [
@@ -151,6 +152,7 @@ app.use("/achievements", achievementRoutes);
 app.use("/reports", reportRouter);
 app.use("/recap", recapRouter);
 app.use("/bingo", bingoRouter);
+app.use("/blocks", blockRoutes);
 app.get("/admin", (req, res) => {
   res.sendFile(path.join(__dirname, "admin.html"));
 });

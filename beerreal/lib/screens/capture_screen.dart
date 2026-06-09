@@ -59,6 +59,7 @@ class _CaptureScreenState extends State<CaptureScreen>
   String? _uploadError;
   double? _lat;
   double? _lng;
+  String? _country;
   String _locationText = 'Ortung…';
   String _locationHint = 'Standort wird ermittelt';
   DrinkModel? _selectedDrink = const DrinkModel(
@@ -202,6 +203,7 @@ class _CaptureScreenState extends State<CaptureScreen>
                     .split(',')
                     .first
                     .trim();
+          _country = address['country'] as String?;
           setState(() {
             _locationText = label.isNotEmpty
                 ? label
@@ -349,6 +351,7 @@ class _CaptureScreenState extends State<CaptureScreen>
         caption: _captionCtrl.text.trim(),
         lat: _lat,
         lng: _lng,
+        country: _country,
         drinkName: _selectedDrink?.name,
         drinkEmoji: _selectedDrink?.emoji,
         rating: _rating,

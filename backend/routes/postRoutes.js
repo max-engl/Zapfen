@@ -13,9 +13,12 @@ const upload = require("../middleware/uploadMiddleware");
 const authMiddleware = require("../middleware/authMiddleware");
 const { sendToUsers, sendToUser, saveNotification, saveNotifications } = require("../services/notificationService");
 const { getFriendIds } = require("../utils/friends");
+const Block = require("../models/Block");
+const User = require("../models/User");
+const { buildBingoCardForUser } = require("../utils/bingo");
 
 const router = express.Router();
-const ALLOWED_REACTIONS = new Set(["🍺", "🔥", "😍", "💀"]);
+const ALLOWED_REACTIONS = new Set(["🍺", "🔥", "😍", "💀", "😂"]);
 
 function getFileExtension(filename) {
     return filename.split(".").pop().toLowerCase();
@@ -81,6 +84,7 @@ function formatPost(post, imageUrl, selfieUrl, likedByMe = false, myReaction = n
         result.lat = post.location.coordinates[1];
         result.lng = post.location.coordinates[0];
     }
+    if (post.country) result.country = post.country;
     return result;
 }
 
@@ -94,6 +98,49 @@ async function formatPostWithUrls(post, likedSet, reactionDataMap) {
     return formatPost(post, imageUrl, selfieUrl, likedSet.has(pid), rd.myReaction, rd.reactions);
 }
 
+async function checkBingoAfterPost(userId, username, avatarUrl, avatarColor, avatarInitial) {
+    try {
+        const card = await buildBingoCardForUser(userId);
+        const now = new Date();
+        const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+        const user = await User.findById(userId).select('bingoLineCount bingoThisMonth');
+        const prevLines = user.bingoThisMonth?.month === monthKey ? (user.bingoThisMonth.lines || 0) : 0;
+        const delta = card.completedLines - prevLines;
+
+        if (delta > 0) {
+            await User.findByIdAndUpdate(userId, {
+                $inc: { bingoLineCount: delta },
+                bingoThisMonth: { month: monthKey, lines: card.completedLines },
+            });
+
+            const friendIds = await getFriendIds(userId);
+            if (friendIds.length > 0) {
+                const body = delta === 1 ? 'hat eine Bingo-Zeile komplett! 🎰' : `hat ${delta} neue Bingo-Zeilen! 🎰`;
+                sendToUsers(friendIds, {
+                    title: `@${username}`,
+                    body,
+                    data: { type: 'bingo_line' },
+                });
+                saveNotifications(friendIds, {
+                    type: 'bingo_line',
+                    actorId: userId,
+                    actorUsername: username,
+                    actorAvatarUrl: avatarUrl ?? null,
+                    actorAvatarColor: avatarColor ?? null,
+                    actorAvatarInitial: avatarInitial ?? null,
+                });
+            }
+        } else if (user.bingoThisMonth?.month !== monthKey) {
+            await User.findByIdAndUpdate(userId, {
+                bingoThisMonth: { month: monthKey, lines: card.completedLines },
+            });
+        }
+    } catch (err) {
+        console.error('Bingo check after post failed:', err.message);
+    }
+}
+
 // POST /posts/upload
 router.post(
     "/upload",
@@ -104,7 +151,7 @@ router.post(
     ]),
     async (req, res) => {
         try {
-            const { caption, lat, lng, drinkName, drinkEmoji, rating } = req.body;
+            const { caption, lat, lng, country, drinkName, drinkEmoji, rating } = req.body;
             const imageFile = req.files?.["image"]?.[0];
             const selfieFile = req.files?.["selfie"]?.[0];
 
@@ -167,6 +214,7 @@ router.post(
                 storagePath,
                 selfieStoragePath,
                 rating: hasRating ? parsedRating : null,
+                country: country?.trim() || null,
                 drink: {
                     name:  drinkName?.trim()  || "",
                     emoji: drinkEmoji?.trim() || "",
@@ -196,6 +244,8 @@ router.post(
             const actorAvatarUrl = req.user.avatarUrl ?? null;
             const actorAvatarColor = req.user.avatarColor ?? null;
             const actorAvatarInitial = req.user.avatarInitial ?? null;
+
+            checkBingoAfterPost(req.user._id, actorUsername, actorAvatarUrl, actorAvatarColor, actorAvatarInitial).catch(() => {});
             const postId = post._id.toString();
             getFriendIds(req.user._id).then(async (friendIds) => {
                 if (!friendIds.length) return;
@@ -270,9 +320,17 @@ router.get("/", authMiddleware, async (req, res) => {
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
 
-        const friendIds = await getFriendIds(req.user._id);
+        const [friendIds, blockedByMe, blockedMe] = await Promise.all([
+            getFriendIds(req.user._id),
+            Block.find({ blocker: req.user._id }).distinct("blocked"),
+            Block.find({ blocked: req.user._id }).distinct("blocker"),
+        ]);
 
-        const posts = await Post.find({ user: { $in: [...friendIds, req.user._id] } })
+        const hiddenUserIds = [...new Set([...blockedByMe.map(String), ...blockedMe.map(String)])];
+
+        const posts = await Post.find({
+            user: { $in: [...friendIds, req.user._id], $nin: hiddenUserIds },
+        })
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
             .limit(limit + 1)
@@ -384,11 +442,17 @@ router.get("/user/:userId", authMiddleware, async (req, res) => {
 // GET /posts/map  —  friends' posts that have location, newest first (last 30 days)
 router.get("/map", authMiddleware, async (req, res) => {
     try {
-        const friendIds = await getFriendIds(req.user._id);
+        const [friendIds, blockedByMe, blockedMe] = await Promise.all([
+            getFriendIds(req.user._id),
+            Block.find({ blocker: req.user._id }).distinct("blocked"),
+            Block.find({ blocked: req.user._id }).distinct("blocker"),
+        ]);
+
+        const hiddenUserIds = [...new Set([...blockedByMe.map(String), ...blockedMe.map(String)])];
         const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
         const posts = await Post.find({
-            user: { $in: [...friendIds, req.user._id] },
+            user: { $in: [...friendIds, req.user._id], $nin: hiddenUserIds },
             "location.coordinates": { $exists: true },
             createdAt: { $gte: since },
         })
@@ -522,22 +586,25 @@ router.post("/:id/reactions", authMiddleware, async (req, res) => {
 
         res.json({ myReaction, reactions, totalReactions: Math.max(0, updatedPost.stats.reactions || 0) });
 
-        // Notify post owner when a reaction is added or changed (not removed), never self
+        // Notify post owner on first-ever reaction from this user — skip if they already got one
         if (myReaction !== null && updatedPost.user.toString() !== req.user._id.toString()) {
-            sendToUser(updatedPost.user, {
-                title: `@${req.user.username} ${myReaction}`,
-                body: "hat auf deinen Beitrag reagiert",
-                data: { type: "post", postId: updatedPost._id.toString() },
-            }).catch(() => {});
-            saveNotification(updatedPost.user, {
-                type: 'cheers',
-                actorId: req.user._id,
-                actorUsername: req.user.username,
-                actorAvatarUrl: req.user.avatarUrl ?? null,
-                actorAvatarColor: req.user.avatarColor ?? null,
-                actorAvatarInitial: req.user.avatarInitial ?? null,
-                postId: updatedPost._id,
-                postThumbPath: post.storagePath ?? null,
+            AppNotification.findOne({ type: 'cheers', actorId: req.user._id, postId: updatedPost._id }).then((already) => {
+                if (already) return;
+                sendToUser(updatedPost.user, {
+                    title: `@${req.user.username} ${myReaction}`,
+                    body: "hat auf deinen Beitrag reagiert",
+                    data: { type: "post", postId: updatedPost._id.toString() },
+                }).catch(() => {});
+                saveNotification(updatedPost.user, {
+                    type: 'cheers',
+                    actorId: req.user._id,
+                    actorUsername: req.user.username,
+                    actorAvatarUrl: req.user.avatarUrl ?? null,
+                    actorAvatarColor: req.user.avatarColor ?? null,
+                    actorAvatarInitial: req.user.avatarInitial ?? null,
+                    postId: updatedPost._id,
+                    postThumbPath: post.storagePath ?? null,
+                }).catch(() => {});
             }).catch(() => {});
         }
     } catch (error) {

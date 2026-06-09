@@ -35,6 +35,11 @@ const postSchema = new mongoose.Schema(
             },
         },
 
+        country: {
+            type: String,
+            default: null,
+        },
+
         drink: {
             name:  { type: String, default: "" },
             emoji: { type: String, default: "" },

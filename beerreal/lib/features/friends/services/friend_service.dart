@@ -19,6 +19,12 @@ class FriendService {
     return list.map((e) => ApiFriendRequest.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  Future<List<ApiSentFriendRequest>> getSentFriendRequests() async {
+    final response = await _client.dio.get(ApiConstants.friendSentRequests);
+    final list = response.data['requests'] as List<dynamic>;
+    return list.map((e) => ApiSentFriendRequest.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
   Future<void> sendFriendRequest(String userId) async {
     await _client.dio.post(ApiConstants.sendFriendRequest(userId));
   }

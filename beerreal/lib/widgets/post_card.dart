@@ -57,6 +57,7 @@ class PostCard extends StatelessWidget {
             post: post,
             t: t,
             onTap: onTap,
+            onDoubleTap: () => onReact('🍺'),
             heroTagPrefix: heroTagPrefix,
             enableHero: enableHero,
           ),
@@ -202,12 +203,14 @@ class _Photo extends StatefulWidget {
   final FeedPost post;
   final PintTheme t;
   final VoidCallback? onTap;
+  final VoidCallback? onDoubleTap;
   final String heroTagPrefix;
   final bool enableHero;
   const _Photo({
     required this.post,
     required this.t,
     this.onTap,
+    this.onDoubleTap,
     this.heroTagPrefix = '',
     this.enableHero = true,
   });
@@ -253,8 +256,59 @@ class _LiveAvatar extends StatelessWidget {
   }
 }
 
-class _PhotoState extends State<_Photo> {
+class _PhotoState extends State<_Photo> with SingleTickerProviderStateMixin {
   bool _swapped = false;
+  bool _cheersBurst = false;
+  late final AnimationController _cheersCtrl;
+  late final Animation<double> _cheersScale;
+  late final Animation<double> _cheersOpacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _cheersCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _cheersScale = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 0.3, end: 2.2)
+            .chain(CurveTween(curve: Curves.elasticOut)),
+        weight: 45,
+      ),
+      TweenSequenceItem(tween: ConstantTween(2.2), weight: 20),
+      TweenSequenceItem(
+        tween: Tween(begin: 2.2, end: 1.6)
+            .chain(CurveTween(curve: Curves.easeIn)),
+        weight: 35,
+      ),
+    ]).animate(_cheersCtrl);
+    _cheersOpacity = Tween(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _cheersCtrl,
+        curve: const Interval(0.6, 1.0, curve: Curves.easeOut),
+      ),
+    );
+    _cheersCtrl.addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted) {
+        setState(() => _cheersBurst = false);
+        _cheersCtrl.reset();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _cheersCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onDoubleTap() {
+    widget.onDoubleTap?.call();
+    setState(() => _cheersBurst = true);
+    _cheersCtrl.forward(from: 0);
+    HapticFeedback.heavyImpact();
+  }
 
   static const _overlayW = 80.0;
   static const _overlayH = 107.0;
@@ -329,8 +383,37 @@ class _PhotoState extends State<_Photo> {
             return Stack(
               children: [
                 Positioned.fill(
-                  child: GestureDetector(onTap: widget.onTap, child: mainImage),
+                  child: GestureDetector(
+                    onTap: widget.onTap,
+                    onDoubleTap:
+                        widget.onDoubleTap != null ? _onDoubleTap : null,
+                    child: mainImage,
+                  ),
                 ),
+                if (_cheersBurst)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Center(
+                        child: FadeTransition(
+                          opacity: _cheersOpacity,
+                          child: ScaleTransition(
+                            scale: _cheersScale,
+                            child: Opacity(
+                              opacity: 0.85,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(22),
+                                child: Image.asset(
+                                  'assets/icons/app_icon.png',
+                                  width: 80,
+                                  height: 80,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 if (hasSelfie)
                   AnimatedPositioned(
                     duration: _dragging
@@ -559,7 +642,6 @@ class _QuickReactions extends StatelessWidget {
   });
 
   void _showReactors(BuildContext context) {
-    // Capture PostService from the widget tree before entering the modal route.
     final svc = context.read<PostService>();
     showModalBottomSheet<void>(
       context: context,
@@ -575,55 +657,84 @@ class _QuickReactions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final counts = {for (final r in post.reactions) r.emoji: r.count};
+    final cheersCount = post.reactions
+        .firstWhere(
+          (r) => r.emoji == '🍺',
+          orElse: () => const PostReaction(emoji: '🍺', count: 0),
+        )
+        .count;
+
+    final activePills = <Widget>[];
+    for (final emoji in kReactionEmojis.skip(1)) {
+      final r = post.reactions.firstWhere(
+        (r) => r.emoji == emoji,
+        orElse: () => PostReaction(emoji: emoji, count: 0),
+      );
+      if (r.count == 0) continue;
+      final isMine = post.myReaction == emoji;
+      activePills
+        ..add(const SizedBox(width: 6))
+        ..add(
+          BounceTap(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onReact(emoji);
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              constraints: const BoxConstraints(minHeight: 34),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+              decoration: BoxDecoration(
+                color: isMine ? t.goldSoft : t.surfaceWeak,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: isMine ? t.goldBorderStrong : t.border,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(emoji, style: const TextStyle(fontSize: 13)),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${r.count}',
+                    style: TextStyle(
+                      color: isMine ? t.goldText : t.textMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+    }
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Emoji reaction pills — tapping reacts/unreacts
-        ...kReactionEmojis.map((emoji) {
-          final selected = post.myReaction == emoji;
-          final count = counts[emoji] ?? 0;
-          return Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: GestureDetector(
-              onTap: () {
-                HapticFeedback.selectionClick();
-                onReact(emoji);
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                constraints: const BoxConstraints(minWidth: 38, minHeight: 34),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-                decoration: BoxDecoration(
-                  color: selected ? t.goldSoft : t.surfaceWeak,
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: selected ? t.goldBorderStrong : t.border,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(emoji, style: const TextStyle(fontSize: 14)),
-                    if (count > 0) ...[
-                      const SizedBox(width: 4),
-                      Text(
-                        '$count',
-                        style: TextStyle(
-                          color: selected ? t.goldText : t.textMuted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-          );
-        }),
-        // "See who reacted" chip — only visible when reactions exist
-        if (post.totalReactions > 0)
+        CheersButton(
+          count: cheersCount,
+          isSelected: post.myReaction == '🍺',
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onReact('🍺');
+          },
+          t: t,
+        ),
+        ...activePills,
+        if (post.myReaction == null) ...[
+          const SizedBox(width: 6),
+          ReactButton(
+            emojis: kReactionEmojis.skip(1).toList(),
+            myReaction: post.myReaction,
+            onReact: onReact,
+            t: t,
+          ),
+        ],
+        if (post.totalReactions > 0) ...[
+          const SizedBox(width: 6),
           GestureDetector(
             onTap: () => _showReactors(context),
             child: Container(
@@ -651,7 +762,396 @@ class _QuickReactions extends StatelessWidget {
               ),
             ),
           ),
+        ],
       ],
+    );
+  }
+}
+
+// ── Cheers button ─────────────────────────────────────────────────────────────
+
+class CheersButton extends StatelessWidget {
+  final int count;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final PintTheme t;
+
+  const CheersButton({
+    super.key,
+    required this.count,
+    required this.isSelected,
+    required this.onTap,
+    required this.t,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return BounceTap(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        constraints: const BoxConstraints(minHeight: 34),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? t.goldSoft : t.surfaceWeak,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: isSelected ? t.goldBorderStrong : t.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('🍺', style: TextStyle(fontSize: 14)),
+            if (count > 0) ...[
+              const SizedBox(width: 5),
+              Text(
+                '$count',
+                style: TextStyle(
+                  color: isSelected ? t.goldText : t.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── React button with Apple-style emoji overlay ────────────────────────────────
+
+class ReactButton extends StatefulWidget {
+  final List<String> emojis;
+  final String? myReaction;
+  final void Function(String) onReact;
+  final PintTheme t;
+
+  const ReactButton({
+    super.key,
+    required this.emojis,
+    required this.myReaction,
+    required this.onReact,
+    required this.t,
+  });
+
+  @override
+  State<ReactButton> createState() => _ReactButtonState();
+}
+
+class _ReactButtonState extends State<ReactButton>
+    with SingleTickerProviderStateMixin {
+  final _key = GlobalKey();
+  OverlayEntry? _entry;
+  late final AnimationController _bounceCtrl;
+  late final Animation<double> _bounceScale;
+
+  @override
+  void initState() {
+    super.initState();
+    _bounceCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+    );
+    _bounceScale = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 1.0, end: 1.22)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 30,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 1.22, end: 1.0)
+            .chain(CurveTween(curve: Curves.elasticOut)),
+        weight: 70,
+      ),
+    ]).animate(_bounceCtrl);
+  }
+
+  void _show() {
+    final box = _key.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final pos = box.localToGlobal(Offset.zero);
+    _entry = OverlayEntry(
+      builder: (_) => _EmojiPopup(
+        buttonPos: pos,
+        buttonSize: box.size,
+        emojis: widget.emojis,
+        myReaction: widget.myReaction,
+        t: widget.t,
+        onSelect: (emoji) {
+          _hide();
+          HapticFeedback.selectionClick();
+          widget.onReact(emoji);
+        },
+        onDismiss: _hide,
+      ),
+    );
+    Overlay.of(context).insert(_entry!);
+  }
+
+  void _hide() {
+    _entry?.remove();
+    _entry = null;
+  }
+
+  @override
+  void dispose() {
+    _bounceCtrl.dispose();
+    _hide();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasOtherReaction =
+        widget.myReaction != null && widget.emojis.contains(widget.myReaction);
+    return GestureDetector(
+      key: _key,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        _bounceCtrl.forward(from: 0);
+        _show();
+      },
+      child: ScaleTransition(
+        scale: _bounceScale,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          constraints: const BoxConstraints(minHeight: 34),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: hasOtherReaction ? widget.t.goldSoft : widget.t.surfaceWeak,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: hasOtherReaction
+                  ? widget.t.goldBorderStrong
+                  : widget.t.border,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.add_reaction_outlined,
+                size: 14,
+                color:
+                    hasOtherReaction ? widget.t.goldText : widget.t.textMuted,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                'React',
+                style: TextStyle(
+                  color: hasOtherReaction ? widget.t.goldText : widget.t.text,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Apple-style emoji popup overlay ───────────────────────────────────────────
+
+class _EmojiPopup extends StatefulWidget {
+  final Offset buttonPos;
+  final Size buttonSize;
+  final List<String> emojis;
+  final String? myReaction;
+  final PintTheme t;
+  final void Function(String) onSelect;
+  final VoidCallback onDismiss;
+
+  const _EmojiPopup({
+    required this.buttonPos,
+    required this.buttonSize,
+    required this.emojis,
+    required this.myReaction,
+    required this.t,
+    required this.onSelect,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_EmojiPopup> createState() => _EmojiPopupState();
+}
+
+class _EmojiPopupState extends State<_EmojiPopup>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+  late final Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _scale = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack);
+    _opacity = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const circleSize = 44.0;
+    final n = widget.emojis.length;
+    final popupW = n * circleSize + (n - 1) * 8.0 + 24.0;
+    const popupH = circleSize + 20.0;
+    const gap = 8.0;
+
+    final screenW = MediaQuery.of(context).size.width;
+    double left =
+        widget.buttonPos.dx + widget.buttonSize.width / 2 - popupW / 2;
+    left = left.clamp(12.0, screenW - popupW - 12.0);
+    final top = widget.buttonPos.dy - popupH - gap;
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: widget.onDismiss,
+          ),
+        ),
+        Positioned(
+          left: left,
+          top: top,
+          child: FadeTransition(
+            opacity: _opacity,
+            child: ScaleTransition(
+              scale: _scale,
+              alignment: Alignment.bottomCenter,
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: widget.t.surface,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: widget.t.border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: widget.t.isDark ? 0.45 : 0.15,
+                        ),
+                        blurRadius: 24,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: widget.emojis.asMap().entries.map((entry) {
+                      final emoji = entry.value;
+                      final isActive = widget.myReaction == emoji;
+                      return Padding(
+                        padding: EdgeInsets.only(
+                          right: entry.key < widget.emojis.length - 1 ? 8 : 0,
+                        ),
+                        child: BounceTap(
+                          onTap: () => widget.onSelect(emoji),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 120),
+                            width: circleSize,
+                            height: circleSize,
+                            decoration: BoxDecoration(
+                              color: isActive
+                                  ? widget.t.goldSoft
+                                  : widget.t.surfaceWeak,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isActive
+                                    ? widget.t.goldBorderStrong
+                                    : widget.t.border,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                emoji,
+                                style: const TextStyle(fontSize: 22),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Bounce-tap wrapper ────────────────────────────────────────────────────────
+
+class BounceTap extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+
+  const BounceTap({super.key, required this.child, required this.onTap});
+
+  @override
+  State<BounceTap> createState() => _BounceTapState();
+}
+
+class _BounceTapState extends State<BounceTap>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+    );
+    _scale = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 1.0, end: 1.28)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 30,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 1.28, end: 1.0)
+            .chain(CurveTween(curve: Curves.elasticOut)),
+        weight: 70,
+      ),
+    ]).animate(_ctrl);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        _ctrl.forward(from: 0);
+        widget.onTap();
+      },
+      child: ScaleTransition(scale: _scale, child: widget.child),
     );
   }
 }
