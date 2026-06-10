@@ -137,6 +137,41 @@ app.get("/invite/:token", async (req, res) => {
   }
 });
 
+// GET /reset-password/:token — email link lands here, redirects to deep link
+app.get("/reset-password/:token", (req, res) => {
+  console.log(`[reset-password] GET hit — token: ${req.params.token}`);
+  const token = req.params.token.replace(/[<>"'&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;", "&": "&amp;" })[c]);
+  const deepLink = `zapfen://reset-password/${encodeURIComponent(req.params.token)}`;
+  console.log(`[reset-password] redirecting to deep link: ${deepLink}`);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(`<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Zapfen – Passwort zurücksetzen</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0F0F0F;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+    .card{background:#1A1A1A;border:1px solid #2A2A2A;border-radius:24px;padding:40px 28px;max-width:360px;width:100%;text-align:center}
+    .icon{font-size:48px;margin-bottom:16px}
+    h1{font-size:22px;font-weight:800;letter-spacing:-.4px;margin-bottom:10px}
+    p{color:#888;font-size:14px;line-height:1.55;margin-bottom:28px}
+    a.btn{display:block;background:#F6B733;color:#1A1000;text-decoration:none;border-radius:14px;padding:15px;font-size:16px;font-weight:700;letter-spacing:-.2px}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">🔑</div>
+    <h1>Passwort zurücksetzen</h1>
+    <p>Tippe auf den Button, um die Zapfen-App zu öffnen und ein neues Passwort zu wählen.</p>
+    <a class="btn" href="${deepLink}">In Zapfen öffnen</a>
+  </div>
+  <script>window.location.href="${deepLink}";</script>
+</body>
+</html>`);
+});
+
 app.use("/auth", authRoutes);
 app.use("/posts", postRoutes);
 app.use("/posts", commentPostRoutes);

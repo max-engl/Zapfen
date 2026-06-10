@@ -634,6 +634,15 @@ class _CredentialsStepState extends State<_CredentialsStep> {
     return 'Noch $rem Zeichen.';
   }
 
+  void _showForgotPasswordSheet(BuildContext ctx) {
+    showModalBottomSheet<void>(
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ForgotPasswordSheet(email: _email.trim()),
+    );
+  }
+
   Future<void> _submit() async {
     if (!_valid) return;
     setState(() {
@@ -735,7 +744,7 @@ class _CredentialsStepState extends State<_CredentialsStep> {
                     highlighted: _pwOk,
                     labelRight: widget.signIn
                         ? GestureDetector(
-                            onTap: () {},
+                            onTap: () => _showForgotPasswordSheet(context),
                             child: Text(
                               'Vergessen?',
                               style: TextStyle(
@@ -1322,6 +1331,149 @@ class _AvatarOptionTile extends StatelessWidget {
             Icon(Icons.chevron_right_rounded, size: 18, color: t.textMuted),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─── Forgot password sheet ────────────────────────────────────────────────
+
+class _ForgotPasswordSheet extends StatefulWidget {
+  final String email;
+  const _ForgotPasswordSheet({this.email = ''});
+
+  @override
+  State<_ForgotPasswordSheet> createState() => _ForgotPasswordSheetState();
+}
+
+class _ForgotPasswordSheetState extends State<_ForgotPasswordSheet> {
+  late String _email;
+  bool _loading = false;
+  bool _sent = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _email = widget.email;
+  }
+
+  bool get _emailOk =>
+      RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(_email.trim());
+
+  Future<void> _submit() async {
+    if (!_emailOk) return;
+    setState(() => _loading = true);
+    await context.read<AuthProvider>().requestPasswordReset(_email.trim());
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      _sent = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = PintThemeProvider.of(context);
+    final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 28),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + keyboardHeight),
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: t.border),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: t.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          if (_sent) ...[
+            Center(
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: t.goldSoft,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: t.goldBorder),
+                ),
+                child: Icon(Icons.mail_outline, color: t.goldText, size: 26),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Center(
+              child: Text(
+                'Link unterwegs!',
+                style: TextStyle(
+                  color: t.text,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 20,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                'Falls die Adresse registriert ist, bekommst du gleich eine E-Mail mit einem Zurücksetz-Link.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: t.textMuted, fontSize: 14, height: 1.45),
+              ),
+            ),
+            const SizedBox(height: 24),
+            _PrimaryButton(
+              label: 'Alles klar',
+              onTap: () => Navigator.of(context).pop(),
+            ),
+          ] else ...[
+            Text(
+              'Passwort vergessen?',
+              style: TextStyle(
+                color: t.text,
+                fontWeight: FontWeight.w800,
+                fontSize: 20,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Gib deine E-Mail-Adresse ein und wir schicken dir einen Link zum Zurücksetzen.',
+              style: TextStyle(color: t.textMuted, fontSize: 14, height: 1.45),
+            ),
+            const SizedBox(height: 20),
+            _AuthField(
+              label: 'E-Mail',
+              icon: Icon(Icons.mail_outline, size: 18, color: t.textMuted),
+              value: _email,
+              onChange: (v) => setState(() => _email = v),
+              keyboardType: TextInputType.emailAddress,
+              placeholder: 'you@example.com',
+              highlighted: _emailOk,
+              autoFocus: true,
+            ),
+            const SizedBox(height: 20),
+            _PrimaryButton(
+              label: 'Link senden',
+              trailing: _loading
+                  ? null
+                  : Icon(Icons.arrow_forward, size: 16, color: _emailOk ? t.goldInk : t.textFaint),
+              disabled: !_emailOk,
+              loading: _loading,
+              onTap: _submit,
+            ),
+          ],
+        ],
       ),
     );
   }

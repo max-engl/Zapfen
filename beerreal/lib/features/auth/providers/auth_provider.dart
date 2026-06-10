@@ -102,6 +102,34 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> requestPasswordReset(String email) async {
+    try {
+      await _authService.requestPasswordReset(email);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    _errorMessage = null;
+    try {
+      await _authService.resetPassword(token: token, newPassword: newPassword);
+      return true;
+    } on DioException catch (e) {
+      _errorMessage = _extractError(e);
+      notifyListeners();
+      return false;
+    } catch (_) {
+      _errorMessage = 'Something went wrong. Please try again.';
+      notifyListeners();
+      return false;
+    }
+  }
+
   void updateUser(AppUser user) {
     _user = user;
     notifyListeners();

@@ -50,8 +50,10 @@ class ApiConstants {
   static const String updateMe = '/users/me';
   static const String searchUsers = '/users/search';
 
-  // Auth – password change / account deletion
+  // Auth – password change / account deletion / password reset
   static const String changePassword = '/auth/password';
+  static const String forgotPassword = '/auth/forgot-password';
+  static const String resetPassword = '/auth/reset-password';
   static const String deleteAccount = '/users/me';
 
   // Post reactions

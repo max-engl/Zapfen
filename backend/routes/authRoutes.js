@@ -1,6 +1,8 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+const { Resend } = require("resend");
 
 const User = require("../models/User");
 const DeletionRequest = require("../models/DeletionRequest");
@@ -206,6 +208,144 @@ router.put("/password", authMiddleware, async (req, res) => {
         res.json({ message: "Password updated successfully" });
     } catch (error) {
         res.status(500).json({ message: "Could not update password", error: error.message });
+    }
+});
+
+// POST /auth/forgot-password
+router.post("/forgot-password", async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) return res.status(400).json({ message: "Email required" });
+
+        // Always respond with the same message to prevent email enumeration
+        const user = await User.findOne({ email: email.trim().toLowerCase() });
+        if (!user) {
+            return res.json({ message: "Falls diese E-Mail existiert, wurde ein Link gesendet." });
+        }
+
+        const token = crypto.randomBytes(32).toString("hex");
+        user.passwordResetToken = token;
+        user.passwordResetExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+        await user.save();
+
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        const baseUrl = (process.env.API_BASE_URL || 'https://api.zapfenapp.de').replace(/\/$/, '');
+        const resetUrl = `${baseUrl}/reset-password/${token}`;
+
+        await resend.emails.send({
+            from: "Zapfen <noreply@zapfenapp.de>",
+            to: user.email,
+            subject: "Passwort zurücksetzen",
+            html: `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Passwort zurücksetzen – Zapfen</title>
+</head>
+<body style="margin:0;padding:0;background:#0F0F0F;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0F0F0F;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#1A1A1A;border-radius:24px;border:1px solid #2A2A2A;overflow:hidden;">
+          <!-- Header -->
+          <tr>
+            <td style="padding:36px 36px 0;text-align:center;">
+              <div style="display:inline-block;background:#F6B733;border-radius:18px;width:52px;height:52px;line-height:52px;font-size:28px;text-align:center;">🍺</div>
+            </td>
+          </tr>
+          <!-- Title -->
+          <tr>
+            <td style="padding:20px 36px 0;text-align:center;">
+              <h1 style="margin:0;color:#FFFFFF;font-size:24px;font-weight:800;letter-spacing:-0.6px;line-height:1.15;">Passwort zurücksetzen</h1>
+            </td>
+          </tr>
+          <!-- Body text -->
+          <tr>
+            <td style="padding:12px 36px 0;text-align:center;">
+              <p style="margin:0;color:#888888;font-size:14px;line-height:1.6;">
+                Hey @${user.username},<br>du hast eine Passwort-Zurücksetzung für dein Zapfen-Konto angefragt.
+                Tippe auf den Button, um ein neues Passwort zu wählen.
+              </p>
+            </td>
+          </tr>
+          <!-- CTA Button -->
+          <tr>
+            <td style="padding:28px 36px 0;text-align:center;">
+              <a href="${resetUrl}"
+                 style="display:inline-block;background:#F6B733;color:#1A1000;text-decoration:none;border-radius:14px;padding:15px 36px;font-size:16px;font-weight:700;letter-spacing:-0.2px;">
+                Passwort zurücksetzen
+              </a>
+            </td>
+          </tr>
+          <!-- Expiry note -->
+          <tr>
+            <td style="padding:18px 36px 0;text-align:center;">
+              <p style="margin:0;color:#555555;font-size:12px;">
+                Dieser Link ist <strong style="color:#888888;">1 Stunde</strong> gültig.
+              </p>
+            </td>
+          </tr>
+          <!-- Divider -->
+          <tr>
+            <td style="padding:24px 36px 0;">
+              <div style="height:1px;background:#2A2A2A;"></div>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="padding:20px 36px 32px;text-align:center;">
+              <p style="margin:0;color:#444444;font-size:11px;line-height:1.6;">
+                Falls du keine Zurücksetzung beantragt hast, kannst du diese E-Mail ignorieren –
+                dein Konto ist sicher.<br><br>
+                © Zapfen · <a href="https://zapfenapp.de" style="color:#555555;text-decoration:none;">zapfenapp.de</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        });
+
+        res.json({ message: "Falls diese E-Mail existiert, wurde ein Link gesendet." });
+    } catch (error) {
+        console.error("[forgot-password]", error);
+        res.status(500).json({ message: "Fehler beim Senden der E-Mail." });
+    }
+});
+
+// POST /auth/reset-password
+router.post("/reset-password", async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
+        if (!token || !newPassword) {
+            return res.status(400).json({ message: "Token and new password required" });
+        }
+        if (newPassword.length < 8) {
+            return res.status(400).json({ message: "Password must be at least 8 characters" });
+        }
+
+        const user = await User.findOne({
+            passwordResetToken: token,
+            passwordResetExpiry: { $gt: new Date() },
+        });
+
+        if (!user) {
+            return res.status(400).json({ message: "Ungültiger oder abgelaufener Link." });
+        }
+
+        user.passwordHash = await bcrypt.hash(newPassword, 12);
+        user.passwordResetToken = null;
+        user.passwordResetExpiry = null;
+        await user.save();
+
+        res.json({ message: "Passwort erfolgreich zurückgesetzt." });
+    } catch (error) {
+        console.error("[reset-password]", error);
+        res.status(500).json({ message: "Fehler beim Zurücksetzen des Passworts." });
     }
 });
 

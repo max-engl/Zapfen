@@ -56,6 +56,8 @@ const userSchema = new mongoose.Schema(
       month: { type: String, default: '' },
       lines: { type: Number, default: 0 },
     },
+    passwordResetToken: { type: String, default: null },
+    passwordResetExpiry: { type: Date, default: null },
   },
   { timestamps: true },
 );

@@ -76,6 +76,23 @@ class AuthService {
     }
   }
 
+  Future<void> requestPasswordReset(String email) async {
+    await _client.dio.post(
+      ApiConstants.forgotPassword,
+      data: {'email': email},
+    );
+  }
+
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    await _client.dio.post(
+      ApiConstants.resetPassword,
+      data: {'token': token, 'newPassword': newPassword},
+    );
+  }
+
   Future<void> logout() => _tokenStorage.clear();
 
   static List<String> _parsePatchNotes(dynamic raw) {

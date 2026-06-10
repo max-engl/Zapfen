@@ -209,6 +209,7 @@ class _PintRootState extends State<PintRoot> {
   final _appLinks = AppLinks();
   StreamSubscription<Uri>? _deepLinkSub;
   String? _pendingInviteToken;
+  String? _pendingResetToken;
 
   static const _themePrefKey = 'pint_theme_dark';
   static const _onboardingPrefKey = 'pint_onboarding_done';
@@ -233,16 +234,29 @@ class _PintRootState extends State<PintRoot> {
   }
 
   void _handleDeepLink(Uri uri) {
-    if (uri.scheme != 'zapfen' || uri.host != 'invite') return;
-    final token = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
-    if (token == null || token.isEmpty) return;
+    if (uri.scheme != 'zapfen') return;
 
-    final navCtx = _navigatorKey.currentContext;
-    if (navCtx != null) {
-      _showInviteSheet(navCtx, token);
-    } else {
-      // App not fully ready yet — queue it
-      _pendingInviteToken = token;
+    if (uri.host == 'invite') {
+      final token = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+      if (token == null || token.isEmpty) return;
+      final navCtx = _navigatorKey.currentContext;
+      if (navCtx != null) {
+        _showInviteSheet(navCtx, token);
+      } else {
+        _pendingInviteToken = token;
+      }
+      return;
+    }
+
+    if (uri.host == 'reset-password') {
+      final token = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+      if (token == null || token.isEmpty) return;
+      final navCtx = _navigatorKey.currentContext;
+      if (navCtx != null) {
+        _showResetPasswordSheet(navCtx, token);
+      } else {
+        _pendingResetToken = token;
+      }
     }
   }
 
@@ -251,6 +265,15 @@ class _PintRootState extends State<PintRoot> {
       context: ctx,
       backgroundColor: Colors.transparent,
       builder: (_) => _InviteSheet(token: token),
+    );
+  }
+
+  void _showResetPasswordSheet(BuildContext ctx, String token) {
+    showModalBottomSheet<void>(
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ResetPasswordSheet(token: token),
     );
   }
 
@@ -353,13 +376,21 @@ class _PintRootState extends State<PintRoot> {
         _feedPreloaded &&
         _onboardingChecked;
 
-    // Flush a queued deep link once the navigator is ready
+    // Flush queued deep links once the navigator is ready
     if (showApp && _onboardingDone && _pendingInviteToken != null) {
       final token = _pendingInviteToken!;
       _pendingInviteToken = null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final ctx = _navigatorKey.currentContext;
         if (ctx != null && mounted) _showInviteSheet(ctx, token);
+      });
+    }
+    if (_pendingResetToken != null) {
+      final token = _pendingResetToken!;
+      _pendingResetToken = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = _navigatorKey.currentContext;
+        if (ctx != null && mounted) _showResetPasswordSheet(ctx, token);
       });
     }
 
@@ -863,6 +894,343 @@ class _InviteSheetState extends State<_InviteSheet> {
           ],
         ],
       ),
+    );
+  }
+}
+
+// ── Reset password sheet (opened via zapfen://reset-password/<token>) ─────────
+
+class _ResetPasswordSheet extends StatefulWidget {
+  final String token;
+  const _ResetPasswordSheet({required this.token});
+
+  @override
+  State<_ResetPasswordSheet> createState() => _ResetPasswordSheetState();
+}
+
+class _ResetPasswordSheetState extends State<_ResetPasswordSheet> {
+  String _pw = '';
+  String _pwConfirm = '';
+  bool _showPw = false;
+  bool _loading = false;
+  bool _done = false;
+  String _error = '';
+
+  bool get _pwOk => _pw.length >= 8;
+  bool get _match => _pw == _pwConfirm && _pwConfirm.isNotEmpty;
+  bool get _valid => _pwOk && _match;
+
+  Future<void> _submit() async {
+    if (!_valid) return;
+    setState(() {
+      _loading = true;
+      _error = '';
+    });
+    final ok = await context.read<AuthProvider>().resetPassword(
+      token: widget.token,
+      newPassword: _pw,
+    );
+    if (!mounted) return;
+    if (ok) {
+      setState(() {
+        _loading = false;
+        _done = true;
+      });
+    } else {
+      setState(() {
+        _loading = false;
+        _error = context.read<AuthProvider>().errorMessage ??
+            'Der Link ist ungültig oder abgelaufen.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = PintThemeProvider.of(context);
+    final keyboardHeight = MediaQuery.viewInsetsOf(context).bottom;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 28),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + keyboardHeight),
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: t.border),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: t.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          if (_done) ...[
+            Center(
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: t.goldSoft,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: t.goldBorder),
+                ),
+                child: Icon(Icons.check, color: t.goldText, size: 28),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Center(
+              child: Text(
+                'Passwort geändert!',
+                style: TextStyle(
+                  color: t.text,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 20,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                'Du kannst dich jetzt mit deinem neuen Passwort anmelden.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: t.textMuted, fontSize: 14, height: 1.45),
+              ),
+            ),
+            const SizedBox(height: 24),
+            GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: t.gold,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Center(
+                  child: Text(
+                    'Los geht\'s',
+                    style: TextStyle(
+                      color: t.goldInk,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ] else ...[
+            Text(
+              'Neues Passwort',
+              style: TextStyle(
+                color: t.text,
+                fontWeight: FontWeight.w800,
+                fontSize: 20,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Wähl ein neues Passwort für dein Konto.',
+              style: TextStyle(color: t.textMuted, fontSize: 14, height: 1.45),
+            ),
+            const SizedBox(height: 20),
+            _PasswordField(
+              label: 'Neues Passwort',
+              value: _pw,
+              showPw: _showPw,
+              onToggleShow: () => setState(() => _showPw = !_showPw),
+              onChange: (v) => setState(() {
+                _pw = v;
+                _error = '';
+              }),
+              highlighted: _pwOk,
+              hint: _pw.isEmpty
+                  ? 'Mindestens 8 Zeichen'
+                  : _pwOk
+                      ? 'Stark genug.'
+                      : 'Noch ${8 - _pw.length} Zeichen',
+              hintOk: _pwOk,
+              t: t,
+            ),
+            const SizedBox(height: 14),
+            _PasswordField(
+              label: 'Passwort bestätigen',
+              value: _pwConfirm,
+              showPw: _showPw,
+              onToggleShow: () => setState(() => _showPw = !_showPw),
+              onChange: (v) => setState(() {
+                _pwConfirm = v;
+                _error = '';
+              }),
+              highlighted: _match,
+              hint: _pwConfirm.isEmpty
+                  ? 'Passwort wiederholen'
+                  : _match
+                      ? 'Passwörter stimmen überein.'
+                      : 'Passwörter stimmen nicht überein.',
+              hintOk: _match,
+              t: t,
+            ),
+            if (_error.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Icon(Icons.error_outline, size: 12, color: Color(0xFFC2511E)),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      _error,
+                      style: const TextStyle(
+                        color: Color(0xFFC2511E),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 20),
+            GestureDetector(
+              onTap: (_valid && !_loading) ? _submit : null,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: (_valid && !_loading) ? t.gold : t.surfaceWeak,
+                  borderRadius: BorderRadius.circular(16),
+                  border: (_valid && !_loading) ? null : Border.all(color: t.border),
+                ),
+                child: _loading
+                    ? Center(child: PintDots(color: t.goldInk, dotSize: 5, spacing: 5))
+                    : Center(
+                        child: Text(
+                          'Passwort speichern',
+                          style: TextStyle(
+                            color: (_valid && !_loading) ? t.goldInk : t.textFaint,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PasswordField extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool showPw;
+  final VoidCallback onToggleShow;
+  final ValueChanged<String> onChange;
+  final bool highlighted;
+  final String hint;
+  final bool hintOk;
+  final PintTheme t;
+
+  const _PasswordField({
+    required this.label,
+    required this.value,
+    required this.showPw,
+    required this.onToggleShow,
+    required this.onChange,
+    required this.highlighted,
+    required this.hint,
+    required this.hintOk,
+    required this.t,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 6),
+          child: Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: t.textMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.4,
+            ),
+          ),
+        ),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            color: t.surfaceWeak,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: highlighted ? t.goldBorder : t.border),
+          ),
+          child: Row(
+            children: [
+              const SizedBox(width: 14),
+              Expanded(
+                child: TextField(
+                  onChanged: onChange,
+                  obscureText: !showPw,
+                  style: TextStyle(
+                    color: t.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.16,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: hint,
+                    hintStyle: TextStyle(color: t.textFaint, fontWeight: FontWeight.w400),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 15),
+                    isDense: true,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: onToggleShow,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Icon(
+                    showPw ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                    size: 18,
+                    color: t.textMuted,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 5),
+        Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: Text(
+            hint,
+            style: TextStyle(
+              color: hintOk ? t.goldText : t.textMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
