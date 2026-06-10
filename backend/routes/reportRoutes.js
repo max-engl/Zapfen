@@ -1,5 +1,6 @@
 const express = require("express");
 const archiver = require("archiver");
+const bcrypt = require("bcrypt");
 const Post = require("../models/Post");
 const Report = require("../models/Report");
 const User = require("../models/User");
@@ -329,6 +330,23 @@ adminRouter.delete("/deletion-requests/:id", async (req, res) => {
         res.json({ message: "Anfrage abgelehnt" });
     } catch (error) {
         res.status(500).json({ message: "Fehler", error: error.message });
+    }
+});
+
+// PATCH /admin/users/:userId/password — admin set a user's password directly
+adminRouter.patch("/users/:userId/password", async (req, res) => {
+    try {
+        const { password } = req.body;
+        if (!password || password.length < 6) {
+            return res.status(400).json({ message: "Passwort muss mindestens 6 Zeichen lang sein" });
+        }
+        const user = await User.findById(req.params.userId);
+        if (!user) return res.status(404).json({ message: "Nutzer nicht gefunden" });
+        user.passwordHash = await bcrypt.hash(password, 12);
+        await user.save();
+        res.json({ message: "Passwort aktualisiert" });
+    } catch (error) {
+        res.status(500).json({ message: "Fehler beim Aktualisieren des Passworts", error: error.message });
     }
 });
 

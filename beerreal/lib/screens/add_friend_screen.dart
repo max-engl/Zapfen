@@ -128,11 +128,9 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
 
                       // Recommendations (shown when not searching)
                       if (_query.length < 2) ...[
-                        if (fp.recommendationsLoading || fp.recommendations.isNotEmpty) ...[
-                          _SectionLabel(
-                            label: 'Vielleicht kennst du',
-                            t: t,
-                          ),
+                        if (fp.recommendationsLoading ||
+                            fp.recommendations.isNotEmpty) ...[
+                          _SectionLabel(label: 'Vielleicht kennst du', t: t),
                           if (fp.recommendationsLoading)
                             Column(
                               children: List.generate(
@@ -181,8 +179,9 @@ class _AddFriendScreenState extends State<AddFriendScreen> {
                                         width: 90,
                                         height: 32,
                                         child: ShimmerBox(
-                                          borderRadius:
-                                              BorderRadius.circular(999),
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -740,10 +739,7 @@ class _RecommendationRow extends StatelessWidget {
                   rec.mutualCount == 1
                       ? '1 gemeinsamer Freund'
                       : '${rec.mutualCount} gemeinsame Freunde',
-                  style: TextStyle(
-                    color: t.textMuted,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: t.textMuted, fontSize: 12),
                 ),
               ],
             ),
@@ -794,18 +790,24 @@ class _AddButtonState extends State<_AddButton>
     );
     _scale = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween(begin: 1.0, end: 0.82)
-            .chain(CurveTween(curve: Curves.easeIn)),
+        tween: Tween(
+          begin: 1.0,
+          end: 0.82,
+        ).chain(CurveTween(curve: Curves.easeIn)),
         weight: 15,
       ),
       TweenSequenceItem(
-        tween: Tween(begin: 0.82, end: 1.18)
-            .chain(CurveTween(curve: Curves.easeOut)),
+        tween: Tween(
+          begin: 0.82,
+          end: 1.18,
+        ).chain(CurveTween(curve: Curves.easeOut)),
         weight: 30,
       ),
       TweenSequenceItem(
-        tween: Tween(begin: 1.18, end: 1.0)
-            .chain(CurveTween(curve: Curves.elasticOut)),
+        tween: Tween(
+          begin: 1.18,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.elasticOut)),
         weight: 55,
       ),
     ]).animate(_ctrl);

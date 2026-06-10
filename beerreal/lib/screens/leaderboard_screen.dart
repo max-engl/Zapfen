@@ -821,7 +821,7 @@ class _MoveDelta extends StatelessWidget {
     final up = move > 0;
     final col = up ? const Color(0xFF22c55e) : const Color(0xFFc2511e);
     return SizedBox(
-      width: 22,
+      width: 34,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [

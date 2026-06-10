@@ -251,6 +251,20 @@
   </div>
 </div>
 
+<!-- Password change modal -->
+<div id="pw-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:900;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px 28px 24px;width:340px;max-width:calc(100vw - 32px)">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">Passwort ändern</div>
+    <div id="pw-modal-user" style="font-size:13px;color:var(--muted);margin-bottom:20px"></div>
+    <div class="field"><label>Neues Passwort</label><input type="password" id="pw-new" placeholder="Mindestens 6 Zeichen" /></div>
+    <div style="display:flex;gap:8px;margin-top:20px">
+      <button class="action-btn" style="flex:1" onclick="closePwModal()">Abbrechen</button>
+      <button class="action-btn success" style="flex:1" id="pw-save-btn" onclick="savePassword()">Speichern</button>
+    </div>
+    <div id="pw-error" style="color:var(--red);font-size:12px;margin-top:10px;min-height:16px"></div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <div id="lightbox" onclick="closeLightbox()">
@@ -431,6 +445,7 @@
         <td style="color:var(--muted)">${fmtDate(u.createdAt)}</td>
         <td style="display:flex;gap:6px;align-items:center">
           ${u.postCount > 0 ? `<button class="action-btn" onclick="exportPhotos('${u._id}','${esc(u.username)}',this)" title="Fotos als ZIP herunterladen">⬇ ZIP</button>` : ''}
+          <button class="action-btn" onclick="openPwModal('${u._id}','${esc(u.username)}')">🔑 Passwort</button>
           ${u.role !== 'admin' ? `<button class="action-btn danger" onclick="deleteUser('${u._id}','${esc(u.username)}')">🗑 Löschen</button>` : '<span style="color:var(--faint);font-size:12px">–</span>'}
         </td>
       </tr>
@@ -635,6 +650,53 @@
     const d = new Date(iso);
     return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
   }
+
+  // ── Change user password ──────────────────────────────────────────────────
+
+  let _pwUserId = null;
+
+  function openPwModal(userId, username) {
+    _pwUserId = userId;
+    document.getElementById('pw-modal-user').textContent = `@${username}`;
+    document.getElementById('pw-new').value = '';
+    document.getElementById('pw-error').textContent = '';
+    document.getElementById('pw-save-btn').disabled = false;
+    document.getElementById('pw-modal').style.display = 'flex';
+    setTimeout(() => document.getElementById('pw-new').focus(), 50);
+  }
+
+  function closePwModal() {
+    document.getElementById('pw-modal').style.display = 'none';
+    _pwUserId = null;
+  }
+
+  async function savePassword() {
+    const password = document.getElementById('pw-new').value;
+    const errEl = document.getElementById('pw-error');
+    const btn = document.getElementById('pw-save-btn');
+    errEl.textContent = '';
+    if (!password || password.length < 6) {
+      errEl.textContent = 'Mindestens 6 Zeichen erforderlich.';
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = '…';
+    try {
+      await api(`/admin/users/${_pwUserId}/password`, { method: 'PATCH', body: { password } });
+      showToast('Passwort gespeichert');
+      closePwModal();
+    } catch (e) {
+      errEl.textContent = e.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Speichern';
+    }
+  }
+
+  // Close modal on backdrop click
+  document.getElementById('pw-modal').addEventListener('click', function(e) {
+    if (e.target === this) closePwModal();
+  });
 
   // ── Delete user from users tab ────────────────────────────────────────────
 

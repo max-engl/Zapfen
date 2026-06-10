@@ -9,7 +9,7 @@ const { generateAvatarColor, getAvatarInitial } = require("../utils/avatarUtil")
 
 const router = express.Router();
 
-const MIN_CLIENT_VERSION = '1.2';
+const MIN_CLIENT_VERSION = '1.1';
 
 const PATCH_NOTES = [
     'Bug fixes und co.',

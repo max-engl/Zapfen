@@ -576,7 +576,9 @@ class _Actions extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _QuickReactions(post: post, onReact: onReact, t: t),
+        Flexible(
+          child: _QuickReactions(post: post, onReact: onReact, t: t),
+        ),
         const SizedBox(width: 10),
         GestureDetector(
           onTap: onTap,
@@ -692,9 +694,11 @@ class _QuickReactions extends StatelessWidget {
         );
     }
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
         CheersButton(
           count: cheersCount,
           isSelected: post.myReaction == '🍺',
@@ -745,6 +749,7 @@ class _QuickReactions extends StatelessWidget {
           ),
         ],
       ],
+      ),
     );
   }
 }
