@@ -188,9 +188,7 @@ app.use("/reports", reportRouter);
 app.use("/recap", recapRouter);
 app.use("/bingo", bingoRouter);
 app.use("/blocks", blockRoutes);
-app.get("/admin", (req, res) => {
-  res.sendFile(path.join(__dirname, "admin.html"));
-});
+app.use("/admin", express.static(path.join(__dirname, "admin-panel/dist")));
 app.use("/admin", adminRouter);
 
 const PORT = process.env.PORT || 3000;
@@ -258,6 +256,48 @@ async function migrateInviteTokenIndex() {
       partialFilterExpression: { inviteToken: { $type: "string" } },
     },
   );
+}
+
+async function compressExistingAvatars() {
+  if (!process.env.R2_AVATAR_BUCKET || !process.env.R2_AVATAR_PUBLIC_BASE_URL) return;
+
+  const User = require("./models/User");
+  const sharp = require("sharp");
+  const { GetObjectCommand, PutObjectCommand } = require("@aws-sdk/client-s3");
+  const r2 = require("./config/r2");
+
+  const publicBase = process.env.R2_AVATAR_PUBLIC_BASE_URL.replace(/\/$/, "");
+  const users = await User.find({ avatarUrl: { $ne: null }, avatarCompressed: { $ne: true } }).select("_id avatarUrl");
+
+  if (users.length === 0) return;
+  console.log(`Avatar compression: processing ${users.length} uncompressed avatar(s)...`);
+
+  let ok = 0;
+  let failed = 0;
+  for (const user of users) {
+    if (!user.avatarUrl.startsWith(publicBase + "/")) {
+      await User.findByIdAndUpdate(user._id, { avatarCompressed: true });
+      continue;
+    }
+    const key = user.avatarUrl.slice(publicBase.length + 1);
+    try {
+      const getRes = await r2.send(new GetObjectCommand({ Bucket: process.env.R2_AVATAR_BUCKET, Key: key }));
+      const chunks = [];
+      for await (const chunk of getRes.Body) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      const original = Buffer.concat(chunks);
+      const compressed = await sharp(original)
+        .resize(512, 512, { fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 85, progressive: true })
+        .toBuffer();
+      await r2.send(new PutObjectCommand({ Bucket: process.env.R2_AVATAR_BUCKET, Key: key, Body: compressed, ContentType: "image/jpeg" }));
+      await User.findByIdAndUpdate(user._id, { avatarCompressed: true });
+      ok++;
+    } catch (err) {
+      console.warn(`Avatar compression failed for user ${user._id}: ${err.message}`);
+      failed++;
+    }
+  }
+  console.log(`Avatar compression: done (${ok} compressed, ${failed} failed)`);
 }
 
 async function migrateAvatarUrlsToR2() {
@@ -351,6 +391,7 @@ async function startServer() {
     await syncDefaultDrinks();
     await migrateAvatarFields();
     await migrateAvatarUrlsToR2();
+    await compressExistingAvatars();
     await migrateInviteTokenIndex();
     await syncAdminUser();
     scheduleNightRecap();

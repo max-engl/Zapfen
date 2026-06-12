@@ -64,6 +64,7 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
     super.initState();
     _post = widget.post;
     _recordView();
+    _refreshReactions();
   }
 
   Future<void> _recordView() async {
@@ -71,6 +72,24 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
       final postService = context.read<PostService>();
       final views = await postService.recordView(_post.id);
       if (mounted) setState(() => _post = _post.copyWith(views: views));
+    } catch (_) {}
+  }
+
+  // Silently fetch fresh reaction data so stale cache never shows wrong state.
+  Future<void> _refreshReactions() async {
+    try {
+      final postService = context.read<PostService>();
+      final fresh = await postService.getPostById(_post.id);
+      if (mounted) {
+        setState(() => _post = _post.copyWith(
+          myReaction: fresh.myReaction,
+          clearMyReaction: fresh.myReaction == null,
+          reactions: fresh.reactions,
+          totalReactions: fresh.totalReactions,
+          likes: fresh.likes,
+          likedByMe: fresh.likedByMe,
+        ));
+      }
     } catch (_) {}
   }
 
@@ -554,7 +573,7 @@ class _PostAppBar extends StatelessWidget implements PreferredSizeWidget {
                   ),
                 ),
                 Text(
-                  '@${post.username} · ${post.timeAgo}',
+                  post.formattedDateTime,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: t.textMuted, fontSize: 11),
                 ),

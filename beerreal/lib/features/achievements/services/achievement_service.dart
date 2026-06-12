@@ -23,6 +23,18 @@ class AchievementService {
         .toList();
   }
 
+  Future<List<FriendAchievementStanding>> fetchFriendStandings(
+    String achievementId,
+  ) async {
+    final res = await _apiClient.dio.get(
+      ApiConstants.achievementFriendStandings(achievementId),
+    );
+    final list = res.data['standings'] as List<dynamic>;
+    return list
+        .map((e) => FriendAchievementStanding.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<AchievementLocationTarget>> fetchLocationTargets() async {
     final res = await _apiClient.dio.get(
       ApiConstants.achievementLocationTargets,

@@ -17,6 +17,7 @@ class FeedProvider extends ChangeNotifier {
   bool _loadingMore = false;
   bool _hasMore = true;
   bool _loadMoreFailed = false;
+  bool _isOffline = false;
   int _page = 0;
   String? _error;
 
@@ -27,6 +28,7 @@ class FeedProvider extends ChangeNotifier {
   bool get loadingMore => _loadingMore;
   bool get hasMore => _hasMore;
   bool get loadMoreFailed => _loadMoreFailed;
+  bool get isOffline => _isOffline;
   String? get error => _error;
   bool isLiked(String postId) =>
       _posts.any((p) => p.id == postId && p.likedByMe);
@@ -73,31 +75,27 @@ class FeedProvider extends ChangeNotifier {
       }
     }
 
-    bool dirty = false;
     try {
       final result = await _postService.getFeed(page: 1, limit: _pageSize);
       final freshIds = result.posts.map((p) => p.id).join(',');
       final currentIds = _posts.map((p) => p.id).join(',');
-      dirty = freshIds != currentIds || result.hasMore != _hasMore;
+      final idsChanged = freshIds != currentIds;
 
-      if (dirty) {
-        _posts = result.posts;
-        _feedDb.savePosts(_posts);
-        _prefetchImages(_posts);
-      }
+      // Always replace posts so reactions/likes are never stale from the cache.
+      _posts = result.posts;
       _hasMore = result.hasMore;
       _page = 1;
+      _isOffline = false;
+      _feedDb.savePosts(_posts);
+      if (idsChanged) _prefetchImages(_posts);
     } on DioException catch (e) {
       _error = _extractError(e);
-      dirty = true;
+      _isOffline = e.response == null; // no response = network unreachable
     } catch (e) {
       _error = 'Could not load feed.';
-      dirty = true;
     } finally {
-      if (_loading || dirty) {
-        _loading = false;
-        notifyListeners();
-      }
+      _loading = false;
+      notifyListeners();
     }
   }
 

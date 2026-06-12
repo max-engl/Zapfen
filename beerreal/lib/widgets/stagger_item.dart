@@ -9,10 +9,10 @@ class StaggerItem extends StatelessWidget {
 
   const StaggerItem({super.key, required this.index, required this.child});
 
-  static const _animMs = 380;
-  static const _staggerMs = 75;
-  static const _maxStagger = 7;
-  static const _totalMs = _animMs + _staggerMs * _maxStagger; // 905ms
+  static const _animMs = 180;
+  static const _staggerMs = 45;
+  static const _maxStagger = 5;
+  static const _totalMs = _animMs + _staggerMs * _maxStagger; // 405ms
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +26,7 @@ class StaggerItem extends StatelessWidget {
       builder: (_, value, child) => Opacity(
         opacity: value,
         child: Transform.translate(
-          offset: Offset(-20 * (1 - value), -20 * (1 - value)),
+          offset: Offset(-10 * (1 - value), -10 * (1 - value)),
           child: child,
         ),
       ),

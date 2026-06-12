@@ -107,7 +107,7 @@ class _Header extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        post.timeAgo,
+                        post.formattedDateTime,
                         style: TextStyle(color: t.textMuted, fontSize: 12),
                       ),
                       if (post.lat != null && post.lng != null)
@@ -574,41 +574,11 @@ class _Actions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Flexible(
-          child: _QuickReactions(post: post, onReact: onReact, t: t),
-        ),
-        const SizedBox(width: 10),
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: t.surfaceWeak,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: t.border),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.chat_bubble_outline, size: 14, color: t.text),
-                const SizedBox(width: 6),
-                Text(
-                  '${post.comments}',
-                  style: TextStyle(
-                    color: t.text,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const Spacer(),
-        Text(post.timeAgo, style: TextStyle(color: t.textFaint, fontSize: 11)),
-      ],
+    return _QuickReactions(
+      post: post,
+      onReact: onReact,
+      onTap: onTap,
+      t: t,
     );
   }
 }
@@ -616,12 +586,14 @@ class _Actions extends StatelessWidget {
 class _QuickReactions extends StatelessWidget {
   final FeedPost post;
   final void Function(String emoji) onReact;
+  final VoidCallback? onTap;
   final PintTheme t;
 
   const _QuickReactions({
     required this.post,
     required this.onReact,
     required this.t,
+    this.onTap,
   });
 
   void _showReactors(BuildContext context) {
@@ -748,6 +720,34 @@ class _QuickReactions extends StatelessWidget {
             ),
           ),
         ],
+        const SizedBox(width: 6),
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 34),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: t.surfaceWeak,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: t.border),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.chat_bubble_outline, size: 14, color: t.text),
+                const SizedBox(width: 6),
+                Text(
+                  '${post.comments}',
+                  style: TextStyle(
+                    color: t.text,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
       ),
     );

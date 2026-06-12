@@ -25,8 +25,10 @@ class AuthService {
     );
     final token = response.data['token'] as String;
     await _tokenStorage.saveAccessToken(token);
+    final user = AppUser.fromJson(response.data['user'] as Map<String, dynamic>);
+    await _tokenStorage.saveUser(user.toJson());
     return (
-      user: AppUser.fromJson(response.data['user'] as Map<String, dynamic>),
+      user: user,
       updateRequired: response.data['updateRequired'] as bool? ?? false,
       patchNotes: _parsePatchNotes(response.data['patchNotes']),
     );
@@ -48,8 +50,10 @@ class AuthService {
     );
     final token = response.data['token'] as String;
     await _tokenStorage.saveAccessToken(token);
+    final user = AppUser.fromJson(response.data['user'] as Map<String, dynamic>);
+    await _tokenStorage.saveUser(user.toJson());
     return (
-      user: AppUser.fromJson(response.data['user'] as Map<String, dynamic>),
+      user: user,
       updateRequired: response.data['updateRequired'] as bool? ?? false,
       patchNotes: _parsePatchNotes(response.data['patchNotes']),
     );
@@ -63,14 +67,28 @@ class AuthService {
         ApiConstants.me,
         queryParameters: {'v': kAppVersion},
       );
+      final user = AppUser.fromJson(response.data['user'] as Map<String, dynamic>);
+      await _tokenStorage.saveUser(user.toJson());
       return (
-        user: AppUser.fromJson(response.data['user'] as Map<String, dynamic>),
+        user: user,
         updateRequired: response.data['updateRequired'] as bool? ?? false,
         patchNotes: _parsePatchNotes(response.data['patchNotes']),
       );
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
+        // Token rejected by server — clear everything and force login.
         await _tokenStorage.clear();
+        return (user: null, updateRequired: false, patchNotes: <String>[]);
+      }
+      // Network error (server offline, timeout, etc.) — use cached user so the
+      // app can run in offline mode with the last-known identity.
+      final cached = await _tokenStorage.loadUser();
+      if (cached != null) {
+        return (
+          user: AppUser.fromJson(cached),
+          updateRequired: false,
+          patchNotes: <String>[],
+        );
       }
       return (user: null, updateRequired: false, patchNotes: <String>[]);
     }

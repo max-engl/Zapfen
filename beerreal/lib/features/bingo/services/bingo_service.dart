@@ -17,6 +17,13 @@ class BingoCell {
 
   bool get isFree => id == 'free';
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'label': label,
+        'emoji': emoji,
+        'done': done,
+      };
+
   factory BingoCell.fromJson(Map<String, dynamic> j) => BingoCell(
     id: (j['id'] as String?) ?? '',
     label: (j['label'] as String?) ?? '',
@@ -39,6 +46,14 @@ class BingoCard {
     required this.monthLabel,
     required this.totalDone,
   });
+
+  Map<String, dynamic> toJson() => {
+        'card': cells.map((c) => c.toJson()).toList(),
+        'completedLines': completedLines,
+        'isBlackout': isBlackout,
+        'monthLabel': monthLabel,
+        'totalDone': totalDone,
+      };
 
   factory BingoCard.fromJson(Map<String, dynamic> j) => BingoCard(
     cells: (j['card'] as List<dynamic>? ?? [])

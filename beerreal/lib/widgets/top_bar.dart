@@ -8,6 +8,7 @@ class PintTopBar extends StatelessWidget {
   final VoidCallback onLeaderboard;
   final VoidCallback onStats;
   final int unreadNotifications;
+  final bool isOffline;
 
   const PintTopBar({
     super.key,
@@ -16,6 +17,7 @@ class PintTopBar extends StatelessWidget {
     required this.onLeaderboard,
     required this.onStats,
     this.unreadNotifications = 0,
+    this.isOffline = false,
   });
 
   @override
@@ -51,6 +53,33 @@ class PintTopBar extends StatelessWidget {
               ],
             ),
           ),
+          if (isOffline) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: t.surfaceWeak,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: t.border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.wifi_off_rounded, size: 10, color: t.textMuted),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Offline',
+                    style: TextStyle(
+                      color: t.textMuted,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const Spacer(),
           // Leaderboard
           _IconBtn(

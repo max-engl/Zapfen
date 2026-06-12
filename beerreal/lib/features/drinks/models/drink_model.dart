@@ -13,6 +13,14 @@ class DrinkModel {
     required this.isCustom,
   });
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'emoji': emoji,
+        'isDefault': isDefault,
+        'isCustom': isCustom,
+      };
+
   factory DrinkModel.fromJson(Map<String, dynamic> j, {bool isCustom = false}) {
     return DrinkModel(
       id: j['_id']?.toString() ?? j['id']?.toString() ?? '',

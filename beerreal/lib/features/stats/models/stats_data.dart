@@ -3,6 +3,8 @@ class StatsTimelinePoint {
   final int count;
   const StatsTimelinePoint({required this.label, required this.count});
 
+  Map<String, dynamic> toJson() => {'label': label, 'count': count};
+
   factory StatsTimelinePoint.fromJson(Map<String, dynamic> json) =>
       StatsTimelinePoint(
         label: json['label'] as String,
@@ -14,6 +16,8 @@ class StatsStyleEntry {
   final String name;
   final int pct;
   const StatsStyleEntry({required this.name, required this.pct});
+
+  Map<String, dynamic> toJson() => {'name': name, 'pct': pct};
 
   factory StatsStyleEntry.fromJson(Map<String, dynamic> json) => StatsStyleEntry(
         name: json['name'] as String,
@@ -41,6 +45,17 @@ class StatsData {
     required this.styles,
     required this.userCount,
   });
+
+  Map<String, dynamic> toJson() => {
+        'total': total,
+        'deltaPct': deltaPct,
+        'timeline': timeline.map((e) => e.toJson()).toList(),
+        'dow': dow,
+        'peakHour': peakHour,
+        'avgPerHead': avgPerHead,
+        'styles': styles.map((e) => e.toJson()).toList(),
+        'userCount': userCount,
+      };
 
   factory StatsData.fromJson(Map<String, dynamic> json) => StatsData(
         total: (json['total'] as num).toInt(),

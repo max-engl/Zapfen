@@ -1,6 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/cupertino.dart'
-    show CupertinoSliverRefreshControl, RefreshIndicatorMode;
+import 'package:flutter/cupertino.dart' show CupertinoSliverRefreshControl;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../core/app_cache_manager.dart';
@@ -11,8 +10,8 @@ import '../features/posts/models/feed_post.dart';
 import '../features/posts/providers/feed_provider.dart';
 import '../widgets/pint_loading.dart';
 import '../widgets/post_card.dart';
+import '../widgets/pint_refresh_logo.dart';
 import '../widgets/shimmer_box.dart';
-import '../widgets/stagger_item.dart';
 import 'friend_profile_screen.dart';
 import 'post_detail_screen.dart';
 import 'profile_screen.dart';
@@ -26,7 +25,7 @@ class FeedScreen extends StatefulWidget {
   State<FeedScreen> createState() => _FeedScreenState();
 }
 
-class _FeedScreenState extends State<FeedScreen> {
+class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
   final _scrollController = ScrollController();
   FeedProvider? _feedProvider;
   final _precachedIds = <String>{};
@@ -34,6 +33,7 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _feedProvider = context.read<FeedProvider>()..addListener(_onFeedUpdated);
@@ -43,10 +43,18 @@ class _FeedScreenState extends State<FeedScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _feedProvider?.removeListener(_onFeedUpdated);
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _feedProvider?.loadFeed();
+    }
   }
 
   void _onFeedUpdated() {
@@ -214,7 +222,7 @@ class _FeedScreenState extends State<FeedScreen> {
         CupertinoSliverRefreshControl(
           onRefresh: () => feed.loadFeed(),
           builder: (_, state, pulledExtent, triggerDistance, __) =>
-              _RefreshLogo(
+              PintRefreshLogo(
                 state: state,
                 pulledExtent: pulledExtent,
                 triggerDistance: triggerDistance,
@@ -292,10 +300,8 @@ class _FeedScreenState extends State<FeedScreen> {
               }
 
               final p = feed.posts[postIndex];
-              return StaggerItem(
+              return PostCard(
                 key: ValueKey(p.id),
-                index: postIndex,
-                child: PostCard(
                   post: p,
                   enableHero: false,
                   onReact: (emoji) => feed.toggleReaction(p.id, emoji),
@@ -327,79 +333,11 @@ class _FeedScreenState extends State<FeedScreen> {
                             ),
                           ),
                         ),
-                ),
               );
             }, childCount: feed.posts.length + 2),
           ),
         ),
       ],
-    );
-  }
-}
-
-class _RefreshLogo extends StatefulWidget {
-  final RefreshIndicatorMode state;
-  final double pulledExtent;
-  final double triggerDistance;
-
-  const _RefreshLogo({
-    required this.state,
-    required this.pulledExtent,
-    required this.triggerDistance,
-  });
-
-  @override
-  State<_RefreshLogo> createState() => _RefreshLogoState();
-}
-
-class _RefreshLogoState extends State<_RefreshLogo>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _spin = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 700),
-  );
-
-  bool get _isRefreshing =>
-      widget.state == RefreshIndicatorMode.refresh ||
-      widget.state == RefreshIndicatorMode.armed;
-
-  @override
-  void didUpdateWidget(_RefreshLogo old) {
-    super.didUpdateWidget(old);
-    if (_isRefreshing && !_spin.isAnimating) {
-      _spin.repeat();
-    } else if (!_isRefreshing && _spin.isAnimating) {
-      _spin.stop();
-    }
-  }
-
-  @override
-  void dispose() {
-    _spin.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = (widget.pulledExtent / widget.triggerDistance).clamp(
-      0.0,
-      1.0,
-    );
-    return Center(
-      child: Opacity(
-        opacity: progress,
-        child: RotationTransition(
-          turns: _isRefreshing ? _spin : AlwaysStoppedAnimation(progress * 0.5),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Image.asset(
-              'assets/icons/app_icon.png',
-              width: 36,
-              height: 36,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

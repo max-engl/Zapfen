@@ -1,7 +1,9 @@
 import 'dart:math' as math;
+import 'package:flutter/cupertino.dart' show CupertinoSliverRefreshControl;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme.dart';
+import '../widgets/pint_refresh_logo.dart';
 import '../widgets/shimmer_box.dart';
 import '../features/stats/models/stats_data.dart';
 import '../features/stats/providers/stats_provider.dart';
@@ -72,44 +74,57 @@ class _StatsScreenState extends State<StatsScreen> {
                           message: provider.error!,
                           onRetry: () => provider.refresh(_scope, _range),
                         )
-                      : RefreshIndicator(
-                          color: t.gold,
-                          onRefresh: () => provider.refresh(_scope, _range),
-                          child: SingleChildScrollView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.only(bottom: 48),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _ScopeToggle(scope: _scope, onChanged: _setScope),
-                                _RangeChips(range: _range, onChanged: _setRange),
-                                if (data != null) ...[
-                                  _HeroKPI(data: data, range: _range),
-                                  _StatCard(
-                                    title: 'Getränke über die Zeit',
-                                    hint: _range == 'week'
-                                        ? 'nach Tag'
-                                        : _range == 'month'
-                                            ? 'nach Woche'
-                                            : 'nach Monat',
-                                    child: _TimelineChart(data: data, t: t),
-                                  ),
-                                  _StatTiles(data: data, scope: _scope),
-                                  _StatCard(
-                                    title: 'Wann wird gezapft',
-                                    hint: 'nach Wochentag',
-                                    child: _DowChart(dow: data.dow, t: t),
-                                  ),
-                                  _StatCard(
-                                    title: 'Top Sorten',
-                                    hint: _scope == 'friends' ? 'dein Kreis' : 'weltweit',
-                                    child: _StylesChart(styles: data.styles, t: t),
-                                  ),
-                                  _Footer(data: data, scope: _scope),
-                                ],
-                              ],
-                            ),
+                      : CustomScrollView(
+                          physics: const BouncingScrollPhysics(
+                            parent: AlwaysScrollableScrollPhysics(),
                           ),
+                          slivers: [
+                            CupertinoSliverRefreshControl(
+                              onRefresh: () => provider.refresh(_scope, _range),
+                              builder: (_, state, pulledExtent, triggerDistance, __) =>
+                                  PintRefreshLogo(
+                                    state: state,
+                                    pulledExtent: pulledExtent,
+                                    triggerDistance: triggerDistance,
+                                  ),
+                            ),
+                            SliverPadding(
+                              padding: const EdgeInsets.only(bottom: 48),
+                              sliver: SliverToBoxAdapter(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    _ScopeToggle(scope: _scope, onChanged: _setScope),
+                                    _RangeChips(range: _range, onChanged: _setRange),
+                                    if (data != null) ...[
+                                      _HeroKPI(data: data, range: _range),
+                                      _StatCard(
+                                        title: 'Getränke über die Zeit',
+                                        hint: _range == 'week'
+                                            ? 'nach Tag'
+                                            : _range == 'month'
+                                                ? 'nach Woche'
+                                                : 'nach Monat',
+                                        child: _TimelineChart(data: data, t: t),
+                                      ),
+                                      _StatTiles(data: data, scope: _scope),
+                                      _StatCard(
+                                        title: 'Wann wird gezapft',
+                                        hint: 'nach Wochentag',
+                                        child: _DowChart(dow: data.dow, t: t),
+                                      ),
+                                      _StatCard(
+                                        title: 'Top Sorten',
+                                        hint: _scope == 'friends' ? 'dein Kreis' : 'weltweit',
+                                        child: _StylesChart(styles: data.styles, t: t),
+                                      ),
+                                      _Footer(data: data, scope: _scope),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
             ),
           ],

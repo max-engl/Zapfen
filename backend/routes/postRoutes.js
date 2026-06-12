@@ -18,6 +18,7 @@ const { getFriendIds } = require("../utils/friends");
 const Block = require("../models/Block");
 const User = require("../models/User");
 const { buildBingoCardForUser } = require("../utils/bingo");
+const { getTzOffset, localDayStart } = require("../utils/localTime");
 
 const router = express.Router();
 const ALLOWED_REACTIONS = new Set(["🍺", "🔥", "😍", "💀", "😂"]);
@@ -259,8 +260,7 @@ router.post(
                 });
 
                 // If 4+ friends have posted today, nudge the ones who haven't yet
-                const todayStart = new Date();
-                todayStart.setUTCHours(0, 0, 0, 0);
+                const todayStart = localDayStart(new Date(), getTzOffset(req));
 
                 const friendsWhoPostedToday = await Post.find({
                     user: { $in: friendIds },

@@ -18,7 +18,7 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _ctrl = PageController();
   int _page = 0;
-  static const _total = 5;
+  static const _total = 6;
 
   void _next() {
     if (_page < _total - 1) {
@@ -44,8 +44,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final t = PintThemeProvider.of(context);
     return Scaffold(
       backgroundColor: t.bg,
-      body: SafeArea(
-        child: Column(
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
@@ -99,10 +101,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     illustration: _LeaderboardIllustration(active: _page == 3),
                     headline: 'Bleib\nan der Spitze.',
                     body:
-                        'Halte deinen Streak. Kletter die Rangliste hoch. Der Bierkönig deines Kreises bist du.',
+                        'Wer zapft am meisten – diese Woche, diesen Monat, insgesamt? Messe dich mit Freunden oder der ganzen Welt.',
                   ),
                   _OPage(
-                    illustration: _FindFriendsIllustration(active: _page == 4),
+                    illustration: _StatsIllustration(active: _page == 4),
+                    headline: 'Alle\nZahlen im Blick.',
+                    body:
+                        'Sieh genau, was du trinkst, wie oft und wann – nach Woche, Monat oder insgesamt.',
+                  ),
+                  _OPage(
+                    illustration: _FindFriendsIllustration(active: _page == 5),
                     headline: 'Hol dir\ndeinen Kreis.',
                     body:
                         'Die App macht erst richtig Spaß mit Freunden. Füge jetzt jemanden hinzu.',
@@ -117,7 +125,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               onSkipFriends: _skipFriends,
             ),
           ],
-        ),
+            ),
+          ),
+          _HintOverlay(page: _page),
+        ],
       ),
     );
   }
@@ -1158,7 +1169,285 @@ class _LeaderboardRow extends StatelessWidget {
   }
 }
 
-// ─── Illustration 5: Find friends ────────────────────────────────────────
+// ─── Illustration 5: Stats ───────────────────────────────────────────────
+
+class _StatsIllustration extends StatefulWidget {
+  final bool active;
+  const _StatsIllustration({required this.active});
+
+  @override
+  State<_StatsIllustration> createState() => _StatsIllustrationState();
+}
+
+class _StatsIllustrationState extends State<_StatsIllustration>
+    with TickerProviderStateMixin {
+  late final List<AnimationController> _barCtrls;
+  late final AnimationController _summaryCtrl;
+  late final List<Animation<double>> _barAnims;
+  late final Animation<Offset> _summarySlide;
+  late final Animation<double> _summaryOpacity;
+
+  static const _values = [0.35, 0.6, 0.5, 1.0, 0.75, 0.85, 0.45];
+  static const _days = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+
+  @override
+  void initState() {
+    super.initState();
+    _barCtrls = List.generate(
+      _values.length,
+      (_) => AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 420),
+      ),
+    );
+    _summaryCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 380),
+    );
+    _barAnims = List.generate(_values.length, (i) {
+      return Tween<double>(begin: 0.0, end: _values[i]).animate(
+        CurvedAnimation(parent: _barCtrls[i], curve: Curves.easeOutCubic),
+      );
+    });
+    _summarySlide = Tween<Offset>(
+      begin: const Offset(0, 0.4),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(parent: _summaryCtrl, curve: Curves.easeOutCubic),
+    );
+    _summaryOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _summaryCtrl, curve: const Interval(0.0, 0.6)),
+    );
+
+    if (widget.active) _play();
+  }
+
+  @override
+  void didUpdateWidget(covariant _StatsIllustration old) {
+    super.didUpdateWidget(old);
+    if (widget.active && !old.active) _play();
+  }
+
+  Future<void> _play() async {
+    for (int i = 0; i < _barCtrls.length; i++) {
+      if (!mounted) return;
+      _barCtrls[i].forward(from: 0);
+      await Future.delayed(const Duration(milliseconds: 65));
+    }
+    if (!mounted) return;
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (!mounted) return;
+    _summaryCtrl.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    for (final c in _barCtrls) {
+      c.dispose();
+    }
+    _summaryCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = PintThemeProvider.of(context);
+    const maxBarH = 130.0;
+    const barW = 30.0;
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          decoration: BoxDecoration(
+            color: t.surface,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: t.border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: t.isDark ? 0.25 : 0.06),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Text(
+                    'Diese Woche',
+                    style: TextStyle(
+                      color: t.text,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.1,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: t.goldSoft,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: t.goldBorder),
+                    ),
+                    child: Text(
+                      'Freunde',
+                      style: TextStyle(
+                        color: t.goldText,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: maxBarH + 22,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    for (int i = 0; i < _values.length; i++)
+                      _StatsBar(
+                        anim: _barAnims[i],
+                        label: _days[i],
+                        maxHeight: maxBarH,
+                        width: barW,
+                        highlight: i == 3,
+                        t: t,
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        SlideTransition(
+          position: _summarySlide,
+          child: FadeTransition(
+            opacity: _summaryOpacity,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _StatsPill(t: t, value: '5 🍺', label: 'Diese Woche'),
+                const SizedBox(width: 8),
+                _StatsPill(t: t, value: '🔥 4', label: 'Streak'),
+                const SizedBox(width: 8),
+                _StatsPill(t: t, value: '47 🍺', label: 'Gesamt'),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatsBar extends StatelessWidget {
+  final Animation<double> anim;
+  final String label;
+  final double maxHeight;
+  final double width;
+  final bool highlight;
+  final PintTheme t;
+
+  const _StatsBar({
+    required this.anim,
+    required this.label,
+    required this.maxHeight,
+    required this.width,
+    required this.highlight,
+    required this.t,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: anim,
+      builder: (_, __) => Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Container(
+            width: width,
+            height: maxHeight * anim.value,
+            decoration: BoxDecoration(
+              color: highlight ? t.gold : t.goldFaint,
+              borderRadius: BorderRadius.circular(7),
+              border: Border.all(
+                color: highlight ? t.goldBorderStrong : t.goldBorder,
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: highlight ? t.goldText : t.textFaint,
+              fontSize: 10,
+              fontWeight: highlight ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatsPill extends StatelessWidget {
+  final PintTheme t;
+  final String value;
+  final String label;
+
+  const _StatsPill({
+    required this.t,
+    required this.value,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: t.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: t.border),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              color: t.text,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              color: t.textMuted,
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Illustration 6: Find friends ────────────────────────────────────────
 
 class _FindFriendsIllustration extends StatefulWidget {
   final bool active;
@@ -1382,6 +1671,266 @@ class _FriendSuggestionRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─── UI hint overlay ──────────────────────────────────────────────────────
+
+class _HintOverlay extends StatefulWidget {
+  final int page;
+  const _HintOverlay({required this.page});
+
+  @override
+  State<_HintOverlay> createState() => _HintOverlayState();
+}
+
+class _HintOverlayState extends State<_HintOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = PintThemeProvider.of(context);
+    final mq = MediaQuery.of(context);
+    final sw = mq.size.width;
+    final padTop = mq.padding.top;
+    final padBottom = mq.padding.bottom;
+
+    Widget child;
+    switch (widget.page) {
+      case 1: // Capture → centre bottom-nav tab
+        child = _BottomTabHint(
+          key: const ValueKey(1),
+          pulse: _pulse, t: t,
+          icon: Icons.camera_alt_outlined, label: 'Zapfen',
+          left: sw * 2 / 5, tabWidth: sw / 5, bottom: padBottom,
+        );
+      case 2: // Feed → first bottom-nav tab
+        child = _BottomTabHint(
+          key: const ValueKey(2),
+          pulse: _pulse, t: t,
+          icon: Icons.grid_view, label: 'Feed',
+          left: 0, tabWidth: sw / 5, bottom: padBottom,
+        );
+      case 3: // Leaderboard → top-bar trophy button (3rd from right: bell+theme+stats+lb = right:150)
+        child = _TopBtnHint(
+          key: const ValueKey(3),
+          pulse: _pulse, t: t,
+          icon: Icons.emoji_events_rounded, iconColor: t.goldText,
+          right: 150, top: padTop + 8,
+        );
+      case 4: // Stats → top-bar bar-chart button (2nd from right after bell+theme = right:106)
+        child = _TopBtnHint(
+          key: const ValueKey(4),
+          pulse: _pulse, t: t,
+          icon: Icons.bar_chart_rounded, iconColor: t.text,
+          right: 106, top: padTop + 8,
+        );
+      case 5: // Friends → 4th bottom-nav tab
+        child = _BottomTabHint(
+          key: const ValueKey(5),
+          pulse: _pulse, t: t,
+          icon: Icons.people, label: 'Freunde',
+          left: sw * 3 / 5, tabWidth: sw / 5, bottom: padBottom,
+        );
+      default:
+        child = const SizedBox.shrink(key: ValueKey(-1));
+    }
+
+    return IgnorePointer(
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        child: child,
+      ),
+    );
+  }
+}
+
+// ─── Top-bar button hint ──────────────────────────────────────────────────
+
+class _TopBtnHint extends StatelessWidget {
+  final AnimationController pulse;
+  final PintTheme t;
+  final IconData icon;
+  final Color iconColor;
+  final double right;
+  final double top;
+
+  const _TopBtnHint({
+    super.key,
+    required this.pulse,
+    required this.t,
+    required this.icon,
+    required this.iconColor,
+    required this.right,
+    required this.top,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // Pulse ring (centred on button: ring 48×48, button 36×36 → offset by -6)
+        Positioned(
+          right: right - 6,
+          top: top - 6,
+          child: AnimatedBuilder(
+            animation: pulse,
+            builder: (_, __) => Opacity(
+              opacity: (1 - pulse.value).clamp(0.0, 1.0),
+              child: Transform.scale(
+                scale: 1.0 + 0.55 * pulse.value,
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: t.gold, width: 2),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        // Button replica
+        Positioned(
+          right: right,
+          top: top,
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: t.surfaceWeak,
+              border: Border.all(color: t.border),
+              boxShadow: [
+                BoxShadow(
+                  color: t.gold.withValues(alpha: 0.4),
+                  blurRadius: 14,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: Icon(icon, size: 18, color: iconColor),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Bottom-nav tab hint ──────────────────────────────────────────────────
+
+class _BottomTabHint extends StatelessWidget {
+  final AnimationController pulse;
+  final PintTheme t;
+  final IconData icon;
+  final String label;
+  final double left;
+  final double tabWidth;
+  final double bottom;
+
+  const _BottomTabHint({
+    super.key,
+    required this.pulse,
+    required this.t,
+    required this.icon,
+    required this.label,
+    required this.left,
+    required this.tabWidth,
+    required this.bottom,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Icon centre inside the 56px tab:
+    // Column centred → content ~44px → top offset ~6px → icon at 6 + 5(pad) + 11(half icon) = 22px from top
+    // From bottom: 56 - 22 = 34px
+    const tabH = 56.0;
+    const ringSize = 48.0;
+    final ringLeft = left + tabWidth / 2 - ringSize / 2;
+
+    return Stack(
+      children: [
+        // Tab replica
+        Positioned(
+          left: left,
+          bottom: bottom,
+          width: tabWidth,
+          height: tabH,
+          child: Container(
+            decoration: BoxDecoration(
+              color: t.bg,
+              border: Border(top: BorderSide(color: t.border)),
+              boxShadow: [
+                BoxShadow(
+                  color: t.gold.withValues(alpha: 0.25),
+                  blurRadius: 16,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: t.goldSoft,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Icon(icon, size: 22, color: t.goldText),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: t.goldText,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Pulse ring centred on the icon
+        Positioned(
+          left: ringLeft,
+          bottom: bottom + tabH - 34 - ringSize / 2,
+          child: AnimatedBuilder(
+            animation: pulse,
+            builder: (_, __) => Opacity(
+              opacity: (1 - pulse.value).clamp(0.0, 1.0),
+              child: Transform.scale(
+                scale: 1.0 + 0.55 * pulse.value,
+                child: Container(
+                  width: ringSize,
+                  height: ringSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: t.gold, width: 2),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

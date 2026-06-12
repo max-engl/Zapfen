@@ -3,18 +3,17 @@ const Post = require('../models/Post');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/authMiddleware');
 const { getFriendIds } = require('../utils/friends');
+const { getTzOffset, localDayOf, localHour, localDow } = require('../utils/localTime');
 
 const router = express.Router();
 
 const DAY_NAMES = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
-function utcDay(date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-}
+function buildTimeline(posts, range, offsetMinutes) {
+  const now = new Date();
+  const today = localDayOf(now, offsetMinutes);
 
-function buildTimeline(posts, range, now) {
   if (range === 'week') {
-    const today = utcDay(now);
     const counts = Array(7).fill(0);
     const labels = [];
     const slotTimes = [];
@@ -27,7 +26,7 @@ function buildTimeline(posts, range, now) {
     }
 
     for (const post of posts) {
-      const postDay = utcDay(post.createdAt).getTime();
+      const postDay = localDayOf(post.createdAt, offsetMinutes).getTime();
       const idx = slotTimes.indexOf(postDay);
       if (idx >= 0) counts[idx]++;
     }
@@ -36,27 +35,28 @@ function buildTimeline(posts, range, now) {
   }
 
   if (range === 'month') {
-    const today = utcDay(now);
     const counts = Array(4).fill(0);
     for (const post of posts) {
-      const daysAgo = Math.round((today - utcDay(post.createdAt)) / 86400000);
+      const daysAgo = Math.round((today - localDayOf(post.createdAt, offsetMinutes)) / 86400000);
       const weekIdx = Math.min(Math.floor(daysAgo / 7), 3);
       counts[3 - weekIdx]++;
     }
     return ['W1', 'W2', 'W3', 'W4'].map((label, i) => ({ label, count: counts[i] }));
   }
 
-  // year — last 12 calendar months
+  // year — last 12 calendar months (local)
+  const localNow = new Date(now.getTime() + offsetMinutes * 60 * 1000);
   const counts = Array(12).fill(0);
   const labels = [];
   for (let i = 11; i >= 0; i--) {
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const d = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth() - i, 1));
     labels.push(['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'][d.getUTCMonth()]);
   }
   for (const post of posts) {
+    const localPost = new Date(post.createdAt.getTime() + offsetMinutes * 60 * 1000);
     const monthDiff =
-      (now.getUTCFullYear() - post.createdAt.getUTCFullYear()) * 12 +
-      (now.getUTCMonth() - post.createdAt.getUTCMonth());
+      (localNow.getUTCFullYear() - localPost.getUTCFullYear()) * 12 +
+      (localNow.getUTCMonth() - localPost.getUTCMonth());
     const idx = 11 - monthDiff;
     if (idx >= 0 && idx < 12) counts[idx]++;
   }
@@ -69,17 +69,18 @@ router.get('/', authMiddleware, async (req, res) => {
     const userId = req.user._id;
     const scope = req.query.scope === 'global' ? 'global' : 'friends';
     const range = ['week', 'month', 'year'].includes(req.query.range) ? req.query.range : 'week';
+    const offsetMinutes = getTzOffset(req);
 
     const now = new Date();
+    const localNow = new Date(now.getTime() + offsetMinutes * 60 * 1000);
     let periodDays;
     if (range === 'week')       periodDays = 7;
     else if (range === 'month') periodDays = 30;
     else                        periodDays = 365;
 
-    // Start from midnight (UTC) of the first day of the period so we
-    // don't miss posts created before the current time of day.
-    const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - periodDays));
-    const prevStart   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - periodDays * 2));
+    // Start from local midnight of the first day of the period.
+    const periodStart = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate() - periodDays) - offsetMinutes * 60 * 1000);
+    const prevStart   = new Date(Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate() - periodDays * 2) - offsetMinutes * 60 * 1000);
 
     let userFilter = {};
     let totalUsers;
@@ -104,20 +105,20 @@ router.get('/', authMiddleware, async (req, res) => {
       ? (total > 0 ? 100 : 0)
       : Math.round(((total - prevCount) / prevCount) * 100);
 
-    const timeline = buildTimeline(currentPosts, range, now);
+    const timeline = buildTimeline(currentPosts, range, offsetMinutes);
 
-    // Day-of-week (Mon=0 … Sun=6)
+    // Day-of-week (Mon=0 … Sun=6) in the user's local timezone
     const dow = Array(7).fill(0);
     for (const post of currentPosts) {
-      dow[(post.createdAt.getDay() + 6) % 7]++;
+      dow[(localDow(post.createdAt, offsetMinutes) + 6) % 7]++;
     }
 
-    // Peak hour + day
+    // Peak hour + day in the user's local timezone
     const hourCounts = Array(24).fill(0);
     const hourDayCounts = Array.from({ length: 24 }, () => Array(7).fill(0));
     for (const post of currentPosts) {
-      const h = post.createdAt.getHours();
-      const d = post.createdAt.getDay();
+      const h = localHour(post.createdAt, offsetMinutes);
+      const d = localDow(post.createdAt, offsetMinutes);
       hourCounts[h]++;
       hourDayCounts[h][d]++;
     }

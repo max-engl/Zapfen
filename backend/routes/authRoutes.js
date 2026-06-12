@@ -11,10 +11,12 @@ const { generateAvatarColor, getAvatarInitial } = require("../utils/avatarUtil")
 
 const router = express.Router();
 
-const MIN_CLIENT_VERSION = '1.1';
+const MIN_CLIENT_VERSION = '1.3';
 
 const PATCH_NOTES = [
     'Bug fixes und co.',
+    'Passwort zurücksetzen jetzt möglich.',
+    'Progress Liste an Freunden pro Achievement'
 ];
 
 function parseVersion(v) {

@@ -1,10 +1,23 @@
 services:
+  backend:
+    build: ./backend
+    container_name: zapfen_backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./backend/.env
+    environment:
+      MONGO_URI: mongodb://admin:password123@social_mongodb:27017/social_app?authSource=admin
+    depends_on:
+      - mongodb
+
   websiteserver:
     image: node:22-alpine
     container_name: pint_websiteserver
     restart: unless-stopped
     working_dir: /app/websiteserver
-    command: ["node", "server.js"]
+    command: [ "node", "server.js" ]
     ports:
       - "4000:4000"
     volumes:
@@ -14,8 +27,6 @@ services:
     image: mongo:7
     container_name: social_mongodb
     restart: unless-stopped
-    ports:
-      - "27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: password123

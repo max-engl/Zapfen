@@ -225,6 +225,23 @@ class FeedPost {
     }
     return '${diff.inDays}d';
   }
+
+  static const _monthNames = [
+    'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez',
+  ];
+
+  String get formattedDateTime {
+    final h = createdAt.hour.toString().padLeft(2, '0');
+    final m = createdAt.minute.toString().padLeft(2, '0');
+    final mon = _monthNames[createdAt.month - 1];
+    final now = DateTime.now();
+    final isThisYear = createdAt.year == now.year;
+    final datePart = isThisYear
+        ? '${createdAt.day}. $mon'
+        : '${createdAt.day}. $mon ${createdAt.year}';
+    return '$h:$m · $datePart';
+  }
 }
 
 /// Builds an 84-cell heatmap grid (col-major, 12 weeks × 7 days) from a list

@@ -1,4 +1,3 @@
-import 'dart:io' show Platform;
 import 'package:camera/camera.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show compute;
@@ -293,10 +292,7 @@ class _CaptureScreenState extends State<CaptureScreen>
         try {
           final selfieFile = await frontCtrl.takePicture();
           final raw = await selfieFile.readAsBytes();
-          // Android front cameras capture mirrored pixels; flip to correct.
-          selfieBytes = Platform.isAndroid
-              ? await compute(_flipJpegHorizontal, raw)
-              : raw;
+          selfieBytes = await compute(_flipJpegHorizontal, raw);
         } catch (_) {}
       }
 
@@ -372,6 +368,25 @@ class _CaptureScreenState extends State<CaptureScreen>
         });
       }
     }
+  }
+
+  Future<void> _retake() async {
+    final oldRear = _rearCtrl;
+    final oldFront = _frontCtrl;
+    setState(() {
+      _stage = _Stage.initializing;
+      _initError = null;
+      _imageBytes = null;
+      _selfieBytes = null;
+      _photosSwapped = false;
+      _selfieCountdown = null;
+      _rearCtrl = null;
+      _frontCtrl = null;
+      _flashMode = FlashMode.off;
+    });
+    try { await oldFront?.dispose(); } catch (_) {}
+    try { await oldRear?.dispose(); } catch (_) {}
+    await _initCameras();
   }
 
   Future<void> _toggleFlash() async {
@@ -655,12 +670,7 @@ class _CaptureScreenState extends State<CaptureScreen>
               Expanded(
                 child: _ActionBtn(
                   t: t,
-                  onTap: () => setState(() {
-                    _stage = _Stage.aim;
-                    _imageBytes = null;
-                    _selfieBytes = null;
-                    _photosSwapped = false;
-                  }),
+                  onTap: _retake,
                   label: 'Nochmal',
                   leadIcon: Icons.refresh_rounded,
                   primary: false,

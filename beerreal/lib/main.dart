@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'core/notification_service.dart';
 import 'core/friend_database.dart';
+import 'core/json_cache.dart';
 import 'theme.dart';
 import 'core/api/api_client.dart';
 import 'core/storage/token_storage.dart';
@@ -127,9 +128,10 @@ Future<void> _main() async {
   final notificationApiService = NotificationApiService(apiClient);
   final achievementService = AchievementService(apiClient);
 
-  // Initialize post cache manager
+  // Initialize post cache manager and shared JSON cache
   final prefs = await SharedPreferences.getInstance();
   final postCacheManager = PostCacheManager(prefs);
+  final jsonCache = JsonCache(prefs);
 
   runApp(
     MultiProvider(
@@ -160,22 +162,23 @@ Future<void> _main() async {
         ),
         Provider<DrinkService>.value(value: drinkService),
         ChangeNotifierProvider<DrinkProvider>(
-          create: (_) => DrinkProvider(drinkService),
+          create: (_) => DrinkProvider(drinkService, jsonCache),
         ),
         ChangeNotifierProvider<LeaderboardProvider>(
-          create: (_) => LeaderboardProvider(leaderboardService),
+          create: (_) => LeaderboardProvider(leaderboardService, jsonCache),
         ),
         ChangeNotifierProvider<StatsProvider>(
-          create: (_) => StatsProvider(statsService),
+          create: (_) => StatsProvider(statsService, jsonCache),
         ),
         ChangeNotifierProvider<NotificationProvider>(
-          create: (_) => NotificationProvider(notificationApiService),
+          create: (_) =>
+              NotificationProvider(notificationApiService, jsonCache),
         ),
         ChangeNotifierProvider<AchievementProvider>(
-          create: (_) => AchievementProvider(achievementService),
+          create: (_) => AchievementProvider(achievementService, jsonCache),
         ),
         ChangeNotifierProvider<BingoProvider>(
-          create: (_) => BingoProvider(bingoService),
+          create: (_) => BingoProvider(bingoService, jsonCache),
         ),
         ChangeNotifierProvider<BlockProvider>(
           create: (_) => BlockProvider(blockService),
@@ -552,6 +555,7 @@ class _PintAppState extends State<PintApp> {
                   unreadNotifications: context
                       .watch<NotificationProvider>()
                       .unreadCount,
+                  isOffline: context.watch<FeedProvider>().isOffline,
                   onBell: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -939,7 +943,8 @@ class _ResetPasswordSheetState extends State<_ResetPasswordSheet> {
     } else {
       setState(() {
         _loading = false;
-        _error = context.read<AuthProvider>().errorMessage ??
+        _error =
+            context.read<AuthProvider>().errorMessage ??
             'Der Link ist ungültig oder abgelaufen.';
       });
     }
@@ -1002,7 +1007,11 @@ class _ResetPasswordSheetState extends State<_ResetPasswordSheet> {
               child: Text(
                 'Du kannst dich jetzt mit deinem neuen Passwort anmelden.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: t.textMuted, fontSize: 14, height: 1.45),
+                style: TextStyle(
+                  color: t.textMuted,
+                  fontSize: 14,
+                  height: 1.45,
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -1057,8 +1066,8 @@ class _ResetPasswordSheetState extends State<_ResetPasswordSheet> {
               hint: _pw.isEmpty
                   ? 'Mindestens 8 Zeichen'
                   : _pwOk
-                      ? 'Stark genug.'
-                      : 'Noch ${8 - _pw.length} Zeichen',
+                  ? 'Stark genug.'
+                  : 'Noch ${8 - _pw.length} Zeichen',
               hintOk: _pwOk,
               t: t,
             ),
@@ -1076,8 +1085,8 @@ class _ResetPasswordSheetState extends State<_ResetPasswordSheet> {
               hint: _pwConfirm.isEmpty
                   ? 'Passwort wiederholen'
                   : _match
-                      ? 'Passwörter stimmen überein.'
-                      : 'Passwörter stimmen nicht überein.',
+                  ? 'Passwörter stimmen überein.'
+                  : 'Passwörter stimmen nicht überein.',
               hintOk: _match,
               t: t,
             ),
@@ -1085,7 +1094,11 @@ class _ResetPasswordSheetState extends State<_ResetPasswordSheet> {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  const Icon(Icons.error_outline, size: 12, color: Color(0xFFC2511E)),
+                  const Icon(
+                    Icons.error_outline,
+                    size: 12,
+                    color: Color(0xFFC2511E),
+                  ),
                   const SizedBox(width: 5),
                   Expanded(
                     child: Text(
@@ -1109,15 +1122,25 @@ class _ResetPasswordSheetState extends State<_ResetPasswordSheet> {
                 decoration: BoxDecoration(
                   color: (_valid && !_loading) ? t.gold : t.surfaceWeak,
                   borderRadius: BorderRadius.circular(16),
-                  border: (_valid && !_loading) ? null : Border.all(color: t.border),
+                  border: (_valid && !_loading)
+                      ? null
+                      : Border.all(color: t.border),
                 ),
                 child: _loading
-                    ? Center(child: PintDots(color: t.goldInk, dotSize: 5, spacing: 5))
+                    ? Center(
+                        child: PintDots(
+                          color: t.goldInk,
+                          dotSize: 5,
+                          spacing: 5,
+                        ),
+                      )
                     : Center(
                         child: Text(
                           'Passwort speichern',
                           style: TextStyle(
-                            color: (_valid && !_loading) ? t.goldInk : t.textFaint,
+                            color: (_valid && !_loading)
+                                ? t.goldInk
+                                : t.textFaint,
                             fontWeight: FontWeight.w800,
                             fontSize: 16,
                             letterSpacing: -0.2,
@@ -1195,7 +1218,10 @@ class _PasswordField extends StatelessWidget {
                   ),
                   decoration: InputDecoration(
                     hintText: hint,
-                    hintStyle: TextStyle(color: t.textFaint, fontWeight: FontWeight.w400),
+                    hintStyle: TextStyle(
+                      color: t.textFaint,
+                      fontWeight: FontWeight.w400,
+                    ),
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
@@ -1209,7 +1235,9 @@ class _PasswordField extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Icon(
-                    showPw ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                    showPw
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
                     size: 18,
                     color: t.textMuted,
                   ),
@@ -1370,7 +1398,7 @@ class _UpdateSheet extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6),
                   child: Text(
-                    'Eine neue Version von Zapfen ist bereit. Aktualisiere jetzt, um deinen Streak zu sichern.',
+                    'Eine neue Version von Zapfen ist bereit. Aktualisiere jetzt in Testflight (IOS) oder PlayStore, um deine Streak zu sichern.',
                     style: TextStyle(
                       color: t.textMuted,
                       fontSize: 13.5,
@@ -1458,7 +1486,7 @@ class _UpdateSheet extends StatelessWidget {
                 const SizedBox(height: 6),
                 // Footnote
                 Text(
-                  '18 MB · dauert ein paar Sekunden',
+                  'dauert nicht lang',
                   style: TextStyle(
                     color: t.textFaint,
                     fontSize: 11,

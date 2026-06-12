@@ -90,6 +90,10 @@ class ApiConstants {
   // Recap
   static const String nightRecap = '/recap/night';
 
+  // Achievement friend standings
+  static String achievementFriendStandings(String achievementId) =>
+      '/achievements/$achievementId/friends';
+
   // Bingo
   static const String bingoCard = '/bingo/card';
   static String bingoCardForUser(String userId) => '/bingo/user/$userId';

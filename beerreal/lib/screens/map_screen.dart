@@ -213,8 +213,11 @@ class _MapScreenState extends State<MapScreen> {
                 ),
                 heatMapOptions: HeatMapOptions(
                   gradient: {
-                    0.4: Colors.amber,
-                    0.65: Colors.orange,
+                    0.0: Colors.green,
+                    0.4: Colors.lightGreen,
+                    0.6: Colors.yellow,
+                    0.78: Colors.orange,
+                    0.92: Colors.red,
                     1.0: Colors.deepOrange,
                   },
                   layerOpacity: 0.85,
@@ -261,8 +264,12 @@ class _MapScreenState extends State<MapScreen> {
                       final isSelected = _selected?.id == post.id;
                       return Marker(
                         point: ll.LatLng(post.lat!, post.lng!),
-                        width: (isRecent && isSelected) ? 110 : (isRecent ? 22 : 18),
-                        height: (isRecent && isSelected) ? 44 : (isRecent ? 22 : 18),
+                        width: (isRecent && isSelected)
+                            ? 110
+                            : (isRecent ? 22 : 18),
+                        height: (isRecent && isSelected)
+                            ? 44
+                            : (isRecent ? 22 : 18),
                         alignment: (isRecent && isSelected)
                             ? Alignment.bottomCenter
                             : Alignment.center,
