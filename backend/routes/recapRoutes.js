@@ -3,7 +3,7 @@ const cron = require("node-cron");
 const Post = require("../models/Post");
 const User = require("../models/User");
 const authMiddleware = require("../middleware/authMiddleware");
-const { getTzOffset } = require("../utils/localTime");
+const { getBerlinOffsetMinutes } = require("../utils/localTime");
 const admin = require("../config/firebase");
 
 const router = express.Router();
@@ -70,7 +70,7 @@ async function buildRecap(userId, sessionStart, sessionEnd) {
 // GET /recap/night — last-night recap for the authenticated user
 router.get("/night", authMiddleware, async (req, res) => {
   try {
-    const { sessionStart, sessionEnd } = getNightWindow(new Date(), getTzOffset(req));
+    const { sessionStart, sessionEnd } = getNightWindow(new Date(), getBerlinOffsetMinutes());
     const recap = await buildRecap(req.user._id, sessionStart, sessionEnd);
     if (!recap) return res.json({ hasRecap: false });
     res.json({ hasRecap: true, ...recap });
@@ -85,7 +85,7 @@ router.get("/night", authMiddleware, async (req, res) => {
 // Called by the daily 9 AM cron job in server.js.
 async function sendNightRecapNotifications() {
   const now = new Date();
-  const { sessionStart, sessionEnd } = getNightWindow(now);
+  const { sessionStart, sessionEnd } = getNightWindow(now, getBerlinOffsetMinutes(now));
 
   const activeUserIds = await Post.distinct("user", {
     createdAt: { $gte: sessionStart, $lt: sessionEnd },

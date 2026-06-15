@@ -6,7 +6,7 @@ const PostReaction = require("../models/PostReaction");
 const User = require("../models/User");
 const authMiddleware = require("../middleware/authMiddleware");
 const { getFriendIds } = require("../utils/friends");
-const { getTzOffset, localDayKey, localHour, localDow } = require("../utils/localTime");
+const { getBerlinOffsetMinutes, localDayKey, localHour, localDow } = require("../utils/localTime");
 
 const router = express.Router();
 
@@ -468,7 +468,7 @@ function degreesToRadians(degrees) {
 router.get("/location-targets", authMiddleware, async (req, res) => {
     try {
         res.set("Cache-Control", "no-store");
-        const offsetMinutes = getTzOffset(req);
+        const offsetMinutes = getBerlinOffsetMinutes();
         const posts = await Post.find({ user: req.user._id })
             .select("createdAt location stats")
             .sort({ createdAt: -1 })
@@ -505,7 +505,7 @@ router.get("/location-targets", authMiddleware, async (req, res) => {
 router.get("/me", authMiddleware, async (req, res) => {
     try {
         res.set("Cache-Control", "no-store");
-        const offsetMinutes = getTzOffset(req);
+        const offsetMinutes = getBerlinOffsetMinutes();
         const posts = await Post.find({ user: req.user._id })
             .select("createdAt location stats")
             .sort({ createdAt: -1 })
@@ -592,7 +592,7 @@ function buildStatusLabel(achievement, earnedDate, offsetMinutes = 0) {
 router.get("/user/:userId", authMiddleware, async (req, res) => {
     try {
         res.set("Cache-Control", "no-store");
-        const offsetMinutes = getTzOffset(req);
+        const offsetMinutes = getBerlinOffsetMinutes();
         const targetId = req.params.userId;
 
         const posts = await Post.find({ user: targetId })
@@ -653,7 +653,7 @@ router.get("/:achievementId/friends", authMiddleware, async (req, res) => {
                 .sort({ createdAt: -1 })
                 .lean();
 
-            const progress = await def.getProgress(posts);
+            const progress = await def.getProgress(posts, getBerlinOffsetMinutes());
             const isSelf = user._id.toString() === req.user._id.toString();
             const goal = progress.goal ?? 1;
             const have = progress.have ?? (progress.earned ? goal : 0);

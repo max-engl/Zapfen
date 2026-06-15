@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/app_cache_manager.dart';
+import '../../../core/feed_database.dart';
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
 
@@ -139,6 +141,14 @@ class AuthProvider extends ChangeNotifier {
     await _authService.logout();
     await AppCacheManager.instance.emptyCache();
     PaintingBinding.instance.imageCache.clear();
+    await FeedDatabase.instance.clear();
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys().where(
+      (k) => k.startsWith('pint_') && k != 'pint_theme_dark' && k != 'pint_onboarding_done',
+    ).toList();
+    for (final key in keys) {
+      await prefs.remove(key);
+    }
     _user = null;
     _updateRequired = false;
     _patchNotes = [];

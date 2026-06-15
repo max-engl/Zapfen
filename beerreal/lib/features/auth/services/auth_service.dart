@@ -111,7 +111,14 @@ class AuthService {
     );
   }
 
-  Future<void> logout() => _tokenStorage.clear();
+  Future<void> logout() async {
+    try {
+      await _client.dio.post(ApiConstants.logout);
+    } catch (_) {
+      // Best-effort — if the request fails (offline, 401) we still clear locally.
+    }
+    await _tokenStorage.clear();
+  }
 
   static List<String> _parsePatchNotes(dynamic raw) {
     if (raw is! List) return [];

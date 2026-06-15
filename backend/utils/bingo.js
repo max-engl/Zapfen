@@ -1,4 +1,34 @@
 const Post = require('../models/Post');
+const { getBerlinOffsetMinutes, localHour, localDow, localDayKey } = require('./localTime');
+
+// Returns the Berlin local date as a Date whose UTC fields hold the local year/month/day.
+function berlinDateOf(date) {
+  const d = new Date(date);
+  const offset = getBerlinOffsetMinutes(d);
+  const local = new Date(d.getTime() + offset * 60 * 1000);
+  return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()));
+}
+
+function berlinHour(date) {
+  const d = new Date(date);
+  return localHour(d, getBerlinOffsetMinutes(d));
+}
+
+function berlinDow(date) {
+  const d = new Date(date);
+  return localDow(d, getBerlinOffsetMinutes(d));
+}
+
+function berlinDayKeyOf(date) {
+  const d = new Date(date);
+  return localDayKey(d, getBerlinOffsetMinutes(d));
+}
+
+// Returns the UTC timestamp for midnight on the first of year/month in Europe/Berlin.
+function berlinMonthStart(year, month) {
+  const approx = new Date(Date.UTC(year, month - 1, 1));
+  return new Date(approx.getTime() - getBerlinOffsetMinutes(approx) * 60 * 1000);
+}
 
 const BINGO_POOL = [
   { id: 'friday', label: 'An einem Freitag', emoji: '🎉' },
@@ -75,47 +105,48 @@ function distanceMeters(a, b) {
 function checkCompletion(cellId, posts) {
   switch (cellId) {
     case 'after_2am':
-      return posts.some(p => { const h = new Date(p.createdAt).getHours(); return h >= 2 && h < 6; });
+      return posts.some(p => { const h = berlinHour(p.createdAt); return h >= 2 && h < 6; });
     case 'before_4pm':
-      return posts.some(p => new Date(p.createdAt).getHours() < 16);
+      return posts.some(p => berlinHour(p.createdAt) < 16);
     case 'three_types':
       return new Set(posts.map(p => p.drink?.name).filter(Boolean)).size >= 3;
     case 'monday':
-      return posts.some(p => new Date(p.createdAt).getDay() === 1);
+      return posts.some(p => berlinDow(p.createdAt) === 1);
     case 'friday':
-      return posts.some(p => new Date(p.createdAt).getDay() === 5);
+      return posts.some(p => berlinDow(p.createdAt) === 5);
     case 'saturday':
-      return posts.some(p => new Date(p.createdAt).getDay() === 6);
+      return posts.some(p => berlinDow(p.createdAt) === 6);
     case 'sunday':
-      return posts.some(p => new Date(p.createdAt).getDay() === 0);
+      return posts.some(p => berlinDow(p.createdAt) === 0);
     case 'five_in_week': {
       const weekMap = {};
       posts.forEach(p => {
-        const d = new Date(p.createdAt);
-        const yr = d.getFullYear();
-        const wk = Math.floor((d - new Date(yr, 0, 1)) / 604800000);
+        const bd = berlinDateOf(p.createdAt);
+        const yr = bd.getUTCFullYear();
+        const startOfYear = new Date(Date.UTC(yr, 0, 1));
+        const wk = Math.floor((bd - startOfYear) / 604800000);
         weekMap[`${yr}-${wk}`] = (weekMap[`${yr}-${wk}`] || 0) + 1;
       });
       return Object.values(weekMap).some(v => v >= 5);
     }
     case 'after_10pm':
-      return posts.some(p => new Date(p.createdAt).getHours() >= 22);
+      return posts.some(p => berlinHour(p.createdAt) >= 22);
     case 'with_location':
       return posts.some(hasCoordinates);
     case 'with_caption':
       return posts.some(p => p.caption && p.caption.trim().length > 0);
     case 'three_same_day': {
       const dayMap = {};
-      posts.forEach(p => { const k = new Date(p.createdAt).toDateString(); dayMap[k] = (dayMap[k] || 0) + 1; });
+      posts.forEach(p => { const k = berlinDayKeyOf(p.createdAt); dayMap[k] = (dayMap[k] || 0) + 1; });
       return Object.values(dayMap).some(v => v >= 3);
     }
     case 'five_stars':
       return posts.some(p => p.rating === 5);
     case 'mittagsbier':
-      return posts.some(p => { const h = new Date(p.createdAt).getHours(); return h >= 12 && h < 14; });
+      return posts.some(p => { const h = berlinHour(p.createdAt); return h >= 12 && h < 14; });
     case 'streak_5': {
-      const daySet = new Set(posts.map(p => new Date(p.createdAt).toDateString()));
-      const days = [...daySet].map(d => new Date(d)).sort((a, b) => a - b);
+      const daySet = new Set(posts.map(p => berlinDayKeyOf(p.createdAt)));
+      const days = [...daySet].map(k => new Date(k + 'T00:00:00Z')).sort((a, b) => a - b);
       let streak = 1, max = 1;
       for (let i = 1; i < days.length; i++) {
         const diff = (days[i] - days[i - 1]) / 86400000;
@@ -131,7 +162,7 @@ function checkCompletion(cellId, posts) {
         const spot = getSpotKey(p);
         if (!spot) return;
         if (!spotDays[spot]) spotDays[spot] = new Set();
-        spotDays[spot].add(new Date(p.createdAt).toDateString());
+        spotDays[spot].add(berlinDayKeyOf(p.createdAt));
       });
       return Object.values(spotDays).some(s => s.size >= 2);
     }
@@ -145,7 +176,7 @@ function checkCompletion(cellId, posts) {
       return false;
     }
     case 'thursday':
-      return posts.some(p => new Date(p.createdAt).getDay() === 4);
+      return posts.some(p => berlinDow(p.createdAt) === 4);
     case 'high_rating':
       return posts.some(p => p.rating >= 4);
     case 'ten_total':
@@ -154,7 +185,7 @@ function checkCompletion(cellId, posts) {
       const dayLocMap = {};
       posts.forEach(p => {
         if (p.location?.coordinates?.length === 2) {
-          const key = new Date(p.createdAt).toDateString();
+          const key = berlinDayKeyOf(p.createdAt);
           if (!dayLocMap[key]) dayLocMap[key] = new Set();
           const [lng, lat] = p.location.coordinates;
           dayLocMap[key].add(`${(lat * 10).toFixed(0)},${(lng * 10).toFixed(0)}`);
@@ -163,14 +194,14 @@ function checkCompletion(cellId, posts) {
       return Object.values(dayLocMap).some(s => s.size >= 2);
     }
     case 'early_morning':
-      return posts.some(p => new Date(p.createdAt).getHours() < 10);
+      return posts.some(p => berlinHour(p.createdAt) < 10);
     case 'wednesday':
-      return posts.some(p => new Date(p.createdAt).getDay() === 3);
+      return posts.some(p => berlinDow(p.createdAt) === 3);
     case 'story_caption':
       return posts.some(p => (p.caption || '').trim().length >= 50);
     case 'double_day': {
       const dayMap = {};
-      posts.forEach(p => { const k = new Date(p.createdAt).toDateString(); dayMap[k] = (dayMap[k] || 0) + 1; });
+      posts.forEach(p => { const k = berlinDayKeyOf(p.createdAt); dayMap[k] = (dayMap[k] || 0) + 1; });
       return Object.values(dayMap).some(v => v >= 2);
     }
     case 'five_types':
@@ -178,21 +209,21 @@ function checkCompletion(cellId, posts) {
     case 'full_weekend': {
       const weekends = {};
       posts.forEach(p => {
-        const d = new Date(p.createdAt);
-        const day = d.getDay();
+        const day = berlinDow(p.createdAt);
         if (day !== 5 && day !== 6 && day !== 0) return;
-        const anchor = new Date(d);
-        if (day === 6) anchor.setDate(d.getDate() - 1);
-        if (day === 0) anchor.setDate(d.getDate() - 2);
-        const key = anchor.toDateString();
+        const bd = berlinDateOf(p.createdAt);
+        const anchor = new Date(bd);
+        if (day === 6) anchor.setUTCDate(bd.getUTCDate() - 1);
+        if (day === 0) anchor.setUTCDate(bd.getUTCDate() - 2);
+        const key = anchor.toISOString().slice(0, 10);
         if (!weekends[key]) weekends[key] = new Set();
         weekends[key].add(day);
       });
       return Object.values(weekends).some(days => days.has(5) && days.has(6) && days.has(0));
     }
     case 'streak_7': {
-      const daySet = new Set(posts.map(p => new Date(p.createdAt).toDateString()));
-      const days = [...daySet].map(d => new Date(d)).sort((a, b) => a - b);
+      const daySet = new Set(posts.map(p => berlinDayKeyOf(p.createdAt)));
+      const days = [...daySet].map(k => new Date(k + 'T00:00:00Z')).sort((a, b) => a - b);
       let streak = 1, max = 1;
       for (let i = 1; i < days.length; i++) {
         const diff = (days[i] - days[i - 1]) / 86400000;
@@ -222,12 +253,12 @@ function countCompletedLines(grid) {
 }
 
 async function buildBingoCardForUser(userId) {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
+  const bd = berlinDateOf(new Date());
+  const year = bd.getUTCFullYear();
+  const month = bd.getUTCMonth() + 1;
 
-  const startOfMonth = new Date(year, month - 1, 1);
-  const endOfMonth = new Date(year, month, 1);
+  const startOfMonth = berlinMonthStart(year, month);
+  const endOfMonth = berlinMonthStart(year, month + 1);
 
   const posts = await Post.find({
     user: userId,

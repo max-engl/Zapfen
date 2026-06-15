@@ -1,27 +1,16 @@
 services:
   backend:
-    build: ./backend
+    image: maxengl/zapfenbackend:latest
     container_name: zapfen_backend
     restart: unless-stopped
     ports:
       - "3000:3000"
     env_file:
-      - ./backend/.env
+      - .env
     environment:
-      MONGO_URI: mongodb://admin:password123@social_mongodb:27017/social_app?authSource=admin
+      MONGO_URI: mongodb://admin:password123@mongodb:27017/social_app?authSource=admin
     depends_on:
       - mongodb
-
-  websiteserver:
-    image: node:22-alpine
-    container_name: pint_websiteserver
-    restart: unless-stopped
-    working_dir: /app/websiteserver
-    command: [ "node", "server.js" ]
-    ports:
-      - "4000:4000"
-    volumes:
-      - .:/app:ro
 
   mongodb:
     image: mongo:7

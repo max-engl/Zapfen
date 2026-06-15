@@ -16,20 +16,20 @@ class StatsProvider extends ChangeNotifier {
   bool get loading => _loading;
   String? get error => _error;
 
-  StatsData? dataFor(String scope, String range) => _memCache['$scope:$range'];
+  StatsData? dataFor(String scope, String range, int offset) =>
+      _memCache['$scope:$range:$offset'];
 
-  static String _cacheKey(String scope, String range) =>
-      'pint_stats_${scope}_$range';
+  static String _cacheKey(String scope, String range, int offset) =>
+      'pint_stats_${scope}_${range}_$offset';
 
-  /// Restore all previously cached (scope, range) combos from SharedPreferences.
   void preloadFromCache() {
-    for (final scope in ['me', 'friends']) {
-      for (final range in ['week', 'month', 'year', 'all']) {
-        final key = _cacheKey(scope, range);
+    for (final scope in ['friends', 'global']) {
+      for (final range in ['week', 'month', 'year']) {
+        final key = _cacheKey(scope, range, 0);
         final map = _cache.loadMap(key);
         if (map != null) {
           try {
-            _memCache['$scope:$range'] = StatsData.fromJson(map);
+            _memCache['$scope:$range:0'] = StatsData.fromJson(map);
           } catch (_) {}
         }
       }
@@ -37,32 +37,30 @@ class StatsProvider extends ChangeNotifier {
     if (_memCache.isNotEmpty) notifyListeners();
   }
 
-  Future<void> load(String scope, String range) async {
-    final key = '$scope:$range';
+  Future<void> load(String scope, String range, int offset) async {
+    final key = '$scope:$range:$offset';
     if (_memCache.containsKey(key)) {
-      // Already in memory (either from cache preload or a previous fetch).
-      // Refresh in background without showing a spinner.
-      _fetchAndUpdate(scope, range);
+      _fetchAndUpdate(scope, range, offset);
       return;
     }
     _loading = true;
     _error = null;
     notifyListeners();
-    await _fetchAndUpdate(scope, range);
+    await _fetchAndUpdate(scope, range, offset);
     _loading = false;
     notifyListeners();
   }
 
-  Future<void> refresh(String scope, String range) async {
-    _memCache.remove('$scope:$range');
-    await load(scope, range);
+  Future<void> refresh(String scope, String range, int offset) async {
+    _memCache.remove('$scope:$range:$offset');
+    await load(scope, range, offset);
   }
 
-  Future<void> _fetchAndUpdate(String scope, String range) async {
+  Future<void> _fetchAndUpdate(String scope, String range, int offset) async {
     try {
-      final fresh = await _service.fetch(scope: scope, range: range);
-      _memCache['$scope:$range'] = fresh;
-      _cache.saveMap(_cacheKey(scope, range), fresh.toJson());
+      final fresh = await _service.fetch(scope: scope, range: range, offset: offset);
+      _memCache['$scope:$range:$offset'] = fresh;
+      _cache.saveMap(_cacheKey(scope, range, offset), fresh.toJson());
       notifyListeners();
     } catch (_) {
       _error = 'Statistiken konnten nicht geladen werden.';

@@ -123,6 +123,7 @@ class FeedDatabase {
     try {
       final db = await _database;
       await db.delete('posts');
+      await db.delete('profile_posts');
     } catch (_) {}
   }
 }

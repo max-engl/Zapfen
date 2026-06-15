@@ -19,6 +19,15 @@ String _fmt(num n) {
   return n.toInt().toString();
 }
 
+const _monthNamesDE = [
+  '', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+  'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
+];
+const _monthAbbrDE = [
+  '', 'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez',
+];
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 class StatsScreen extends StatefulWidget {
@@ -31,32 +40,75 @@ class StatsScreen extends StatefulWidget {
 class _StatsScreenState extends State<StatsScreen> {
   String _scope = 'friends';
   String _range = 'week';
+  int _offset = 0; // 0 = current period, -1 = previous, etc.
+  StatsData? _staleData; // shown (dimmed) while next period is loading
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<StatsProvider>().load(_scope, _range);
+      context.read<StatsProvider>().load(_scope, _range, _offset);
     });
   }
 
   void _setScope(String s) {
-    setState(() => _scope = s);
-    context.read<StatsProvider>().load(s, _range);
+    setState(() {
+      _scope = s;
+      _offset = 0;
+      _staleData = null;
+    });
+    context.read<StatsProvider>().load(s, _range, 0);
   }
 
   void _setRange(String r) {
-    setState(() => _range = r);
-    context.read<StatsProvider>().load(_scope, r);
+    setState(() {
+      _range = r;
+      _offset = 0;
+      _staleData = null;
+    });
+    context.read<StatsProvider>().load(_scope, r, 0);
+  }
+
+  void _changeOffset(int delta) {
+    final next = _offset + delta;
+    if (next > 0) return;
+    setState(() => _offset = next);
+    context.read<StatsProvider>().load(_scope, _range, next);
+  }
+
+  // Derives a human-readable period label from _range + _offset on the client
+  // side so the label is always visible immediately (no round-trip needed).
+  String get _periodLabel {
+    final now = DateTime.now();
+    if (_range == 'week') {
+      final today  = DateTime(now.year, now.month, now.day);
+      final monday = today
+          .subtract(Duration(days: today.weekday - 1))
+          .add(Duration(days: _offset * 7));
+      final sunday = monday.add(const Duration(days: 6));
+      return '${monday.day}. ${_monthAbbrDE[monday.month]}. – '
+          '${sunday.day}. ${_monthAbbrDE[sunday.month]}.';
+    }
+    if (_range == 'month') {
+      int year = now.year;
+      int month = now.month + _offset;
+      while (month < 1)  { month += 12; year--; }
+      while (month > 12) { month -= 12; year++; }
+      return '${_monthNamesDE[month]} $year';
+    }
+    return '${now.year + _offset}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final t = PintThemeProvider.of(context);
+    final t        = PintThemeProvider.of(context);
     final provider = context.watch<StatsProvider>();
-    final data = provider.dataFor(_scope, _range);
-    final loading = provider.loading && data == null;
-    final hasError = provider.error != null && data == null;
+    final data     = provider.dataFor(_scope, _range, _offset);
+    if (data != null) _staleData = data;
+    final displayData    = data ?? _staleData;
+    final loading        = provider.loading && displayData == null;
+    final isTransitioning = data == null && displayData != null;
+    final hasError = provider.error != null && displayData == null;
 
     return Scaffold(
       backgroundColor: t.bg,
@@ -72,7 +124,7 @@ class _StatsScreenState extends State<StatsScreen> {
                       ? _StatsError(
                           t: t,
                           message: provider.error!,
-                          onRetry: () => provider.refresh(_scope, _range),
+                          onRetry: () => provider.refresh(_scope, _range, _offset),
                         )
                       : CustomScrollView(
                           physics: const BouncingScrollPhysics(
@@ -80,7 +132,8 @@ class _StatsScreenState extends State<StatsScreen> {
                           ),
                           slivers: [
                             CupertinoSliverRefreshControl(
-                              onRefresh: () => provider.refresh(_scope, _range),
+                              onRefresh: () =>
+                                  provider.refresh(_scope, _range, _offset),
                               builder: (_, state, pulledExtent, triggerDistance, __) =>
                                   PintRefreshLogo(
                                     state: state,
@@ -94,32 +147,53 @@ class _StatsScreenState extends State<StatsScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
-                                    _ScopeToggle(scope: _scope, onChanged: _setScope),
-                                    _RangeChips(range: _range, onChanged: _setRange),
-                                    if (data != null) ...[
-                                      _HeroKPI(data: data, range: _range),
-                                      _StatCard(
-                                        title: 'Getränke über die Zeit',
-                                        hint: _range == 'week'
-                                            ? 'nach Tag'
-                                            : _range == 'month'
-                                                ? 'nach Woche'
-                                                : 'nach Monat',
-                                        child: _TimelineChart(data: data, t: t),
+                                    _ScopeToggle(
+                                        scope: _scope, onChanged: _setScope),
+                                    _RangeChips(
+                                        range: _range, onChanged: _setRange),
+                                    _PeriodNavigator(
+                                      label: _periodLabel,
+                                      canGoForward: _offset < 0,
+                                      onPrev: () => _changeOffset(-1),
+                                      onNext: () => _changeOffset(1),
+                                    ),
+                                    if (displayData != null)
+                                      AnimatedOpacity(
+                                        opacity: isTransitioning ? 0.38 : 1.0,
+                                        duration: const Duration(milliseconds: 180),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                                          children: [
+                                            _HeroKPI(data: displayData, range: _range),
+                                            _StatCard(
+                                              title: 'Getränke über die Zeit',
+                                              hint: _range == 'year'
+                                                  ? 'nach Woche'
+                                                  : 'nach Tag',
+                                              child: _TimelineChart(
+                                                  data: displayData,
+                                                  t: t,
+                                                  range: _range),
+                                            ),
+                                            _StatTiles(data: displayData, scope: _scope),
+                                            _StatCard(
+                                              title: 'Wann wird gezapft',
+                                              hint: 'nach Wochentag',
+                                              child: _DowChart(
+                                                  dow: displayData.dow, t: t),
+                                            ),
+                                            _StatCard(
+                                              title: 'Top Sorten',
+                                              hint: _scope == 'friends'
+                                                  ? 'dein Kreis'
+                                                  : 'weltweit',
+                                              child: _StylesChart(
+                                                  styles: displayData.styles, t: t),
+                                            ),
+                                            _Footer(data: displayData, scope: _scope),
+                                          ],
+                                        ),
                                       ),
-                                      _StatTiles(data: data, scope: _scope),
-                                      _StatCard(
-                                        title: 'Wann wird gezapft',
-                                        hint: 'nach Wochentag',
-                                        child: _DowChart(dow: data.dow, t: t),
-                                      ),
-                                      _StatCard(
-                                        title: 'Top Sorten',
-                                        hint: _scope == 'friends' ? 'dein Kreis' : 'weltweit',
-                                        child: _StylesChart(styles: data.styles, t: t),
-                                      ),
-                                      _Footer(data: data, scope: _scope),
-                                    ],
                                   ],
                                 ),
                               ),
@@ -326,6 +400,89 @@ class _RangeChips extends StatelessWidget {
   }
 }
 
+// ── Period navigator ──────────────────────────────────────────────────────────
+
+class _PeriodNavigator extends StatelessWidget {
+  final String label;
+  final bool canGoForward;
+  final VoidCallback onPrev;
+  final VoidCallback onNext;
+  const _PeriodNavigator({
+    required this.label,
+    required this.canGoForward,
+    required this.onPrev,
+    required this.onNext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = PintThemeProvider.of(context);
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragEnd: (d) {
+        if ((d.primaryVelocity ?? 0) < -300) onPrev();
+        if ((d.primaryVelocity ?? 0) > 300 && canGoForward) onNext();
+      },
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+        child: Row(
+          children: [
+            _NavBtn(icon: Icons.chevron_left, onTap: onPrev, t: t),
+            Expanded(
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: t.text,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ),
+            _NavBtn(
+              icon: Icons.chevron_right,
+              onTap: canGoForward ? onNext : null,
+              t: t,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final PintTheme t;
+  const _NavBtn({required this.icon, required this.onTap, required this.t});
+
+  @override
+  Widget build(BuildContext context) {
+    final active = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: active ? t.surfaceWeak : Colors.transparent,
+          border: Border.all(
+            color: active ? t.border : Colors.transparent,
+          ),
+        ),
+        child: Icon(
+          icon,
+          size: 18,
+          color: active ? t.text : t.textFaint,
+        ),
+      ),
+    );
+  }
+}
+
 // ── Hero KPI ──────────────────────────────────────────────────────────────────
 
 class _HeroKPI extends StatelessWidget {
@@ -385,7 +542,9 @@ class _HeroKPI extends StatelessWidget {
                 child: Row(
                   children: [
                     Icon(
-                      up ? Icons.arrow_drop_up_rounded : Icons.arrow_drop_down_rounded,
+                      up
+                          ? Icons.arrow_drop_up_rounded
+                          : Icons.arrow_drop_down_rounded,
                       size: 18,
                       color: deltaColor,
                     ),
@@ -472,30 +631,75 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// ── Timeline chart ────────────────────────────────────────────────────────────
+// ── Timeline chart (interactive) ──────────────────────────────────────────────
 
-class _TimelineChart extends StatelessWidget {
+class _TimelineChart extends StatefulWidget {
   final StatsData data;
   final PintTheme t;
-  const _TimelineChart({required this.data, required this.t});
+  final String range;
+  const _TimelineChart({
+    required this.data,
+    required this.t,
+    required this.range,
+  });
+
+  @override
+  State<_TimelineChart> createState() => _TimelineChartState();
+}
+
+class _TimelineChartState extends State<_TimelineChart> {
+  int? _hoverIndex;
+
+  void _updateHover(Offset localPos) {
+    final points = widget.data.timeline;
+    if (points.isEmpty) return;
+    const padX  = 4.0;
+    final box   = context.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final w      = box.size.width;
+    final innerW = w - padX * 2;
+    final n      = points.length;
+    final x      = localPos.dx.clamp(padX, w - padX);
+    final idx    = n <= 1
+        ? 0
+        : ((x - padX) / innerW * (n - 1)).round().clamp(0, n - 1);
+    if (idx != _hoverIndex) setState(() => _hoverIndex = idx);
+  }
+
+  // Label shown in the tooltip when hovering (always non-empty)
+  String _tooltipLabel(int idx) {
+    final axisLabel = widget.data.timeline[idx].label;
+    if (widget.range == 'week') return axisLabel; // Mo, Di, …
+    if (widget.range == 'month') return '${idx + 1}.';
+    return 'W${idx + 1}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final values = data.timeline.map((p) => p.count).toList();
-    final labels = data.timeline.map((p) => p.label).toList();
-    return SizedBox(
-      height: 150,
-      child: CustomPaint(
-        painter: _TimelinePainter(
-          values: values,
-          labels: labels,
-          gold: t.gold,
-          goldText: t.goldText,
-          bgColor: t.surface,
-          borderColor: t.border,
-          textFaintColor: t.textFaint,
+    final values = widget.data.timeline.map((p) => p.count).toList();
+    final labels = widget.data.timeline.map((p) => p.label).toList();
+
+    return GestureDetector(
+      onPanStart:  (d) => _updateHover(d.localPosition),
+      onPanUpdate: (d) => _updateHover(d.localPosition),
+      onPanEnd:    (_) => setState(() => _hoverIndex = null),
+      onPanCancel: ()  => setState(() => _hoverIndex = null),
+      child: SizedBox(
+        height: 150,
+        child: CustomPaint(
+          painter: _TimelinePainter(
+            values:         values,
+            labels:         labels,
+            gold:           widget.t.gold,
+            goldText:       widget.t.goldText,
+            bgColor:        widget.t.surface,
+            borderColor:    widget.t.border,
+            textFaintColor: widget.t.textFaint,
+            hoverIndex:     _hoverIndex,
+            hoverLabel:     _hoverIndex != null ? _tooltipLabel(_hoverIndex!) : null,
+          ),
+          size: Size.infinite,
         ),
-        size: Size.infinite,
       ),
     );
   }
@@ -509,6 +713,8 @@ class _TimelinePainter extends CustomPainter {
   final Color bgColor;
   final Color borderColor;
   final Color textFaintColor;
+  final int? hoverIndex;
+  final String? hoverLabel;
 
   _TimelinePainter({
     required this.values,
@@ -518,6 +724,8 @@ class _TimelinePainter extends CustomPainter {
     required this.bgColor,
     required this.borderColor,
     required this.textFaintColor,
+    this.hoverIndex,
+    this.hoverLabel,
   });
 
   static String _fmtVal(int n) {
@@ -534,7 +742,7 @@ class _TimelinePainter extends CustomPainter {
     const padB = 24.0, padT = 14.0, padX = 4.0;
 
     final maxVal = values.reduce(math.max);
-    final n = values.length;
+    final n      = values.length;
     final innerW = size.width - padX * 2;
 
     double px(int i) =>
@@ -557,8 +765,7 @@ class _TimelinePainter extends CustomPainter {
     final linePath = Path()..moveTo(pts[0].dx, pts[0].dy);
     for (int i = 1; i < pts.length; i++) {
       final cx = (pts[i - 1].dx + pts[i].dx) / 2;
-      linePath.cubicTo(
-          cx, pts[i - 1].dy, cx, pts[i].dy, pts[i].dx, pts[i].dy);
+      linePath.cubicTo(cx, pts[i - 1].dy, cx, pts[i].dy, pts[i].dx, pts[i].dy);
     }
 
     // Area fill
@@ -593,12 +800,14 @@ class _TimelinePainter extends CustomPainter {
         ..strokeJoin = StrokeJoin.round,
     );
 
-    // Dots
+    // Dots — highlight max point unless hovering
     final maxI = maxVal > 0 ? values.indexOf(maxVal) : 0;
     for (int i = 0; i < pts.length; i++) {
-      final isMax = i == maxI && maxVal > 0;
-      final r = isMax ? 4.0 : 2.5;
-      canvas.drawCircle(pts[i], r, Paint()..color = isMax ? gold : bgColor);
+      final isMax    = i == maxI && maxVal > 0 && hoverIndex == null;
+      final isHovered = i == hoverIndex;
+      if (!isMax && !isHovered && n > 14) continue; // skip small dots in dense charts
+      final r = isMax || isHovered ? 4.0 : 2.5;
+      canvas.drawCircle(pts[i], r, Paint()..color = (isMax || isHovered) ? gold : bgColor);
       canvas.drawCircle(
         pts[i],
         r,
@@ -609,8 +818,8 @@ class _TimelinePainter extends CustomPainter {
       );
     }
 
-    // Peak label
-    if (maxVal > 0) {
+    // Peak label (only when not hovering)
+    if (maxVal > 0 && hoverIndex == null) {
       final tp = TextPainter(
         text: TextSpan(
           text: _fmtVal(maxVal),
@@ -622,14 +831,12 @@ class _TimelinePainter extends CustomPainter {
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      tp.paint(
-        canvas,
-        Offset(pts[maxI].dx - tp.width / 2, pts[maxI].dy - 18),
-      );
+      tp.paint(canvas, Offset(pts[maxI].dx - tp.width / 2, pts[maxI].dy - 18));
     }
 
     // Axis labels
     for (int i = 0; i < labels.length; i++) {
+      if (labels[i].isEmpty) continue;
       final tp = TextPainter(
         text: TextSpan(
           text: labels[i],
@@ -641,16 +848,72 @@ class _TimelinePainter extends CustomPainter {
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      tp.paint(
-        canvas,
-        Offset(px(i) - tp.width / 2, size.height - padB + 6),
+      tp.paint(canvas, Offset(px(i) - tp.width / 2, size.height - padB + 6));
+    }
+
+    // ── Hover overlay ─────────────────────────────────────────────────────────
+    if (hoverIndex != null && hoverIndex! < pts.length) {
+      final hx = pts[hoverIndex!].dx;
+      final hy = pts[hoverIndex!].dy;
+
+      // Vertical line
+      canvas.drawLine(
+        Offset(hx, padT),
+        Offset(hx, size.height - padB),
+        Paint()
+          ..color = gold.withValues(alpha: 0.45)
+          ..strokeWidth = 1.5,
       );
+
+      // Large highlight dot
+      canvas.drawCircle(pts[hoverIndex!], 5.5, Paint()..color = gold);
+      canvas.drawCircle(
+        pts[hoverIndex!],
+        5.5,
+        Paint()
+          ..color = bgColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.5,
+      );
+
+      // Tooltip bubble
+      final count      = values[hoverIndex!];
+      final labelPart  = hoverLabel ?? '';
+      final tooltipTxt = labelPart.isNotEmpty ? '$labelPart · $count' : '$count';
+
+      final tp = TextPainter(
+        text: TextSpan(
+          text: tooltipTxt,
+          style: const TextStyle(
+            color: Color(0xFF1A1000),
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+      const pH = 7.0, pV = 5.0;
+      final bW = tp.width + pH * 2;
+      final bH = tp.height + pV * 2;
+      double bx = (hx - bW / 2).clamp(padX, size.width - padX - bW);
+      double by = hy - bH - 12;
+      if (by < padT) by = hy + 12;
+
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(Rect.fromLTWH(bx, by, bW, bH), const Radius.circular(7)),
+        Paint()..color = gold,
+      );
+      tp.paint(canvas, Offset(bx + pH, by + pV));
     }
   }
 
   @override
   bool shouldRepaint(_TimelinePainter old) =>
-      old.values != values || old.gold != gold || old.bgColor != bgColor;
+      old.values != values ||
+      old.gold != gold ||
+      old.bgColor != bgColor ||
+      old.hoverIndex != hoverIndex;
 }
 
 // ── Stat tiles ────────────────────────────────────────────────────────────────
@@ -732,7 +995,7 @@ class _DowChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final maxVal = dow.isEmpty ? 1 : dow.reduce(math.max);
-    final maxI = maxVal > 0 ? dow.indexOf(maxVal) : -1;
+    final maxI   = maxVal > 0 ? dow.indexOf(maxVal) : -1;
 
     return SizedBox(
       height: 120,
@@ -763,9 +1026,7 @@ class _DowChart extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: i == maxI ? t.gold : t.surfaceWeak,
                       borderRadius: BorderRadius.circular(7),
-                      border: i == maxI
-                          ? null
-                          : Border.all(color: t.border),
+                      border: i == maxI ? null : Border.all(color: t.border),
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -902,23 +1163,41 @@ class _StatsShimmer extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-            child: SizedBox(height: 52, child: ShimmerBox(borderRadius: BorderRadius.circular(14))),
+            child: SizedBox(
+                height: 52,
+                child: ShimmerBox(borderRadius: BorderRadius.circular(14))),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Row(children: [
               for (int i = 0; i < 3; i++) ...[
                 if (i > 0) const SizedBox(width: 8),
-                Expanded(child: SizedBox(height: 36, child: ShimmerBox(borderRadius: BorderRadius.circular(999)))),
+                Expanded(
+                    child: SizedBox(
+                        height: 36,
+                        child: ShimmerBox(
+                            borderRadius: BorderRadius.circular(999)))),
               ],
             ]),
           ),
           Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            child: SizedBox(
+                height: 40,
+                child: ShimmerBox(borderRadius: BorderRadius.circular(12))),
+          ),
+          Padding(
             padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              SizedBox(width: 140, height: 13, child: ShimmerBox(borderRadius: BorderRadius.circular(6))),
+              SizedBox(
+                  width: 140,
+                  height: 13,
+                  child: ShimmerBox(borderRadius: BorderRadius.circular(6))),
               const SizedBox(height: 8),
-              SizedBox(width: 100, height: 42, child: ShimmerBox(borderRadius: BorderRadius.circular(8))),
+              SizedBox(
+                  width: 100,
+                  height: 42,
+                  child: ShimmerBox(borderRadius: BorderRadius.circular(8))),
             ]),
           ),
           for (int c = 0; c < 3; c++)
@@ -941,7 +1220,8 @@ class _StatsError extends StatelessWidget {
   final PintTheme t;
   final String message;
   final VoidCallback onRetry;
-  const _StatsError({required this.t, required this.message, required this.onRetry});
+  const _StatsError(
+      {required this.t, required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -953,12 +1233,15 @@ class _StatsError extends StatelessWidget {
           children: [
             Icon(Icons.bar_chart_rounded, size: 48, color: t.textMuted),
             const SizedBox(height: 12),
-            Text(message, style: TextStyle(color: t.textMuted, fontSize: 14), textAlign: TextAlign.center),
+            Text(message,
+                style: TextStyle(color: t.textMuted, fontSize: 14),
+                textAlign: TextAlign.center),
             const SizedBox(height: 16),
             GestureDetector(
               onTap: onRetry,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 decoration: BoxDecoration(
                   color: t.goldSoft,
                   borderRadius: BorderRadius.circular(999),
@@ -966,7 +1249,8 @@ class _StatsError extends StatelessWidget {
                 ),
                 child: Text(
                   'Erneut versuchen',
-                  style: TextStyle(color: t.goldText, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                      color: t.goldText, fontWeight: FontWeight.w700),
                 ),
               ),
             ),
