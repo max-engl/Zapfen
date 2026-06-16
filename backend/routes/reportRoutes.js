@@ -8,6 +8,7 @@ const User = require("../models/User");
 const Like = require("../models/Like");
 const Comment = require("../models/Comment");
 const PostReaction = require("../models/PostReaction");
+const SelfieReaction = require("../models/SelfieReaction");
 const CommentReaction = require("../models/CommentReaction");
 const Friend = require("../models/Friend");
 const Block = require("../models/Block");
@@ -262,6 +263,9 @@ adminRouter.delete("/posts/:postId", async (req, res) => {
         const pathsToDelete = [post.storagePath];
         if (post.selfieStoragePath) pathsToDelete.push(post.selfieStoragePath);
 
+        const selfieReactionsToDelete = await SelfieReaction.find({ post: post._id }).select("storagePath");
+        pathsToDelete.push(...selfieReactionsToDelete.map((r) => r.storagePath));
+
         await r2.send(new DeleteObjectsCommand({
             Bucket: process.env.R2_POST_BUCKET,
             Delete: { Objects: pathsToDelete.map((Key) => ({ Key })), Quiet: true },
@@ -272,6 +276,7 @@ adminRouter.delete("/posts/:postId", async (req, res) => {
             post.deleteOne(),
             Like.deleteMany({ post: post._id }),
             PostReaction.deleteMany({ post: post._id }),
+            SelfieReaction.deleteMany({ post: post._id }),
             Comment.deleteMany({ post: post._id }),
             CommentReaction.deleteMany({ comment: { $in: commentIds } }),
             Report.updateMany({ post: post._id }, { status: "reviewed" }),
@@ -329,11 +334,19 @@ async function deleteUserAccount(userId) {
     const userPosts = await Post.find({ user: userId }).select("storagePath selfieStoragePath").lean();
     const postIds = userPosts.map(p => p._id);
 
-    if (userPosts.length > 0) {
+    const ownSelfieReactions = await SelfieReaction.find({ user: userId }).select("storagePath").lean();
+    const selfieReactionsOnOwnPosts = postIds.length > 0
+        ? await SelfieReaction.find({ post: { $in: postIds } }).select("storagePath").lean()
+        : [];
+
+    if (userPosts.length > 0 || ownSelfieReactions.length > 0 || selfieReactionsOnOwnPosts.length > 0) {
         const pathsToDelete = [];
         for (const post of userPosts) {
             if (post.storagePath) pathsToDelete.push(post.storagePath);
             if (post.selfieStoragePath) pathsToDelete.push(post.selfieStoragePath);
+        }
+        for (const r of [...ownSelfieReactions, ...selfieReactionsOnOwnPosts]) {
+            if (r.storagePath) pathsToDelete.push(r.storagePath);
         }
         try {
             await r2.send(new DeleteObjectsCommand({
@@ -359,6 +372,7 @@ async function deleteUserAccount(userId) {
         Post.deleteMany({ user: userId }),
         Like.deleteMany({ $or: [{ user: userId }, ...(postIds.length ? [{ post: { $in: postIds } }] : [])] }),
         PostReaction.deleteMany({ $or: [{ user: userId }, ...(postIds.length ? [{ post: { $in: postIds } }] : [])] }),
+        SelfieReaction.deleteMany({ $or: [{ user: userId }, ...(postIds.length ? [{ post: { $in: postIds } }] : [])] }),
         Comment.deleteMany({ $or: [{ user: userId }, ...(postIds.length ? [{ post: { $in: postIds } }] : [])] }),
         allCommentIds.length
             ? CommentReaction.deleteMany({ comment: { $in: allCommentIds } })

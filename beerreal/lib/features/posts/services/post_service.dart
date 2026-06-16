@@ -3,6 +3,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/api/api_constants.dart';
 import '../models/feed_post.dart';
 import '../models/post_reaction.dart';
+import '../models/selfie_reaction.dart';
 
 class PostService {
   final ApiClient _client;
@@ -130,5 +131,26 @@ class PostService {
           .toList(),
       totalReactions: (data['totalReactions'] as num?)?.toInt() ?? 0,
     );
+  }
+
+  Future<SelfieReaction> sendSelfieReaction(
+    String postId, {
+    required List<int> imageBytes,
+    required String filename,
+  }) async {
+    final formData = FormData.fromMap({
+      'selfie': MultipartFile.fromBytes(imageBytes, filename: filename),
+    });
+    final response = await _client.dio.post(
+      ApiConstants.selfieReactToPost(postId),
+      data: formData,
+    );
+    return SelfieReaction.fromJson(
+      response.data['selfieReaction'] as Map<String, dynamic>,
+    );
+  }
+
+  Future<void> removeSelfieReaction(String postId) async {
+    await _client.dio.delete(ApiConstants.selfieReactToPost(postId));
   }
 }

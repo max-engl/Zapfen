@@ -6,6 +6,7 @@ const User = require("../models/User");
 const Post = require("../models/Post");
 const Like = require("../models/Like");
 const PostReaction = require("../models/PostReaction");
+const SelfieReaction = require("../models/SelfieReaction");
 const Comment = require("../models/Comment");
 const CommentReaction = require("../models/CommentReaction");
 const Friend = require("../models/Friend");
@@ -235,6 +236,12 @@ router.delete("/me", authMiddleware, async (req, res) => {
             if (p.storagePath) storagePaths.push(p.storagePath);
             if (p.selfieStoragePath) storagePaths.push(p.selfieStoragePath);
         }
+        const selfieReactionsToDelete = await SelfieReaction.find({
+            $or: [{ user: userId }, { post: { $in: postIds } }],
+        }).select("storagePath");
+        for (const r of selfieReactionsToDelete) {
+            if (r.storagePath) storagePaths.push(r.storagePath);
+        }
         if (storagePaths.length > 0) {
             await r2.send(new DeleteObjectsCommand({
                 Bucket: process.env.R2_POST_BUCKET,
@@ -265,6 +272,7 @@ router.delete("/me", authMiddleware, async (req, res) => {
             Post.deleteMany({ user: userId }),
             Like.deleteMany({ $or: [{ user: userId }, { post: { $in: postIds } }] }),
             PostReaction.deleteMany({ $or: [{ user: userId }, { post: { $in: postIds } }] }),
+            SelfieReaction.deleteMany({ $or: [{ user: userId }, { post: { $in: postIds } }] }),
             Comment.deleteMany({ $or: [{ user: userId }, { post: { $in: postIds } }] }),
             allCommentIds.length > 0
                 ? CommentReaction.deleteMany({ $or: [{ user: userId }, { comment: { $in: allCommentIds } }] })

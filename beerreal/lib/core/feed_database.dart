@@ -29,6 +29,7 @@ class FeedDatabase {
   drinking_now INTEGER NOT NULL,
   my_reaction TEXT,
   reactions TEXT NOT NULL,
+  selfie_reactions TEXT NOT NULL,
   created_at TEXT NOT NULL,
   lat REAL,
   lng REAL,
@@ -48,7 +49,7 @@ class FeedDatabase {
     final dir = await getDatabasesPath();
     return openDatabase(
       '$dir/pint_feed.db',
-      version: 8,
+      version: 9,
       onCreate: (db, _) async {
         await db.execute(_kCreateSql);
         await db.execute(_kCreateProfileSql);

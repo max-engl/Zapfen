@@ -4,18 +4,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../core/app_cache_manager.dart';
-import 'pint_loading.dart';
 import '../core/geocoding_service.dart';
 import '../theme.dart';
+import '../features/auth/providers/auth_provider.dart';
 import '../features/posts/models/feed_post.dart';
 import '../features/posts/models/post_reaction.dart';
-import '../features/posts/services/post_service.dart';
+import '../features/posts/models/selfie_reaction.dart';
 import 'avatar.dart';
 import 'report_post_sheet.dart';
 
 class PostCard extends StatelessWidget {
   final FeedPost post;
   final void Function(String emoji) onReact;
+  final VoidCallback onSelfieReact;
+  final Future<void> Function(String reactionId) onRemoveSelfieReaction;
   final VoidCallback? onProfileTap;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
@@ -26,6 +28,8 @@ class PostCard extends StatelessWidget {
     super.key,
     required this.post,
     required this.onReact,
+    required this.onSelfieReact,
+    required this.onRemoveSelfieReaction,
     this.onProfileTap,
     this.onTap,
     this.onDelete,
@@ -61,7 +65,14 @@ class PostCard extends StatelessWidget {
             _Caption(post: post, t: t),
           ],
           const SizedBox(height: 12),
-          _Actions(post: post, onReact: onReact, onTap: onTap, t: t),
+          _Actions(
+            post: post,
+            onReact: onReact,
+            onSelfieReact: onSelfieReact,
+            onRemoveSelfieReaction: onRemoveSelfieReaction,
+            onTap: onTap,
+            t: t,
+          ),
         ],
       ),
     );
@@ -326,6 +337,7 @@ class _PhotoState extends State<_Photo> with SingleTickerProviderStateMixin {
     final post = widget.post;
     final t = widget.t;
     final hasSelfie = post.selfieUrl.isNotEmpty;
+    final myUserId = context.watch<AuthProvider>().user?.id;
 
     final mainUrl = _swapped ? post.selfieUrl : post.imageUrl;
     final mainKey = _swapped
@@ -398,6 +410,16 @@ class _PhotoState extends State<_Photo> with SingleTickerProviderStateMixin {
                           ),
                         ),
                       ),
+                    ),
+                  ),
+                if (post.selfieReactions.isNotEmpty)
+                  Positioned(
+                    right: 12,
+                    bottom: 12,
+                    child: SelfieAvatarStack(
+                      reactions: post.selfieReactions,
+                      myUserId: myUserId,
+                      t: t,
                     ),
                   ),
                 if (hasSelfie)
@@ -562,56 +584,24 @@ class _RatingStars extends StatelessWidget {
 class _Actions extends StatelessWidget {
   final FeedPost post;
   final void Function(String emoji) onReact;
+  final VoidCallback onSelfieReact;
+  final Future<void> Function(String reactionId) onRemoveSelfieReaction;
   final VoidCallback? onTap;
   final PintTheme t;
 
   const _Actions({
     required this.post,
     required this.onReact,
+    required this.onSelfieReact,
+    required this.onRemoveSelfieReaction,
     required this.t,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return _QuickReactions(
-      post: post,
-      onReact: onReact,
-      onTap: onTap,
-      t: t,
-    );
-  }
-}
-
-class _QuickReactions extends StatelessWidget {
-  final FeedPost post;
-  final void Function(String emoji) onReact;
-  final VoidCallback? onTap;
-  final PintTheme t;
-
-  const _QuickReactions({
-    required this.post,
-    required this.onReact,
-    required this.t,
-    this.onTap,
-  });
-
-  void _showReactors(BuildContext context) {
-    final svc = context.read<PostService>();
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => ReactorsSheet(
-        postId: post.id,
-        reactions: post.reactions,
-        postService: svc,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
+    final myUserId = context.watch<AuthProvider>().user?.id;
+    final mySelfie = post.mySelfieReaction(myUserId);
     final cheersCount = post.reactions
         .firstWhere(
           (r) => r.emoji == '🍺',
@@ -619,58 +609,8 @@ class _QuickReactions extends StatelessWidget {
         )
         .count;
 
-    final activePills = <Widget>[];
-    for (final emoji in kReactionEmojis.skip(1)) {
-      final r = post.reactions.firstWhere(
-        (r) => r.emoji == emoji,
-        orElse: () => PostReaction(emoji: emoji, count: 0),
-      );
-      if (r.count == 0) continue;
-      final isMine = post.myReaction == emoji;
-      activePills
-        ..add(const SizedBox(width: 6))
-        ..add(
-          BounceTap(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              onReact(emoji);
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              constraints: const BoxConstraints(minHeight: 34),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-              decoration: BoxDecoration(
-                color: isMine ? t.goldSoft : t.surfaceWeak,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: isMine ? t.goldBorderStrong : t.border,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(emoji, style: const TextStyle(fontSize: 13)),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${r.count}',
-                    style: TextStyle(
-                      color: isMine ? t.goldText : t.textMuted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-    }
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+    return Row(
+      children: [
         CheersButton(
           count: cheersCount,
           isSelected: post.myReaction == '🍺',
@@ -680,47 +620,14 @@ class _QuickReactions extends StatelessWidget {
           },
           t: t,
         ),
-        ...activePills,
-        if (post.myReaction == null) ...[
-          const SizedBox(width: 6),
-          ReactButton(
-            emojis: kReactionEmojis.skip(1).toList(),
-            myReaction: post.myReaction,
-            onReact: onReact,
-            t: t,
-          ),
-        ],
-        if (post.totalReactions > 0) ...[
-          const SizedBox(width: 6),
-          GestureDetector(
-            onTap: () => _showReactors(context),
-            child: Container(
-              constraints: const BoxConstraints(minHeight: 34),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-              decoration: BoxDecoration(
-                color: t.surfaceWeak,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: t.border),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.people_outline, size: 14, color: t.textMuted),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${post.totalReactions}',
-                    style: TextStyle(
-                      color: t.textMuted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-        const SizedBox(width: 6),
+        const SizedBox(width: 10),
+        SelfieReactButton(
+          mySelfie: mySelfie,
+          onOpenCapture: onSelfieReact,
+          onRemove: onRemoveSelfieReaction,
+          t: t,
+        ),
+        const SizedBox(width: 10),
         GestureDetector(
           onTap: onTap,
           child: Container(
@@ -748,7 +655,216 @@ class _QuickReactions extends StatelessWidget {
             ),
           ),
         ),
+        const Spacer(),
       ],
+    );
+  }
+}
+
+// ── Selfie reaction button ──────────────────────────────────────────────────
+
+class SelfieReactButton extends StatefulWidget {
+  final SelfieReaction? mySelfie;
+  final VoidCallback onOpenCapture;
+  final Future<void> Function(String reactionId) onRemove;
+  final PintTheme t;
+
+  const SelfieReactButton({
+    super.key,
+    required this.mySelfie,
+    required this.onOpenCapture,
+    required this.onRemove,
+    required this.t,
+  });
+
+  @override
+  State<SelfieReactButton> createState() => _SelfieReactButtonState();
+}
+
+class _SelfieReactButtonState extends State<SelfieReactButton> {
+  bool _busy = false;
+
+  Future<void> _handleTap() async {
+    if (_busy) return;
+    HapticFeedback.selectionClick();
+    final mySelfie = widget.mySelfie;
+    if (mySelfie == null) {
+      widget.onOpenCapture();
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await widget.onRemove(mySelfie.id);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.t;
+    final isActive = widget.mySelfie != null;
+    return BounceTap(
+      onTap: _handleTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        constraints: const BoxConstraints(minHeight: 34),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? t.goldSoft : t.surfaceWeak,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: isActive ? t.goldBorderStrong : t.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.face_retouching_natural_outlined,
+              size: 15,
+              color: isActive ? t.goldText : t.text,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              isActive ? 'Reagiert' : 'Selfie',
+              style: TextStyle(
+                color: isActive ? t.goldText : t.text,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Selfie reaction avatar stack ────────────────────────────────────────────
+
+class SelfieAvatarStack extends StatelessWidget {
+  final List<SelfieReaction> reactions;
+  final String? myUserId;
+  final PintTheme t;
+
+  const SelfieAvatarStack({
+    super.key,
+    required this.reactions,
+    required this.myUserId,
+    required this.t,
+  });
+
+  static const _circleSize = 38.0;
+  static const _overlap = 14.0;
+
+  @override
+  Widget build(BuildContext context) {
+    if (reactions.isEmpty) return const SizedBox.shrink();
+    final overflow = reactions.length > 4 ? reactions.length - 4 : 0;
+    final display = overflow > 0
+        ? reactions.sublist(reactions.length - 4)
+        : reactions;
+    final slots = display.length + (overflow > 0 ? 1 : 0);
+    final width = _circleSize + (slots - 1) * _overlap;
+
+    final children = <Widget>[];
+    if (overflow > 0) {
+      children.add(
+        Positioned(
+          right: display.length * _overlap,
+          bottom: 0,
+          child: _OverflowBadge(count: overflow),
+        ),
+      );
+    }
+    for (var i = 0; i < display.length; i++) {
+      final s = display[i];
+      final isMine = myUserId != null && s.userId == myUserId;
+      children.add(
+        Positioned(
+          right: (display.length - 1 - i) * _overlap,
+          bottom: 0,
+          child: _SelfieAvatarCircle(reaction: s, isMine: isMine, t: t),
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: width,
+      height: _circleSize,
+      child: Stack(clipBehavior: Clip.none, children: children),
+    );
+  }
+}
+
+class _SelfieAvatarCircle extends StatelessWidget {
+  final SelfieReaction reaction;
+  final bool isMine;
+  final PintTheme t;
+
+  const _SelfieAvatarCircle({
+    required this.reaction,
+    required this.isMine,
+    required this.t,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: SelfieAvatarStack._circleSize,
+      height: SelfieAvatarStack._circleSize,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: t.surfaceWeak,
+        border: Border.all(
+          color: isMine ? t.gold : Colors.black,
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(color: t.selfieOutline, spreadRadius: 1),
+          const BoxShadow(
+            color: Color(0x66000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: reaction.imageUrl.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: reaction.imageUrl,
+                cacheManager: AppCacheManager.instance,
+                fit: BoxFit.cover,
+                fadeInDuration: Duration.zero,
+                errorWidget: (_, __, ___) => Container(color: t.surfaceWeak),
+              )
+            : Container(color: t.surfaceWeak),
+      ),
+    );
+  }
+}
+
+class _OverflowBadge extends StatelessWidget {
+  final int count;
+  const _OverflowBadge({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: SelfieAvatarStack._circleSize,
+      height: SelfieAvatarStack._circleSize,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xC7000000),
+        border: Border.all(color: Colors.black, width: 2),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        '+$count',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -787,301 +903,18 @@ class CheersButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('🍺', style: TextStyle(fontSize: 14)),
-            if (count > 0) ...[
-              const SizedBox(width: 5),
-              Text(
-                '$count',
-                style: TextStyle(
-                  color: isSelected ? t.goldText : t.textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
+            const SizedBox(width: 5),
+            Text(
+              '$count',
+              style: TextStyle(
+                color: isSelected ? t.goldText : t.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
               ),
-            ],
+            ),
           ],
         ),
       ),
-    );
-  }
-}
-
-// ── React button with Apple-style emoji overlay ────────────────────────────────
-
-class ReactButton extends StatefulWidget {
-  final List<String> emojis;
-  final String? myReaction;
-  final void Function(String) onReact;
-  final PintTheme t;
-
-  const ReactButton({
-    super.key,
-    required this.emojis,
-    required this.myReaction,
-    required this.onReact,
-    required this.t,
-  });
-
-  @override
-  State<ReactButton> createState() => _ReactButtonState();
-}
-
-class _ReactButtonState extends State<ReactButton>
-    with SingleTickerProviderStateMixin {
-  final _key = GlobalKey();
-  OverlayEntry? _entry;
-  late final AnimationController _bounceCtrl;
-  late final Animation<double> _bounceScale;
-
-  @override
-  void initState() {
-    super.initState();
-    _bounceCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 320),
-    );
-    _bounceScale = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween(begin: 1.0, end: 1.22)
-            .chain(CurveTween(curve: Curves.easeOut)),
-        weight: 30,
-      ),
-      TweenSequenceItem(
-        tween: Tween(begin: 1.22, end: 1.0)
-            .chain(CurveTween(curve: Curves.elasticOut)),
-        weight: 70,
-      ),
-    ]).animate(_bounceCtrl);
-  }
-
-  void _show() {
-    final box = _key.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null) return;
-    final pos = box.localToGlobal(Offset.zero);
-    _entry = OverlayEntry(
-      builder: (_) => _EmojiPopup(
-        buttonPos: pos,
-        buttonSize: box.size,
-        emojis: widget.emojis,
-        myReaction: widget.myReaction,
-        t: widget.t,
-        onSelect: (emoji) {
-          _hide();
-          HapticFeedback.selectionClick();
-          widget.onReact(emoji);
-        },
-        onDismiss: _hide,
-      ),
-    );
-    Overlay.of(context).insert(_entry!);
-  }
-
-  void _hide() {
-    _entry?.remove();
-    _entry = null;
-  }
-
-  @override
-  void dispose() {
-    _bounceCtrl.dispose();
-    _hide();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final hasOtherReaction =
-        widget.myReaction != null && widget.emojis.contains(widget.myReaction);
-    return GestureDetector(
-      key: _key,
-      onTap: () {
-        HapticFeedback.selectionClick();
-        _bounceCtrl.forward(from: 0);
-        _show();
-      },
-      child: ScaleTransition(
-        scale: _bounceScale,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          constraints: const BoxConstraints(minHeight: 34),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          decoration: BoxDecoration(
-            color: hasOtherReaction ? widget.t.goldSoft : widget.t.surfaceWeak,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: hasOtherReaction
-                  ? widget.t.goldBorderStrong
-                  : widget.t.border,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.add_reaction_outlined,
-                size: 14,
-                color:
-                    hasOtherReaction ? widget.t.goldText : widget.t.textMuted,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                'React',
-                style: TextStyle(
-                  color: hasOtherReaction ? widget.t.goldText : widget.t.text,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Apple-style emoji popup overlay ───────────────────────────────────────────
-
-class _EmojiPopup extends StatefulWidget {
-  final Offset buttonPos;
-  final Size buttonSize;
-  final List<String> emojis;
-  final String? myReaction;
-  final PintTheme t;
-  final void Function(String) onSelect;
-  final VoidCallback onDismiss;
-
-  const _EmojiPopup({
-    required this.buttonPos,
-    required this.buttonSize,
-    required this.emojis,
-    required this.myReaction,
-    required this.t,
-    required this.onSelect,
-    required this.onDismiss,
-  });
-
-  @override
-  State<_EmojiPopup> createState() => _EmojiPopupState();
-}
-
-class _EmojiPopupState extends State<_EmojiPopup>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _scale;
-  late final Animation<double> _opacity;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 200),
-    );
-    _scale = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack);
-    _opacity = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
-    _ctrl.forward();
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const circleSize = 44.0;
-    final n = widget.emojis.length;
-    final popupW = n * circleSize + (n - 1) * 8.0 + 24.0;
-    const popupH = circleSize + 20.0;
-    const gap = 8.0;
-
-    final screenW = MediaQuery.of(context).size.width;
-    double left =
-        widget.buttonPos.dx + widget.buttonSize.width / 2 - popupW / 2;
-    left = left.clamp(12.0, screenW - popupW - 12.0);
-    final top = widget.buttonPos.dy - popupH - gap;
-
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: widget.onDismiss,
-          ),
-        ),
-        Positioned(
-          left: left,
-          top: top,
-          child: FadeTransition(
-            opacity: _opacity,
-            child: ScaleTransition(
-              scale: _scale,
-              alignment: Alignment.bottomCenter,
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: widget.t.surface,
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: widget.t.border),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(
-                          alpha: widget.t.isDark ? 0.45 : 0.15,
-                        ),
-                        blurRadius: 24,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: widget.emojis.asMap().entries.map((entry) {
-                      final emoji = entry.value;
-                      final isActive = widget.myReaction == emoji;
-                      return Padding(
-                        padding: EdgeInsets.only(
-                          right: entry.key < widget.emojis.length - 1 ? 8 : 0,
-                        ),
-                        child: BounceTap(
-                          onTap: () => widget.onSelect(emoji),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 120),
-                            width: circleSize,
-                            height: circleSize,
-                            decoration: BoxDecoration(
-                              color: isActive
-                                  ? widget.t.goldSoft
-                                  : widget.t.surfaceWeak,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isActive
-                                    ? widget.t.goldBorderStrong
-                                    : widget.t.border,
-                              ),
-                            ),
-                            child: Center(
-                              child: Text(
-                                emoji,
-                                style: const TextStyle(fontSize: 22),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -1138,270 +971,6 @@ class _BounceTapState extends State<BounceTap>
         widget.onTap();
       },
       child: ScaleTransition(scale: _scale, child: widget.child),
-    );
-  }
-}
-
-// ── Who reacted sheet ─────────────────────────────────────────────────────────
-
-class ReactorsSheet extends StatefulWidget {
-  final String postId;
-  final List<PostReaction> reactions;
-  final PostService postService;
-
-  const ReactorsSheet({
-    super.key,
-    required this.postId,
-    required this.reactions,
-    required this.postService,
-  });
-
-  @override
-  State<ReactorsSheet> createState() => ReactorsSheetState();
-}
-
-class ReactorsSheetState extends State<ReactorsSheet> {
-  List<ReactionActor>? _actors;
-  // null = "Alle" (show everyone), non-null = filter by that emoji
-  String? _selectedEmoji;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetch();
-  }
-
-  Future<void> _fetch() async {
-    try {
-      final actors = await widget.postService.getPostReactions(widget.postId);
-      if (mounted) setState(() => _actors = actors);
-    } catch (_) {
-      if (mounted) setState(() => _actors = []);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final t = PintThemeProvider.of(context);
-
-    final activeEmojis = kReactionEmojis
-        .where((e) => widget.reactions.any((r) => r.emoji == e && r.count > 0))
-        .toList();
-
-    final filtered = _selectedEmoji == null
-        ? _actors
-        : _actors?.where((a) => a.emoji == _selectedEmoji).toList();
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 28),
-      decoration: BoxDecoration(
-        color: t.surface,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: t.border),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle
-          Container(
-            width: 36,
-            height: 4,
-            margin: const EdgeInsets.only(top: 12, bottom: 4),
-            decoration: BoxDecoration(
-              color: t.border,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-
-          // Title row
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-            child: Row(
-              children: [
-                Text(
-                  'Reaktionen',
-                  style: TextStyle(
-                    color: t.text,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                if (_actors != null && _actors!.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: t.goldSoft,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: t.goldBorder),
-                    ),
-                    child: Text(
-                      '${_actors!.length}',
-                      style: TextStyle(
-                        color: t.goldText,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-
-          // Emoji filter tabs — only when multiple emoji types have reactions
-          if (activeEmojis.length > 1)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    // "Alle" tab
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: GestureDetector(
-                        onTap: () => setState(() => _selectedEmoji = null),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 140),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _selectedEmoji == null
-                                ? t.goldSoft
-                                : t.surfaceWeak,
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: _selectedEmoji == null
-                                  ? t.goldBorderStrong
-                                  : t.border,
-                            ),
-                          ),
-                          child: Text(
-                            'Alle',
-                            style: TextStyle(
-                              color: _selectedEmoji == null
-                                  ? t.goldText
-                                  : t.textMuted,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Individual emoji tabs
-                    ...activeEmojis.map((emoji) {
-                      final sel = emoji == _selectedEmoji;
-                      final count = widget.reactions
-                          .firstWhere((r) => r.emoji == emoji)
-                          .count;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: GestureDetector(
-                          onTap: () => setState(() => _selectedEmoji = emoji),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 140),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: sel ? t.goldSoft : t.surfaceWeak,
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: sel ? t.goldBorderStrong : t.border,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  emoji,
-                                  style: const TextStyle(fontSize: 15),
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  '$count',
-                                  style: TextStyle(
-                                    color: sel ? t.goldText : t.textMuted,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
-                  ],
-                ),
-              ),
-            ),
-
-          Divider(height: 1, color: t.border),
-
-          // User list
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 320),
-            child: _actors == null
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 32),
-                    child: SpinningAppLogo(size: 24),
-                  )
-                : (filtered?.isEmpty ?? true)
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 28),
-                    child: Text(
-                      'Noch keine Reaktionen.',
-                      style: TextStyle(color: t.textMuted, fontSize: 14),
-                    ),
-                  )
-                : ListView.builder(
-                    shrinkWrap: true,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: filtered!.length,
-                    itemBuilder: (_, i) {
-                      final a = filtered[i];
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 10,
-                        ),
-                        child: Row(
-                          children: [
-                            PintAvatar(
-                              size: 38,
-                              imageUrl: a.avatarUrl,
-                              avatarColor: a.avatarColor,
-                              initials: a.avatarInitial,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                '@${a.username}',
-                                style: TextStyle(
-                                  color: t.text,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            Text(a.emoji, style: const TextStyle(fontSize: 18)),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
     );
   }
 }

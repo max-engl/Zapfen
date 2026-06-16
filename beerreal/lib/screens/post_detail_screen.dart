@@ -13,6 +13,7 @@ import '../features/auth/providers/auth_provider.dart';
 import '../features/posts/models/comment.dart';
 import '../features/posts/models/feed_post.dart';
 import '../features/posts/models/post_reaction.dart';
+import '../features/posts/models/selfie_reaction.dart';
 import '../features/posts/providers/comment_provider.dart';
 import '../features/posts/providers/feed_provider.dart';
 import '../features/posts/providers/profile_posts_provider.dart';
@@ -21,9 +22,10 @@ import '../features/posts/services/post_service.dart';
 import '../widgets/avatar.dart';
 import '../widgets/pint_dialogs.dart';
 import '../widgets/post_card.dart'
-    show BounceTap, CheersButton, ReactButton, ReactorsSheet;
+    show BounceTap, CheersButton, SelfieReactButton, SelfieAvatarStack;
 import '../widgets/report_post_sheet.dart';
 import '../widgets/shimmer_box.dart';
+import 'selfie_react_capture_screen.dart';
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
@@ -59,6 +61,7 @@ class _PostDetailBody extends StatefulWidget {
 class _PostDetailBodyState extends State<_PostDetailBody> {
   late FeedPost _post;
   final _commentController = TextEditingController();
+  final _commentFocusNode = FocusNode();
 
   @override
   void initState() {
@@ -97,6 +100,7 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
   @override
   void dispose() {
     _commentController.dispose();
+    _commentFocusNode.dispose();
     super.dispose();
   }
 
@@ -108,6 +112,54 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
       orElse: () => _post,
     );
     if (mounted) setState(() => _post = updated);
+  }
+
+  Future<void> _onSelfieReact() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SelfieReactCaptureScreen(
+          onSend: (bytes) async {
+            final reaction = await context.read<FeedProvider>().sendSelfieReaction(
+              _post.id,
+              imageBytes: bytes,
+              filename: 'selfie_reaction.jpg',
+            );
+            if (!mounted) return;
+            final withoutMine = _post.selfieReactions
+                .where((r) => r.userId != reaction.userId)
+                .toList();
+            setState(() {
+              _post = _post.copyWith(
+                selfieReactions: [...withoutMine, reaction],
+              );
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onRemoveSelfieReaction(String reactionId) async {
+    final original = _post.selfieReactions;
+    setState(() {
+      _post = _post.copyWith(
+        selfieReactions: original.where((r) => r.id != reactionId).toList(),
+      );
+    });
+    try {
+      await context.read<FeedProvider>().removeSelfieReaction(
+        _post.id,
+        reactionId,
+      );
+    } catch (_) {
+      if (mounted) {
+        setState(() => _post = _post.copyWith(selfieReactions: original));
+      }
+    }
+  }
+
+  void _focusComposer() {
+    _commentFocusNode.requestFocus();
   }
 
   Future<void> _sendComment() async {

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import '../models/feed_post.dart';
+import '../models/selfie_reaction.dart';
 import '../services/post_service.dart';
 import '../../../core/app_cache_manager.dart';
 import '../../../core/feed_database.dart';
@@ -200,6 +201,56 @@ class FeedProvider extends ChangeNotifier {
           totalReactions: result.totalReactions,
         );
       notifyListeners();
+    } catch (_) {
+      _posts = List.of(_posts)..[idx] = original;
+      notifyListeners();
+    }
+  }
+
+  Future<SelfieReaction> sendSelfieReaction(
+    String postId, {
+    required List<int> imageBytes,
+    required String filename,
+  }) async {
+    final reaction = await _postService.sendSelfieReaction(
+      postId,
+      imageBytes: imageBytes,
+      filename: filename,
+    );
+    final idx = _posts.indexWhere((p) => p.id == postId);
+    if (idx != -1) {
+      final post = _posts[idx];
+      final withoutMine = post.selfieReactions
+          .where((r) => r.userId != reaction.userId)
+          .toList();
+      _posts = List.of(_posts)
+        ..[idx] = post.copyWith(
+          selfieReactions: [...withoutMine, reaction],
+        );
+      notifyListeners();
+      _feedDb.savePosts(_posts);
+    }
+    return reaction;
+  }
+
+  Future<void> removeSelfieReaction(String postId, String reactionId) async {
+    final idx = _posts.indexWhere((p) => p.id == postId);
+    if (idx == -1) {
+      await _postService.removeSelfieReaction(postId);
+      return;
+    }
+
+    final original = _posts[idx];
+    final optimistic = original.selfieReactions
+        .where((r) => r.id != reactionId)
+        .toList();
+    _posts = List.of(_posts)
+      ..[idx] = original.copyWith(selfieReactions: optimistic);
+    notifyListeners();
+
+    try {
+      await _postService.removeSelfieReaction(postId);
+      _feedDb.savePosts(_posts);
     } catch (_) {
       _posts = List.of(_posts)..[idx] = original;
       notifyListeners();

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'post_reaction.dart';
+import 'selfie_reaction.dart';
 
 class FeedPost {
   final String id;
@@ -24,6 +25,7 @@ class FeedPost {
   final bool drinkingNow;
   final String? myReaction;
   final List<PostReaction> reactions;
+  final List<SelfieReaction> selfieReactions;
   final DateTime createdAt;
   final double? lat;
   final double? lng;
@@ -52,11 +54,20 @@ class FeedPost {
     this.drinkingNow = false,
     this.myReaction,
     this.reactions = const [],
+    this.selfieReactions = const [],
     required this.createdAt,
     this.lat,
     this.lng,
     this.country,
   });
+
+  SelfieReaction? mySelfieReaction(String? myUserId) {
+    if (myUserId == null) return null;
+    for (final r in selfieReactions) {
+      if (r.userId == myUserId) return r;
+    }
+    return null;
+  }
 
   String get drinkLabel {
     if (drinkName.isEmpty) return '';
@@ -70,6 +81,7 @@ class FeedPost {
     final drink = json['drink'] as Map<String, dynamic>? ?? {};
     final myReaction = json['myReaction'] as String?;
     final rawReactions = json['reactions'] as List<dynamic>? ?? [];
+    final rawSelfieReactions = json['selfieReactions'] as List<dynamic>? ?? [];
     return FeedPost(
       id: () {
         final v = (json['id'] ?? json['_id'] ?? '') as String;
@@ -101,6 +113,9 @@ class FeedPost {
             (e) => PostReaction.fromJson(e as Map<String, dynamic>, myReaction),
           )
           .toList(),
+      selfieReactions: rawSelfieReactions
+          .map((e) => SelfieReaction.fromJson(e as Map<String, dynamic>))
+          .toList(),
       createdAt: DateTime.parse(json['createdAt'] as String),
       lat: (json['lat'] as num?)?.toDouble(),
       lng: (json['lng'] as num?)?.toDouble(),
@@ -114,6 +129,8 @@ class FeedPost {
     final myReaction = row['my_reaction'] as String?;
     final rawReactions =
         jsonDecode(row['reactions'] as String) as List<dynamic>;
+    final rawSelfieReactions =
+        jsonDecode(row['selfie_reactions'] as String? ?? '[]') as List<dynamic>;
     return FeedPost(
       id: row['id'] as String,
       userId: row['user_id'] as String,
@@ -140,6 +157,9 @@ class FeedPost {
           .map(
             (e) => PostReaction.fromJson(e as Map<String, dynamic>, myReaction),
           )
+          .toList(),
+      selfieReactions: rawSelfieReactions
+          .map((e) => SelfieReaction.fromJson(e as Map<String, dynamic>))
           .toList(),
       createdAt: DateTime.parse(row['created_at'] as String),
       lat: row['lat'] as double?,
@@ -174,6 +194,9 @@ class FeedPost {
     'reactions': jsonEncode(
       reactions.map((r) => {'emoji': r.emoji, 'count': r.count}).toList(),
     ),
+    'selfie_reactions': jsonEncode(
+      selfieReactions.map((r) => r.toJson()).toList(),
+    ),
     'created_at': createdAt.toIso8601String(),
     'lat': lat,
     'lng': lng,
@@ -186,6 +209,7 @@ class FeedPost {
     int? totalReactions,
     String? myReaction,
     List<PostReaction>? reactions,
+    List<SelfieReaction>? selfieReactions,
     bool clearMyReaction = false,
     int? comments,
     int? views,
@@ -213,6 +237,7 @@ class FeedPost {
     drinkingNow: drinkingNow,
     myReaction: clearMyReaction ? null : (myReaction ?? this.myReaction),
     reactions: reactions ?? this.reactions,
+    selfieReactions: selfieReactions ?? this.selfieReactions,
     createdAt: createdAt,
     lat: lat,
     lng: lng,

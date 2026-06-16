@@ -340,6 +340,7 @@ class _NotifRowState extends State<_NotifRow> {
     switch (n.type) {
       case 'poured':
       case 'cheers':
+      case 'selfie_reaction':
       case 'comment':
         if (n.postId == null) return;
         setState(() => _loading = true);
@@ -907,6 +908,12 @@ _BadgeData _badge(String type, PintTheme t) {
         bg: t.goldSoft,
         fg: t.goldText,
       );
+    case 'selfie_reaction':
+      return _BadgeData(
+        icon: Icons.face_retouching_natural_outlined,
+        bg: t.goldSoft,
+        fg: t.goldText,
+      );
     case 'comment':
       return _BadgeData(
         icon: Icons.chat_bubble_outline_rounded,
@@ -945,6 +952,8 @@ String _body(String type) {
   switch (type) {
     case 'cheers':
       return 'hat auf deinen Beitrag reagiert';
+    case 'selfie_reaction':
+      return 'hat mit einem Selfie auf deinen Beitrag reagiert';
     case 'comment':
       return 'hat deinen Beitrag kommentiert';
     case 'request':

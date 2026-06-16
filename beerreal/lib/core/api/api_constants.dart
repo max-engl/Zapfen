@@ -59,6 +59,7 @@ class ApiConstants {
 
   // Post reactions
   static String reactToPost(String id) => '/posts/$id/reactions';
+  static String selfieReactToPost(String id) => '/posts/$id/selfie-reaction';
 
   // Drinks
   static const String drinks = '/drinks';

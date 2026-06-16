@@ -5,6 +5,7 @@ const Post = require("../models/Post");
 const Friend = require("../models/Friend");
 const Like = require("../models/Like");
 const PostReaction = require("../models/PostReaction");
+const SelfieReaction = require("../models/SelfieReaction");
 const Comment = require("../models/Comment");
 const CommentReaction = require("../models/CommentReaction");
 const AppNotification = require("../models/AppNotification");
@@ -21,7 +22,8 @@ const { buildBingoCardForUser } = require("../utils/bingo");
 const { getBerlinOffsetMinutes, localDayStart, toGermanLocalIso } = require("../utils/localTime");
 
 const router = express.Router();
-const ALLOWED_REACTIONS = new Set(["🍺", "🔥", "😍", "💀", "😂"]);
+// Posts can only carry a "cheers" reaction or a selfie reaction (see SelfieReaction model).
+const ALLOWED_REACTIONS = new Set(["🍺"]);
 
 function getFileExtension(filename) {
     return filename.split(".").pop().toLowerCase();
@@ -62,7 +64,38 @@ async function getReactionData(userId, postIds) {
     return map;
 }
 
-function formatPost(post, imageUrl, selfieUrl, likedByMe = false, myReaction = null, reactions = []) {
+async function getSelfieReactionData(postIds) {
+    const allSelfieReactions = await SelfieReaction.find({ post: { $in: postIds } })
+        .populate("user", "username avatarUrl avatarColor avatarInitial")
+        .sort({ createdAt: 1 });
+    const map = {};
+    for (const p of postIds) {
+        map[p.toString()] = [];
+    }
+    for (const r of allSelfieReactions) {
+        const pid = r.post.toString();
+        if (!map[pid]) continue;
+        map[pid].push(r);
+    }
+    return map;
+}
+
+async function formatSelfieReactions(rawList) {
+    return Promise.all(
+        rawList.map(async (r) => ({
+            id: r._id,
+            userId: r.user._id,
+            username: r.user.username,
+            avatarUrl: r.user.avatarUrl ?? null,
+            avatarColor: r.user.avatarColor ?? null,
+            avatarInitial: r.user.avatarInitial ?? null,
+            imageUrl: await createSignedPostUrl(r.storagePath),
+            createdAt: toGermanLocalIso(r.createdAt),
+        }))
+    );
+}
+
+function formatPost(post, imageUrl, selfieUrl, likedByMe = false, myReaction = null, reactions = [], selfieReactions = []) {
     const result = {
         id: post._id,
         user: post.user,
@@ -77,6 +110,7 @@ function formatPost(post, imageUrl, selfieUrl, likedByMe = false, myReaction = n
         likedByMe,
         myReaction,
         reactions,
+        selfieReactions,
         createdAt: toGermanLocalIso(post.createdAt),
     };
     if (post.location && post.location.coordinates && post.location.coordinates.length === 2) {
@@ -87,14 +121,15 @@ function formatPost(post, imageUrl, selfieUrl, likedByMe = false, myReaction = n
     return result;
 }
 
-async function formatPostWithUrls(post, likedSet, reactionDataMap) {
-    const [imageUrl, selfieUrl] = await Promise.all([
+async function formatPostWithUrls(post, likedSet, reactionDataMap, selfieReactionDataMap) {
+    const pid = post._id.toString();
+    const [imageUrl, selfieUrl, selfieReactions] = await Promise.all([
         createSignedPostUrl(post.storagePath),
         post.selfieStoragePath ? createSignedPostUrl(post.selfieStoragePath) : Promise.resolve(null),
+        formatSelfieReactions(selfieReactionDataMap?.[pid] ?? []),
     ]);
-    const pid = post._id.toString();
     const rd = reactionDataMap?.[pid] ?? { myReaction: null, reactions: [] };
-    return formatPost(post, imageUrl, selfieUrl, likedSet.has(pid), rd.myReaction, rd.reactions);
+    return formatPost(post, imageUrl, selfieUrl, likedSet.has(pid), rd.myReaction, rd.reactions, selfieReactions);
 }
 
 async function checkBingoAfterPost(userId, username, avatarUrl, avatarColor, avatarInitial) {
@@ -332,13 +367,14 @@ router.get("/", authMiddleware, async (req, res) => {
         const pagePosts = hasMore ? posts.slice(0, limit) : posts;
 
         const postIds = pagePosts.map((p) => p._id);
-        const [likedSet, reactionDataMap] = await Promise.all([
+        const [likedSet, reactionDataMap, selfieReactionDataMap] = await Promise.all([
             getLikedSet(req.user._id, postIds),
             getReactionData(req.user._id, postIds),
+            getSelfieReactionData(postIds),
         ]);
 
         const postsWithUrls = await Promise.all(
-            pagePosts.map((post) => formatPostWithUrls(post, likedSet, reactionDataMap))
+            pagePosts.map((post) => formatPostWithUrls(post, likedSet, reactionDataMap, selfieReactionDataMap))
         );
 
         const activeSince = new Date(Date.now() - 2 * 60 * 60 * 1000);
@@ -374,13 +410,14 @@ router.get("/me", authMiddleware, async (req, res) => {
             .populate("user", "username avatarUrl avatarColor avatarInitial");
 
         const postIds = posts.map((p) => p._id);
-        const [likedSet, reactionDataMap] = await Promise.all([
+        const [likedSet, reactionDataMap, selfieReactionDataMap] = await Promise.all([
             getLikedSet(req.user._id, postIds),
             getReactionData(req.user._id, postIds),
+            getSelfieReactionData(postIds),
         ]);
 
         const postsWithUrls = await Promise.all(
-            posts.map((post) => formatPostWithUrls(post, likedSet, reactionDataMap))
+            posts.map((post) => formatPostWithUrls(post, likedSet, reactionDataMap, selfieReactionDataMap))
         );
 
         res.json({ posts: postsWithUrls });
@@ -416,13 +453,14 @@ router.get("/user/:userId", authMiddleware, async (req, res) => {
             .populate("user", "username avatarUrl avatarColor avatarInitial");
 
         const postIds = posts.map((p) => p._id);
-        const [likedSet, reactionDataMap] = await Promise.all([
+        const [likedSet, reactionDataMap, selfieReactionDataMap] = await Promise.all([
             getLikedSet(req.user._id, postIds),
             getReactionData(req.user._id, postIds),
+            getSelfieReactionData(postIds),
         ]);
 
         const postsWithUrls = await Promise.all(
-            posts.map((post) => formatPostWithUrls(post, likedSet, reactionDataMap))
+            posts.map((post) => formatPostWithUrls(post, likedSet, reactionDataMap, selfieReactionDataMap))
         );
 
         res.json({ posts: postsWithUrls });
@@ -453,13 +491,14 @@ router.get("/map", authMiddleware, async (req, res) => {
             .populate("user", "username avatarUrl avatarColor avatarInitial");
 
         const postIds = posts.map((p) => p._id);
-        const [likedSet, reactionDataMap] = await Promise.all([
+        const [likedSet, reactionDataMap, selfieReactionDataMap] = await Promise.all([
             getLikedSet(req.user._id, postIds),
             getReactionData(req.user._id, postIds),
+            getSelfieReactionData(postIds),
         ]);
 
         const postsWithUrls = await Promise.all(
-            posts.map((post) => formatPostWithUrls(post, likedSet, reactionDataMap))
+            posts.map((post) => formatPostWithUrls(post, likedSet, reactionDataMap, selfieReactionDataMap))
         );
 
         res.json({ posts: postsWithUrls });
@@ -604,6 +643,100 @@ router.post("/:id/reactions", authMiddleware, async (req, res) => {
     }
 });
 
+// POST /posts/:id/selfie-reaction  —  send (or replace) a quick-selfie reaction
+router.post("/:id/selfie-reaction", authMiddleware, upload.single("selfie"), async (req, res) => {
+    try {
+        const file = req.file;
+        if (!file) return res.status(400).json({ message: "No selfie image uploaded" });
+
+        const post = await Post.findById(req.params.id).select("_id user storagePath");
+        if (!post) return res.status(404).json({ message: "Post not found" });
+
+        const ext = getFileExtension(file.originalname);
+        const storagePath = `${req.user._id}/reaction_${uuidv4()}.${ext}`;
+
+        try {
+            await r2.send(new PutObjectCommand({
+                Bucket: process.env.R2_POST_BUCKET,
+                Key: storagePath,
+                Body: file.buffer,
+                ContentType: file.mimetype,
+            }));
+        } catch (uploadErr) {
+            return res.status(500).json({ message: "Selfie reaction upload failed", error: uploadErr.message });
+        }
+
+        const existing = await SelfieReaction.findOne({ post: post._id, user: req.user._id });
+        if (existing) {
+            await r2.send(new DeleteObjectsCommand({
+                Bucket: process.env.R2_POST_BUCKET,
+                Delete: { Objects: [{ Key: existing.storagePath }], Quiet: true },
+            })).catch(() => { });
+            await existing.deleteOne();
+        }
+
+        const reaction = await SelfieReaction.create({
+            post: post._id,
+            user: req.user._id,
+            storagePath,
+        });
+
+        const imageUrl = await createSignedPostUrl(storagePath);
+
+        res.json({
+            selfieReaction: {
+                id: reaction._id,
+                userId: req.user._id,
+                username: req.user.username,
+                avatarUrl: req.user.avatarUrl ?? null,
+                avatarColor: req.user.avatarColor ?? null,
+                avatarInitial: req.user.avatarInitial ?? null,
+                imageUrl,
+                createdAt: toGermanLocalIso(reaction.createdAt),
+            },
+        });
+
+        // Notify post owner only the first time this user reacts (not on retakes/replaces)
+        if (!existing && post.user.toString() !== req.user._id.toString()) {
+            sendToUser(post.user, {
+                title: `@${req.user.username} 🤳`,
+                body: "hat mit einem Selfie reagiert",
+                data: { type: "post", postId: post._id.toString() },
+            }).catch(() => { });
+            saveNotification(post.user, {
+                type: 'selfie_reaction',
+                actorId: req.user._id,
+                actorUsername: req.user.username,
+                actorAvatarUrl: req.user.avatarUrl ?? null,
+                actorAvatarColor: req.user.avatarColor ?? null,
+                actorAvatarInitial: req.user.avatarInitial ?? null,
+                postId: post._id,
+                postThumbPath: post.storagePath ?? null,
+            }).catch(() => { });
+        }
+    } catch (error) {
+        res.status(500).json({ message: "Could not send selfie reaction", error: error.message });
+    }
+});
+
+// DELETE /posts/:id/selfie-reaction  —  remove your own selfie reaction
+router.delete("/:id/selfie-reaction", authMiddleware, async (req, res) => {
+    try {
+        const existing = await SelfieReaction.findOne({ post: req.params.id, user: req.user._id });
+        if (!existing) return res.status(404).json({ message: "No selfie reaction to remove" });
+
+        await r2.send(new DeleteObjectsCommand({
+            Bucket: process.env.R2_POST_BUCKET,
+            Delete: { Objects: [{ Key: existing.storagePath }], Quiet: true },
+        })).catch(() => { });
+        await existing.deleteOne();
+
+        res.json({ message: "Selfie reaction removed" });
+    } catch (error) {
+        res.status(500).json({ message: "Could not remove selfie reaction", error: error.message });
+    }
+});
+
 // GET /posts/:id  —  single post (must be own or friend's)
 router.get("/:id", authMiddleware, async (req, res) => {
     try {
@@ -630,11 +763,12 @@ router.get("/:id", authMiddleware, async (req, res) => {
             }
         }
 
-        const [likedSet, reactionDataMap] = await Promise.all([
+        const [likedSet, reactionDataMap, selfieReactionDataMap] = await Promise.all([
             getLikedSet(req.user._id, [post._id]),
             getReactionData(req.user._id, [post._id]),
+            getSelfieReactionData([post._id]),
         ]);
-        const formatted = await formatPostWithUrls(post, likedSet, reactionDataMap);
+        const formatted = await formatPostWithUrls(post, likedSet, reactionDataMap, selfieReactionDataMap);
 
         res.json({ post: formatted });
     } catch (error) {
@@ -686,6 +820,9 @@ router.delete("/:id", authMiddleware, async (req, res) => {
         const pathsToDelete = [post.storagePath];
         if (post.selfieStoragePath) pathsToDelete.push(post.selfieStoragePath);
 
+        const selfieReactionsToDelete = await SelfieReaction.find({ post: post._id }).select("storagePath");
+        pathsToDelete.push(...selfieReactionsToDelete.map((r) => r.storagePath));
+
         await r2.send(new DeleteObjectsCommand({
             Bucket: process.env.R2_POST_BUCKET,
             Delete: { Objects: pathsToDelete.map((Key) => ({ Key })), Quiet: true },
@@ -696,6 +833,7 @@ router.delete("/:id", authMiddleware, async (req, res) => {
             post.deleteOne(),
             Like.deleteMany({ post: post._id }),
             PostReaction.deleteMany({ post: post._id }),
+            SelfieReaction.deleteMany({ post: post._id }),
             Comment.deleteMany({ post: post._id }),
             CommentReaction.deleteMany({ comment: { $in: commentIds } }),
         ]);
