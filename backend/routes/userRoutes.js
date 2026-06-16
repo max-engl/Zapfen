@@ -16,6 +16,7 @@ const Block = require("../models/Block");
 const r2 = require("../config/r2");
 const { PutObjectCommand, DeleteObjectsCommand } = require("@aws-sdk/client-s3");
 const upload = require("../middleware/uploadMiddleware");
+const sharp = require("sharp");
 const authMiddleware = require("../middleware/authMiddleware");
 
 const router = express.Router();
@@ -138,16 +139,19 @@ router.patch(
                 });
             }
 
-            const extension = getFileExtension(req.file.originalname);
+            const compressed = await sharp(req.file.buffer)
+                .resize(512, 512, { fit: "inside", withoutEnlargement: true })
+                .jpeg({ quality: 85, progressive: true })
+                .toBuffer();
 
-            const storagePath = `${req.user._id}/${uuidv4()}.${extension}`;
+            const storagePath = `${req.user._id}/${uuidv4()}.jpg`;
 
             try {
                 await r2.send(new PutObjectCommand({
                     Bucket: process.env.R2_AVATAR_BUCKET,
                     Key: storagePath,
-                    Body: req.file.buffer,
-                    ContentType: req.file.mimetype,
+                    Body: compressed,
+                    ContentType: "image/jpeg",
                 }));
             } catch (uploadErr) {
                 return res.status(500).json({
@@ -162,6 +166,7 @@ router.patch(
                 req.user._id,
                 {
                     avatarUrl: publicUrl,
+                    avatarCompressed: true,
                 },
                 {
                     new: true,

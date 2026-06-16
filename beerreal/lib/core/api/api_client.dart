@@ -29,6 +29,8 @@ class ApiClient {
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+          options.headers['X-Tz-Offset'] =
+              DateTime.now().timeZoneOffset.inMinutes.toString();
           return handler.next(options);
         },
         onError: (error, handler) async {

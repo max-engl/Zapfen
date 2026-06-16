@@ -1,4 +1,4 @@
-import 'dart:io' show Platform;
+import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show compute;
@@ -18,7 +18,9 @@ import 'drink_picker_sheet.dart';
 Uint8List _flipJpegHorizontal(Uint8List bytes) {
   final decoded = img.decodeImage(bytes);
   if (decoded == null) return bytes;
-  return Uint8List.fromList(img.encodeJpg(img.flipHorizontal(decoded), quality: 92));
+  return Uint8List.fromList(
+    img.encodeJpg(img.flipHorizontal(decoded), quality: 92),
+  );
 }
 
 enum _Stage { initializing, aim, review, describe, uploading }
@@ -73,6 +75,12 @@ class _CaptureScreenState extends State<CaptureScreen>
   late final AnimationController _successFlash;
   bool _uploadSuccess = false;
   FlashMode _flashMode = FlashMode.off;
+  double _currentZoom = 1.0;
+  double _baseZoom   = 1.0;
+  double _minZoom    = 1.0;
+  double _maxZoom    = 8.0;
+  Timer? _zoomIndicatorTimer;
+  bool   _showZoomIndicator = false;
 
   @override
   void initState() {
@@ -96,6 +104,7 @@ class _CaptureScreenState extends State<CaptureScreen>
     _captionCtrl.dispose();
     _flashAnim.dispose();
     _successFlash.dispose();
+    _zoomIndicatorTimer?.cancel();
     super.dispose();
   }
 
@@ -119,6 +128,8 @@ class _CaptureScreenState extends State<CaptureScreen>
       );
       await rearCtrl.initialize();
       await rearCtrl.setFlashMode(FlashMode.off);
+      _minZoom = await rearCtrl.getMinZoomLevel();
+      _maxZoom = await rearCtrl.getMaxZoomLevel();
 
       if (!mounted) {
         rearCtrl.dispose();
@@ -293,10 +304,7 @@ class _CaptureScreenState extends State<CaptureScreen>
         try {
           final selfieFile = await frontCtrl.takePicture();
           final raw = await selfieFile.readAsBytes();
-          // Android front cameras capture mirrored pixels; flip to correct.
-          selfieBytes = Platform.isAndroid
-              ? await compute(_flipJpegHorizontal, raw)
-              : raw;
+          selfieBytes = await compute(_flipJpegHorizontal, raw);
         } catch (_) {}
       }
 
@@ -372,6 +380,48 @@ class _CaptureScreenState extends State<CaptureScreen>
         });
       }
     }
+  }
+
+  Future<void> _retake() async {
+    final oldRear = _rearCtrl;
+    final oldFront = _frontCtrl;
+    setState(() {
+      _stage = _Stage.initializing;
+      _initError = null;
+      _imageBytes = null;
+      _selfieBytes = null;
+      _photosSwapped = false;
+      _selfieCountdown = null;
+      _rearCtrl = null;
+      _frontCtrl = null;
+      _flashMode = FlashMode.off;
+      _currentZoom = 1.0;
+      _baseZoom    = 1.0;
+      _showZoomIndicator = false;
+    });
+    _zoomIndicatorTimer?.cancel();
+    try {
+      await oldFront?.dispose();
+    } catch (_) {}
+    try {
+      await oldRear?.dispose();
+    } catch (_) {}
+    await _initCameras();
+  }
+
+  void _onPinchUpdate(ScaleUpdateDetails d) {
+    if (d.pointerCount < 2 || _imageBytes != null) return;
+    final zoom = (_baseZoom * d.scale).clamp(_minZoom, _maxZoom);
+    if ((zoom - _currentZoom).abs() < 0.005) return;
+    _rearCtrl?.setZoomLevel(zoom);
+    _zoomIndicatorTimer?.cancel();
+    _zoomIndicatorTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _showZoomIndicator = false);
+    });
+    setState(() {
+      _currentZoom = zoom;
+      _showZoomIndicator = true;
+    });
   }
 
   Future<void> _toggleFlash() async {
@@ -474,19 +524,52 @@ class _CaptureScreenState extends State<CaptureScreen>
         _CamTopBar(
           t: t,
           label: 'JETZT ZAPFEN',
-          sub: 'Prompt schließt in 84 Min',
+          sub: 'Bitte lächeln :)',
           onClose: widget.onClose,
           flashMode: _flashMode,
         ),
         Expanded(
           child: Center(
             child: _initError != null
-                ? Text(
-                    _initError!,
-                    style: const TextStyle(
-                      color: Color(0x8CFFFFFF),
-                      fontSize: 14,
-                    ),
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _initError!,
+                        style: const TextStyle(
+                          color: Color(0x8CFFFFFF),
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() => _initError = null);
+                          _initCameras();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: const Text(
+                            'Erneut versuchen',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   )
                 : const PintLogoLoaderInline(size: 48),
           ),
@@ -504,7 +587,7 @@ class _CaptureScreenState extends State<CaptureScreen>
         _CamTopBar(
           t: t,
           label: 'JETZT ZAPFEN',
-          sub: 'Prompt schließt in 84 Min',
+          sub: 'Bitte lächeln :)',
           onClose: widget.onClose,
           flashMode: _flashMode,
           onFlashToggle: _toggleFlash,
@@ -605,6 +688,42 @@ class _CaptureScreenState extends State<CaptureScreen>
                           ),
                         ),
                       ),
+                      // Pinch-to-zoom gesture capture (transparent overlay)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.translucent,
+                          onScaleStart: (d) => _baseZoom = _currentZoom,
+                          onScaleUpdate: _onPinchUpdate,
+                        ),
+                      ),
+                      // Zoom level indicator
+                      if (_showZoomIndicator)
+                        Positioned(
+                          bottom: 14,
+                          left: 0,
+                          right: 0,
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xB2000000),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                '${_currentZoom.toStringAsFixed(1)}×',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -655,12 +774,7 @@ class _CaptureScreenState extends State<CaptureScreen>
               Expanded(
                 child: _ActionBtn(
                   t: t,
-                  onTap: () => setState(() {
-                    _stage = _Stage.aim;
-                    _imageBytes = null;
-                    _selfieBytes = null;
-                    _photosSwapped = false;
-                  }),
+                  onTap: _retake,
                   label: 'Nochmal',
                   leadIcon: Icons.refresh_rounded,
                   primary: false,
@@ -2153,20 +2267,20 @@ class _PostBtnState extends State<_PostBtn> {
               child: widget.success
                   ? _SpringCheckmark(key: const ValueKey('check'))
                   : widget.uploading
-                      ? SizedBox(
-                          key: const ValueKey('dots'),
-                          child: PintDots(color: t.goldInk, dotSize: 6, spacing: 5),
-                        )
-                      : Text(
-                          key: const ValueKey('label'),
-                          'An deinen Kreis posten',
-                          style: TextStyle(
-                            color: t.goldInk,
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.2,
-                          ),
-                        ),
+                  ? SizedBox(
+                      key: const ValueKey('dots'),
+                      child: PintDots(color: t.goldInk, dotSize: 6, spacing: 5),
+                    )
+                  : Text(
+                      key: const ValueKey('label'),
+                      'An deinen Kreis posten',
+                      style: TextStyle(
+                        color: t.goldInk,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
             ),
           ),
         ),
@@ -2194,9 +2308,10 @@ class _SpringCheckmarkState extends State<_SpringCheckmark>
       vsync: this,
       duration: const Duration(milliseconds: 500),
     )..forward();
-    _scale = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut),
-    );
+    _scale = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut));
   }
 
   @override

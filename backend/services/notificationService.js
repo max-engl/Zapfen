@@ -16,9 +16,16 @@ function buildMessage(token, title, body, data) {
     };
 }
 
+function isStaleTokenError(errCode) {
+    return errCode === 'messaging/registration-token-not-registered'
+        || errCode === 'messaging/invalid-registration-token'
+        || errCode === 'messaging/invalid-argument';
+}
+
 /**
  * Send a push notification to one user by their MongoDB _id.
  * Silently no-ops if the user has no FCM token.
+ * Auto-purges the token if FCM reports it as invalid/unregistered.
  */
 async function sendToUser(userId, { title, body, data = {} }) {
     if (!userId) return;
@@ -27,28 +34,40 @@ async function sendToUser(userId, { title, body, data = {} }) {
         if (!user?.fcmToken) return;
         await admin.messaging().send(buildMessage(user.fcmToken, title, body, data));
     } catch (err) {
-        console.error(`Notification to ${userId} failed:`, err.message);
+        if (isStaleTokenError(err.code)) {
+            await User.findByIdAndUpdate(userId, { $unset: { fcmToken: "" } }).catch(() => {});
+        } else {
+            console.error(`Notification to ${userId} failed:`, err.message);
+        }
     }
 }
 
 /**
  * Fan-out a notification to multiple users.
  * Batches in groups of 500 (FCM sendEach limit).
+ * Auto-purges any tokens FCM reports as invalid/unregistered.
  */
 async function sendToUsers(userIds, { title, body, data = {} }) {
     if (!userIds?.length) return;
     try {
         const users = await User.find({
             _id: { $in: userIds },
-            fcmToken: { $ne: null },
-        }).select("fcmToken");
+            fcmToken: { $exists: true, $ne: null },
+        }).select("_id fcmToken");
 
         if (!users.length) return;
 
         const messages = users.map((u) => buildMessage(u.fcmToken, title, body, data));
 
         for (let i = 0; i < messages.length; i += 500) {
-            await admin.messaging().sendEach(messages.slice(i, i + 500));
+            const batch = users.slice(i, i + 500);
+            const result = await admin.messaging().sendEach(messages.slice(i, i + 500));
+            const staleIds = result.responses
+                .map((r, idx) => (!r.success && isStaleTokenError(r.error?.code)) ? batch[idx]._id : null)
+                .filter(Boolean);
+            if (staleIds.length) {
+                await User.updateMany({ _id: { $in: staleIds } }, { $unset: { fcmToken: "" } }).catch(() => {});
+            }
         }
     } catch (err) {
         console.error("Batch notification failed:", err.message);

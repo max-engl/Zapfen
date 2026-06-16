@@ -6,10 +6,14 @@ class StatsService {
   final ApiClient _apiClient;
   StatsService(this._apiClient);
 
-  Future<StatsData> fetch({required String scope, required String range}) async {
+  Future<StatsData> fetch({
+    required String scope,
+    required String range,
+    int offset = 0,
+  }) async {
     final res = await _apiClient.dio.get(
       ApiConstants.stats,
-      queryParameters: {'scope': scope, 'range': range},
+      queryParameters: {'scope': scope, 'range': range, 'offset': offset},
     );
     return StatsData.fromJson(res.data as Map<String, dynamic>);
   }

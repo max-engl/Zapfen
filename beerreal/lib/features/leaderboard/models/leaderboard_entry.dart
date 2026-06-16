@@ -29,6 +29,22 @@ class LeaderboardEntry {
     required this.isYou,
   });
 
+  Map<String, dynamic> toJson() => {
+        'userId': userId,
+        'username': username,
+        'avatarUrl': avatarUrl,
+        'avatarColor': avatarColor,
+        'avatarInitial': avatarInitial,
+        'pints': pints,
+        'drinksWk': drinksWk,
+        'drinksMo': drinksMo,
+        'pintMove': pintMove,
+        'wkMove': wkMove,
+        'moMove': moMove,
+        'isNew': isNew,
+        'isYou': isYou,
+      };
+
   factory LeaderboardEntry.fromJson(Map<String, dynamic> json) {
     return LeaderboardEntry(
       userId: json['userId'] as String,

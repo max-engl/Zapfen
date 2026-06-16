@@ -27,6 +27,21 @@ class AppNotification {
     required this.createdAt,
   });
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'type': type,
+        'actorId': actorId,
+        'actorUsername': actorUsername,
+        'actorAvatarUrl': actorAvatarUrl,
+        'actorAvatarColor': actorAvatarColor,
+        'actorAvatarInitial': actorAvatarInitial,
+        'postId': postId,
+        'postThumbUrl': postThumbUrl,
+        'mutualCount': mutualCount,
+        'read': read,
+        'createdAt': createdAt.toIso8601String(),
+      };
+
   factory AppNotification.fromJson(Map<String, dynamic> json) {
     return AppNotification(
       id:             json['id'] as String,

@@ -28,4 +28,14 @@ class AppUser {
       avatarInitial: json['avatarInitial'] as String?,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'username': username,
+        'email': email,
+        'role': role,
+        'avatarUrl': avatarUrl,
+        'avatarColor': avatarColor,
+        'avatarInitial': avatarInitial,
+      };
 }

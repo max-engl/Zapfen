@@ -20,6 +20,7 @@ class FriendProvider extends ChangeNotifier {
 
   // per-user UI state for AddFriendScreen
   final Map<String, String> _userActions = {}; // userId → 'requested' | 'accepted' | 'removed'
+  final Set<String> _acceptingIds = {};
 
   List<ApiFriend> get friends => _friends;
   List<ApiFriendRequest> get requests => _requests;
@@ -102,6 +103,8 @@ class FriendProvider extends ChangeNotifier {
   }
 
   Future<bool> acceptRequest(String userId) async {
+    if (_acceptingIds.contains(userId)) return false;
+    _acceptingIds.add(userId);
     try {
       await _friendService.acceptFriendRequest(userId);
       final idx = _requests.indexWhere((r) => r.from.id == userId);
@@ -121,6 +124,8 @@ class FriendProvider extends ChangeNotifier {
       return true;
     } catch (_) {
       return false;
+    } finally {
+      _acceptingIds.remove(userId);
     }
   }
 

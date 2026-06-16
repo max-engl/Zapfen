@@ -11,10 +11,12 @@ const { generateAvatarColor, getAvatarInitial } = require("../utils/avatarUtil")
 
 const router = express.Router();
 
-const MIN_CLIENT_VERSION = '1.1';
+const MIN_CLIENT_VERSION = '1.4';
 
 const PATCH_NOTES = [
     'Bug fixes und co.',
+    'Statistiken sind jetzt übersichtlicher.',
+    'Die Post-Zeiten sind jetzt korrekt'
 ];
 
 function parseVersion(v) {
@@ -163,6 +165,16 @@ router.post("/login", async (req, res) => {
             message: "Login failed",
             error: error.message,
         });
+    }
+});
+
+// POST /auth/logout  —  clear FCM token so the device stops receiving push notifications
+router.post("/logout", authMiddleware, async (req, res) => {
+    try {
+        await User.findByIdAndUpdate(req.user._id, { $unset: { fcmToken: "" } });
+        res.json({ message: "Logged out" });
+    } catch (error) {
+        res.status(500).json({ message: "Logout failed", error: error.message });
     }
 });
 

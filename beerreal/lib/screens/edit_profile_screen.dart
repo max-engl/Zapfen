@@ -45,6 +45,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _avatarRemoved = false;
   File? _pendingAvatar;
   bool _saving = false;
+  bool _uploadingAvatar = false;
   bool _deletingAccount = false;
   String? _toast;
 
@@ -200,18 +201,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     setState(() {
       _pendingAvatar = File(picked.path);
       _avatarRemoved = false;
+      _uploadingAvatar = true;
     });
     try {
       final oldUrl = context.read<AuthProvider>().user?.avatarUrl;
       final user = await widget.profileService.uploadAvatar(_pendingAvatar!);
       if (!mounted) return;
       context.read<AuthProvider>().updateUser(user);
-      setState(() => _pendingAvatar = null);
+      setState(() {
+        _pendingAvatar = null;
+        _uploadingAvatar = false;
+      });
       _showToast('Foto aktualisiert');
       _evictAvatar(oldUrl); // fire-and-forget cleanup of old cached file
     } on DioException {
       if (!mounted) return;
-      setState(() => _pendingAvatar = null);
+      setState(() {
+        _pendingAvatar = null;
+        _uploadingAvatar = false;
+      });
       _showToast('Foto-Upload fehlgeschlagen');
     }
   }
@@ -448,8 +456,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             hasPhoto: _hasPhoto,
                             avatarUrl: _avatarUrl,
                             pendingFile: _pendingAvatar,
+                            uploading: _uploadingAvatar,
                             username: _username,
-                            onUpload: _pickAvatar,
+                            onUpload: _uploadingAvatar ? () {} : _pickAvatar,
                             onRemove: _removeAvatar,
                           ),
                           _SectionHeading(t: t, title: 'Benutzername'),
@@ -844,6 +853,7 @@ class _AvatarBlock extends StatelessWidget {
   final bool hasPhoto;
   final String? avatarUrl;
   final File? pendingFile;
+  final bool uploading;
   final String username;
   final VoidCallback onUpload;
   final VoidCallback onRemove;
@@ -853,6 +863,7 @@ class _AvatarBlock extends StatelessWidget {
     required this.hasPhoto,
     required this.avatarUrl,
     required this.pendingFile,
+    required this.uploading,
     required this.username,
     required this.onUpload,
     required this.onRemove,
@@ -889,11 +900,30 @@ class _AvatarBlock extends StatelessWidget {
                 ),
                 child: ClipOval(child: _avatarWidget()),
               ),
+              if (uploading)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.black.withValues(alpha: 0.45),
+                    ),
+                    child: const Center(
+                      child: SizedBox(
+                        width: 26,
+                        height: 26,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               Positioned(
                 right: -2,
                 bottom: -2,
                 child: GestureDetector(
-                  onTap: onUpload,
+                  onTap: uploading ? null : onUpload,
                   child: Container(
                     width: 32,
                     height: 32,

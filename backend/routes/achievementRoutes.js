@@ -3,7 +3,10 @@ const fs = require("fs");
 const path = require("path");
 const Post = require("../models/Post");
 const PostReaction = require("../models/PostReaction");
+const User = require("../models/User");
 const authMiddleware = require("../middleware/authMiddleware");
+const { getFriendIds } = require("../utils/friends");
+const { getBerlinOffsetMinutes, localDayKey, localHour, localDow } = require("../utils/localTime");
 
 const router = express.Router();
 
@@ -163,8 +166,8 @@ const ACHIEVEMENTS = [
         icon: "streak",
         name: "Heiße Serie",
         blurb: "Logge an 5 Tagen hintereinander einen Drink.",
-        getProgress: (posts) => {
-            const streak = computeStreak(posts);
+        getProgress: (posts, offsetMinutes = 0) => {
+            const streak = computeStreak(posts, offsetMinutes);
             return { earned: streak >= 5, have: streak, goal: 5 };
         },
     },
@@ -236,12 +239,11 @@ const ACHIEVEMENTS = [
         icon: "owl",
         name: "Nachteule",
         blurb: "Logge 10 Drinks nach Mitternacht.",
-        getProgress: (posts) => {
-            const nightPours = posts.filter(
-                (p) =>
-                    new Date(p.createdAt).getHours() >= 0 &&
-                    new Date(p.createdAt).getHours() < 6,
-            ).length;
+        getProgress: (posts, offsetMinutes = 0) => {
+            const nightPours = posts.filter((p) => {
+                const h = localHour(new Date(p.createdAt), offsetMinutes);
+                return h >= 0 && h < 6;
+            }).length;
             return { earned: nightPours >= 10, have: nightPours, goal: 10 };
         },
     },
@@ -266,8 +268,8 @@ const HIDDEN_ACHIEVEMENTS = [
         icon: "secret",
         name: "Sieben-Tage-Woche",
         blurb: "Du hast an allen 7 Wochentagen mindestens einmal geloggt.",
-        getProgress: (posts) => {
-            const days = new Set(posts.map((p) => new Date(p.createdAt).getDay()));
+        getProgress: (posts, offsetMinutes = 0) => {
+            const days = new Set(posts.map((p) => localDow(new Date(p.createdAt), offsetMinutes)));
             return { earned: days.size === 7 };
         },
     },
@@ -276,10 +278,10 @@ const HIDDEN_ACHIEVEMENTS = [
         icon: "secret",
         name: "Geisterstunde",
         blurb: "Geloggt genau zwischen 00:00 und 00:05 Uhr.",
-        getProgress: (posts) => ({
+        getProgress: (posts, offsetMinutes = 0) => ({
             earned: posts.some((p) => {
-                const d = new Date(p.createdAt);
-                return d.getHours() === 0 && d.getMinutes() < 5;
+                const d = new Date(p.createdAt.getTime() + offsetMinutes * 60 * 1000);
+                return d.getUTCHours() === 0 && d.getUTCMinutes() < 5;
             }),
         }),
     },
@@ -288,10 +290,10 @@ const HIDDEN_ACHIEVEMENTS = [
         icon: "secret",
         name: "Montagsfrühstück",
         blurb: "Geloggt vor 9 Uhr morgens an einem Montag.",
-        getProgress: (posts) => ({
+        getProgress: (posts, offsetMinutes = 0) => ({
             earned: posts.some((p) => {
-                const d = new Date(p.createdAt);
-                return d.getDay() === 1 && d.getHours() < 9;
+                return localDow(new Date(p.createdAt), offsetMinutes) === 1 &&
+                       localHour(new Date(p.createdAt), offsetMinutes) < 9;
             }),
         }),
     },
@@ -300,10 +302,10 @@ const HIDDEN_ACHIEVEMENTS = [
         icon: "secret",
         name: "Regenbogen",
         blurb: "7 verschiedene Sorten an einem einzigen Tag geloggt.",
-        getProgress: (posts) => {
+        getProgress: (posts, offsetMinutes = 0) => {
             const byDay = {};
             posts.forEach((p) => {
-                const key = new Date(p.createdAt).toDateString();
+                const key = localDayKey(new Date(p.createdAt), offsetMinutes);
                 if (!byDay[key]) byDay[key] = new Set();
                 if (p.drink?.name) byDay[key].add(p.drink.name);
             });
@@ -315,14 +317,14 @@ const HIDDEN_ACHIEVEMENTS = [
         icon: "secret",
         name: "Stammgast",
         blurb: "An demselben Ort an mindestens 5 verschiedenen Tagen geloggt.",
-        getProgress: (posts) => {
+        getProgress: (posts, offsetMinutes = 0) => {
             const spotDays = {};
             posts.forEach((p) => {
                 if (p.location?.coordinates?.length === 2) {
                     const [lng, lat] = p.location.coordinates;
                     const spot = `${(lat * 10).toFixed(0)},${(lng * 10).toFixed(0)}`;
                     if (!spotDays[spot]) spotDays[spot] = new Set();
-                    spotDays[spot].add(new Date(p.createdAt).toDateString());
+                    spotDays[spot].add(localDayKey(new Date(p.createdAt), offsetMinutes));
                 }
             });
             return { earned: Object.values(spotDays).some((s) => s.size >= 5) };
@@ -330,22 +332,14 @@ const HIDDEN_ACHIEVEMENTS = [
     },
 ];
 
-function computeStreak(posts) {
+function computeStreak(posts, offsetMinutes = 0) {
     if (!posts.length) return 0;
 
-    const daySet = new Set(
-        posts.map((p) => {
-            const d = new Date(p.createdAt);
-            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        }),
-    );
+    const daySet = new Set(posts.map((p) => localDayKey(new Date(p.createdAt), offsetMinutes)));
 
-    const today = new Date();
     let streak = 0;
     for (let i = 0; i <= 365; i++) {
-        const d = new Date(today);
-        d.setDate(today.getDate() - i);
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const key = localDayKey(new Date(Date.now() - i * 86400000), offsetMinutes);
         if (daySet.has(key)) {
             streak++;
         } else if (i > 0) {
@@ -474,13 +468,14 @@ function degreesToRadians(degrees) {
 router.get("/location-targets", authMiddleware, async (req, res) => {
     try {
         res.set("Cache-Control", "no-store");
+        const offsetMinutes = getBerlinOffsetMinutes();
         const posts = await Post.find({ user: req.user._id })
             .select("createdAt location stats")
             .sort({ createdAt: -1 })
             .lean();
 
         const targets = await Promise.all(LOCATION_ACHIEVEMENTS.map(async (a) => {
-            const progress = await a.getProgress(posts);
+            const progress = await a.getProgress(posts, offsetMinutes);
             const target = {
                 id: a.id,
                 icon: a.icon,
@@ -493,7 +488,7 @@ router.get("/location-targets", authMiddleware, async (req, res) => {
                 have: progress.have || 0,
                 goal: progress.goal || 1,
             };
-            target.statusLabel = buildStatusLabel(target, progress.date);
+            target.statusLabel = buildStatusLabel(target, progress.date, offsetMinutes);
             return target;
         }));
 
@@ -510,6 +505,7 @@ router.get("/location-targets", authMiddleware, async (req, res) => {
 router.get("/me", authMiddleware, async (req, res) => {
     try {
         res.set("Cache-Control", "no-store");
+        const offsetMinutes = getBerlinOffsetMinutes();
         const posts = await Post.find({ user: req.user._id })
             .select("createdAt location stats")
             .sort({ createdAt: -1 })
@@ -517,7 +513,7 @@ router.get("/me", authMiddleware, async (req, res) => {
 
         const results = [];
         for (const a of ACHIEVEMENTS) {
-            const progress = await a.getProgress(posts);
+            const progress = await a.getProgress(posts, offsetMinutes);
             const achievement = {
                 id: a.id,
                 icon: a.icon,
@@ -527,7 +523,7 @@ router.get("/me", authMiddleware, async (req, res) => {
                 have: progress.have || 0,
                 goal: progress.goal || 1,
             };
-            achievement.statusLabel = buildStatusLabel(achievement, progress.date);
+            achievement.statusLabel = buildStatusLabel(achievement, progress.date, offsetMinutes);
             if (progress.earned && progress.date) {
                 achievement.earnedDate = progress.date;
             }
@@ -535,7 +531,7 @@ router.get("/me", authMiddleware, async (req, res) => {
         }
 
         const hiddenResults = await Promise.all(HIDDEN_ACHIEVEMENTS.map(async (a) => {
-            const progress = await a.getProgress(posts);
+            const progress = await a.getProgress(posts, offsetMinutes);
             if (!progress.earned) {
                 return {
                     id: a.id,
@@ -558,7 +554,7 @@ router.get("/me", authMiddleware, async (req, res) => {
                 hidden: true,
                 have: 1,
                 goal: 1,
-                statusLabel: buildStatusLabel({ earned: true, have: 1, goal: 1 }, null),
+                statusLabel: buildStatusLabel({ earned: true, have: 1, goal: 1 }, null, offsetMinutes),
             };
         }));
 
@@ -571,7 +567,7 @@ router.get("/me", authMiddleware, async (req, res) => {
     }
 });
 
-function buildStatusLabel(achievement, earnedDate) {
+function buildStatusLabel(achievement, earnedDate, offsetMinutes = 0) {
     if (!achievement.earned) {
         const remaining = Math.max(achievement.goal - achievement.have, 0);
         return `Noch ${remaining} · ${Math.min(achievement.have, achievement.goal)}/${achievement.goal}`;
@@ -579,15 +575,11 @@ function buildStatusLabel(achievement, earnedDate) {
 
     if (!earnedDate) return "Erhalten";
 
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const date = new Date(earnedDate);
-    const earnedDay = new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate(),
-    );
-    const days = Math.floor((today - earnedDay) / (24 * 60 * 60 * 1000));
+    const todayKey = localDayKey(new Date(), offsetMinutes);
+    const earnedKey = localDayKey(new Date(earnedDate), offsetMinutes);
+    const todayMs = new Date(todayKey).getTime();
+    const earnedMs = new Date(earnedKey).getTime();
+    const days = Math.floor((todayMs - earnedMs) / 86400000);
 
     if (days <= 0) return "Erhalten · heute";
     if (days === 1) return "Erhalten · gestern";
@@ -600,6 +592,7 @@ function buildStatusLabel(achievement, earnedDate) {
 router.get("/user/:userId", authMiddleware, async (req, res) => {
     try {
         res.set("Cache-Control", "no-store");
+        const offsetMinutes = getBerlinOffsetMinutes();
         const targetId = req.params.userId;
 
         const posts = await Post.find({ user: targetId })
@@ -609,7 +602,7 @@ router.get("/user/:userId", authMiddleware, async (req, res) => {
 
         const results = [];
         for (const a of ACHIEVEMENTS) {
-            const progress = await a.getProgress(posts);
+            const progress = await a.getProgress(posts, offsetMinutes);
             const achievement = {
                 id: a.id,
                 icon: a.icon,
@@ -619,7 +612,7 @@ router.get("/user/:userId", authMiddleware, async (req, res) => {
                 have: progress.have || 0,
                 goal: progress.goal || 1,
             };
-            achievement.statusLabel = buildStatusLabel(achievement, progress.date);
+            achievement.statusLabel = buildStatusLabel(achievement, progress.date, offsetMinutes);
             if (progress.earned && progress.date) {
                 achievement.earnedDate = progress.date;
             }
@@ -630,6 +623,66 @@ router.get("/user/:userId", authMiddleware, async (req, res) => {
     } catch (error) {
         res.status(500).json({
             message: "Erfolge konnten nicht geladen werden.",
+            error: error.message,
+        });
+    }
+});
+
+// GET /achievements/:achievementId/friends — how friends (+ self) are doing on one achievement
+router.get("/:achievementId/friends", authMiddleware, async (req, res) => {
+    try {
+        const { achievementId } = req.params;
+
+        const allDefs = [...ACHIEVEMENTS, ...HIDDEN_ACHIEVEMENTS];
+        const def = allDefs.find((a) => a.id === achievementId);
+        if (!def) {
+            return res.status(404).json({ message: "Achievement nicht gefunden." });
+        }
+
+        const friendIds = await getFriendIds(req.user._id);
+        const allUserIds = [req.user._id, ...friendIds];
+
+        const users = await User.find({ _id: { $in: allUserIds } })
+            .select("_id username avatarColor avatarInitial avatarUrl")
+            .lean();
+
+        const standings = [];
+        for (const user of users) {
+            const posts = await Post.find({ user: user._id })
+                .select("createdAt location stats drink")
+                .sort({ createdAt: -1 })
+                .lean();
+
+            const progress = await def.getProgress(posts, getBerlinOffsetMinutes());
+            const isSelf = user._id.toString() === req.user._id.toString();
+            const goal = progress.goal ?? 1;
+            const have = progress.have ?? (progress.earned ? goal : 0);
+
+            standings.push({
+                userId: user._id,
+                username: user.username,
+                avatarColor: user.avatarColor ?? "#F6B733",
+                avatarInitial: user.avatarInitial ?? "?",
+                avatarUrl: user.avatarUrl ?? null,
+                isSelf,
+                earned: Boolean(progress.earned),
+                earnedDate: progress.earned && progress.date ? progress.date : null,
+                have: Math.min(have, goal),
+                goal,
+            });
+        }
+
+        standings.sort((a, b) => {
+            if (a.earned !== b.earned) return a.earned ? -1 : 1;
+            const aRatio = a.goal > 0 ? a.have / a.goal : 0;
+            const bRatio = b.goal > 0 ? b.have / b.goal : 0;
+            return bRatio - aRatio;
+        });
+
+        res.json({ standings });
+    } catch (error) {
+        res.status(500).json({
+            message: "Freundes-Standings konnten nicht geladen werden.",
             error: error.message,
         });
     }

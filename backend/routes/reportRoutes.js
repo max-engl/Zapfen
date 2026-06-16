@@ -1,6 +1,7 @@
 const express = require("express");
 const archiver = require("archiver");
 const bcrypt = require("bcrypt");
+const { Resend } = require("resend");
 const Post = require("../models/Post");
 const Report = require("../models/Report");
 const User = require("../models/User");
@@ -18,6 +19,86 @@ const { DeleteObjectsCommand, GetObjectCommand } = require("@aws-sdk/client-s3")
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const authMiddleware = require("../middleware/authMiddleware");
 const adminMiddleware = require("../middleware/adminMiddleware");
+const { sendToUsers } = require("../services/notificationService");
+
+async function sendReportNotificationEmail(report, reporter, post) {
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const adminUrl = `${process.env.BASE_URL}/admin#reports`;
+    const reportedUser = await require("../models/User").findById(post.user).select("username").lean();
+    const reportedUsername = reportedUser?.username ?? post.user.toString();
+    const reporterUsername = reporter.username ?? reporter._id.toString();
+    const createdAt = new Date(report.createdAt).toLocaleString("de-DE", { timeZone: "Europe/Berlin" });
+
+    await resend.emails.send({
+        from: "Zapfen <noreply@zapfenapp.de>",
+        to: "engl.devmail@gmail.com",
+        subject: `🚩 Neuer Report von @${reporterUsername}`,
+        html: `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Neuer Report – Zapfen Admin</title>
+</head>
+<body style="margin:0;padding:0;background:#0F0F0F;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0F0F0F;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#1A1A1A;border-radius:24px;border:1px solid #2A2A2A;overflow:hidden;">
+          <tr>
+            <td style="padding:36px 36px 0;text-align:center;">
+              <div style="display:inline-block;background:#C0392B;border-radius:18px;width:52px;height:52px;line-height:52px;font-size:28px;text-align:center;">🚩</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 36px 8px;text-align:center;">
+              <div style="color:#FFFFFF;font-size:22px;font-weight:800;letter-spacing:-0.5px;">Neuer Report eingegangen</div>
+              <div style="color:#888;font-size:13px;margin-top:6px;">${createdAt}</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 36px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#242424;border-radius:14px;border:1px solid #2A2A2A;">
+                <tr>
+                  <td style="padding:16px 20px;border-bottom:1px solid #2A2A2A;">
+                    <div style="color:#888;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Gemeldet von</div>
+                    <div style="color:#FFF;font-size:15px;font-weight:600;">@${reporterUsername}</div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 20px;border-bottom:1px solid #2A2A2A;">
+                    <div style="color:#888;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Gemeldeter Nutzer</div>
+                    <div style="color:#FFF;font-size:15px;font-weight:600;">@${reportedUsername}</div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 20px;border-bottom:1px solid #2A2A2A;">
+                    <div style="color:#888;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Post-ID</div>
+                    <div style="color:#AAA;font-size:13px;font-family:monospace;">${post._id}</div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <div style="color:#888;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Grund</div>
+                    <div style="color:#FFF;font-size:15px;line-height:1.5;">${report.reason.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 36px 36px;text-align:center;">
+              <a href="${adminUrl}" style="display:inline-block;background:#F6B733;color:#1A1A1A;font-weight:800;font-size:15px;text-decoration:none;padding:14px 32px;border-radius:14px;letter-spacing:-0.2px;">Im Admin-Panel ansehen →</a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+    });
+}
 
 // User-facing: submit a report
 const reportRouter = express.Router();
@@ -43,6 +124,11 @@ reportRouter.post("/posts/:postId", authMiddleware, async (req, res) => {
             reportedUser: post.user,
             reason: reason.trim(),
         });
+
+        // Fire-and-forget — don't block the response on email delivery
+        sendReportNotificationEmail(report, req.user, post).catch(err =>
+            console.error("[report] email error:", err.message)
+        );
 
         res.status(201).json({ message: "Report submitted", reportId: report._id });
     } catch (error) {
@@ -359,6 +445,26 @@ adminRouter.delete("/users/:userId", async (req, res) => {
         res.json({ message: "Nutzerkonto gelöscht" });
     } catch (error) {
         res.status(500).json({ message: "Fehler beim Löschen", error: error.message });
+    }
+});
+
+// POST /admin/broadcast — send a push notification to all users with an FCM token
+adminRouter.post("/broadcast", async (req, res) => {
+    try {
+        const { title, body } = req.body;
+        if (!title?.trim() || !body?.trim()) {
+            return res.status(400).json({ message: "Titel und Nachricht sind erforderlich" });
+        }
+        const recipients = await User.find({ fcmToken: { $exists: true, $ne: null } }).select("_id");
+        const recipientIds = recipients.map((u) => u._id);
+        if (!recipientIds.length) {
+            return res.json({ message: "Keine Empfänger mit aktivierten Benachrichtigungen", sent: 0 });
+        }
+        sendToUsers(recipientIds, { title: title.trim(), body: body.trim(), data: { type: "broadcast" } })
+            .catch((err) => console.error("[broadcast] sendToUsers error:", err.message));
+        res.json({ message: "Broadcast gesendet", sent: recipientIds.length });
+    } catch (error) {
+        res.status(500).json({ message: "Fehler beim Senden", error: error.message });
     }
 });
 

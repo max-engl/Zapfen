@@ -97,7 +97,11 @@ class _Header extends StatelessWidget {
                 color: t.surfaceWeak,
                 border: Border.all(color: t.border),
               ),
-              child: Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: t.text),
+              child: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 16,
+                color: t.text,
+              ),
             ),
           ),
           const Spacer(),
@@ -206,7 +210,10 @@ class _Body extends StatelessWidget {
               GestureDetector(
                 onTap: () => context.read<NotificationProvider>().load(),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: t.surfaceWeak,
                     borderRadius: BorderRadius.circular(999),
@@ -214,7 +221,11 @@ class _Body extends StatelessWidget {
                   ),
                   child: Text(
                     'Erneut versuchen',
-                    style: TextStyle(color: t.text, fontWeight: FontWeight.w600, fontSize: 13),
+                    style: TextStyle(
+                      color: t.text,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ),
@@ -250,7 +261,9 @@ class _Body extends StatelessWidget {
               StaggerItem(
                 key: ValueKey(n.id),
                 index: notifIdx++,
-                child: _NotifRow(notification: n, onGoToFriends: onGoToFriends),
+                child: n.type == 'bingo_line'
+                    ? _BingoLineNotifRow(notification: n)
+                    : _NotifRow(notification: n, onGoToFriends: onGoToFriends),
               ),
           ],
         Padding(
@@ -258,7 +271,11 @@ class _Body extends StatelessWidget {
           child: Text(
             'Das war alles aus den letzten 30 Tagen 🍻',
             textAlign: TextAlign.center,
-            style: TextStyle(color: t.textFaint, fontSize: 12, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: t.textFaint,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ],
@@ -349,7 +366,9 @@ class _NotifRowState extends State<_NotifRow> {
         );
         if (!mounted) return;
         await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => FriendProfileScreen(friend: friend)),
+          MaterialPageRoute(
+            builder: (_) => FriendProfileScreen(friend: friend),
+          ),
         );
 
       case 'request':
@@ -426,7 +445,11 @@ class _NotifRowState extends State<_NotifRow> {
                         color: badgeData.bg,
                         border: Border.all(color: t.bg, width: 2),
                       ),
-                      child: Icon(badgeData.icon, size: 11, color: badgeData.fg),
+                      child: Icon(
+                        badgeData.icon,
+                        size: 11,
+                        color: badgeData.fg,
+                      ),
                     ),
                   ),
               ],
@@ -439,21 +462,34 @@ class _NotifRowState extends State<_NotifRow> {
                 children: [
                   RichText(
                     text: TextSpan(
-                      style: TextStyle(fontSize: 14, height: 1.35, color: t.text),
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.35,
+                        color: t.text,
+                      ),
                       children: [
                         if (n.actorUsername != null)
                           TextSpan(
                             text: '@${n.actorUsername}',
-                            style: const TextStyle(fontWeight: FontWeight.w700, letterSpacing: -0.01 * 14),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.01 * 14,
+                            ),
                           ),
                         if (n.mutualCount > 0)
                           TextSpan(
                             text: ' · ${n.mutualCount} gemeinsame',
-                            style: TextStyle(color: t.textMuted, fontWeight: FontWeight.w500),
+                            style: TextStyle(
+                              color: t.textMuted,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         TextSpan(
                           text: ' ${_body(n.type)}',
-                          style: TextStyle(color: t.textMuted, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            color: t.textMuted,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ],
                     ),
@@ -461,10 +497,13 @@ class _NotifRowState extends State<_NotifRow> {
                   const SizedBox(height: 3),
                   Text(
                     '${n.timeLabel} ago',
-                    style: TextStyle(fontSize: 11.5, color: t.textFaint, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: t.textFaint,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  if (n.type == 'request')
-                    _FriendActions(notification: n),
+                  if (n.type == 'request') _FriendActions(notification: n),
                 ],
               ),
             ),
@@ -483,18 +522,195 @@ class _NotifRowState extends State<_NotifRow> {
                   cacheManager: AppCacheManager.instance,
                   width: 46,
                   height: 46,
+                  memCacheWidth: 138,
+                  memCacheHeight: 138,
+                  fadeInDuration: Duration.zero,
                   fit: BoxFit.cover,
                   placeholder: (_, __) => const ShimmerBox(),
-                  errorWidget: (_, __, ___) => Container(
-                    width: 46,
-                    height: 46,
-                    color: t.surfaceWeak,
-                  ),
+                  errorWidget: (_, __, ___) =>
+                      Container(width: 46, height: 46, color: t.surfaceWeak),
                 ),
               ),
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Bingo line notification row ───────────────────────────────────────────────
+
+class _BingoLineNotifRow extends StatelessWidget {
+  final AppNotification notification;
+  const _BingoLineNotifRow({required this.notification});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = PintThemeProvider.of(context);
+    final n = notification;
+
+    return GestureDetector(
+      onTap: () {
+        if (!n.read) context.read<NotificationProvider>().markRead(n.id);
+      },
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(10, 5, 10, 5),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [t.goldFaint, t.goldSoft.withValues(alpha: 0.6)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: t.goldBorder, width: 1.5),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Unread dot
+              SizedBox(
+                width: 8,
+                child: n.read
+                    ? const SizedBox.shrink()
+                    : Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: t.gold,
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 8),
+              // Avatar with gold ring
+              PintAvatar(
+                size: 46,
+                imageUrl: n.actorAvatarUrl,
+                avatarColor: n.actorAvatarColor,
+                initials: n.actorAvatarInitial,
+                ring: true,
+              ),
+              const SizedBox(width: 12),
+              // Text block
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'BINGO!',
+                          style: TextStyle(
+                            color: t.goldText,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.6,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text('🎊', style: const TextStyle(fontSize: 13)),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    RichText(
+                      text: TextSpan(
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.3,
+                          color: t.text,
+                        ),
+                        children: [
+                          if (n.actorUsername != null)
+                            TextSpan(
+                              text: '@${n.actorUsername}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          TextSpan(
+                            text: ' hat eine Zeile im Bingo-Feld komplett!',
+                            style: TextStyle(
+                              color: t.textMuted,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${n.timeLabel} ago',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: t.goldText,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Mini 5×5 bingo grid
+              _MiniBingoGrid(t: t),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniBingoGrid extends StatelessWidget {
+  final PintTheme t;
+  const _MiniBingoGrid({required this.t});
+
+  static const _completedRow = 2; // highlight row index 2 (middle row)
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 42,
+      height: 42,
+      child: Column(
+        children: List.generate(5, (row) {
+          final isCompletedRow = row == _completedRow;
+          return Expanded(
+            child: Row(
+              children: List.generate(5, (col) {
+                final isCenter = row == 2 && col == 2;
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(1.5),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isCompletedRow
+                            ? t.gold
+                            : isCenter
+                            ? t.goldSoft
+                            : t.surfaceWeak.withValues(alpha: 0.8),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: isCenter && !isCompletedRow
+                          ? Center(
+                              child: Text(
+                                '★',
+                                style: TextStyle(
+                                  fontSize: 5,
+                                  color: t.goldText,
+                                ),
+                              ),
+                            )
+                          : null,
+                    ),
+                  ),
+                );
+              }),
+            ),
+          );
+        }),
       ),
     );
   }
@@ -570,7 +786,9 @@ class _FriendActionsState extends State<_FriendActions> {
             onTap: () async {
               final actorId = widget.notification.actorId;
               if (actorId == null) return;
-              final ok = await context.read<FriendProvider>().declineRequest(actorId);
+              final ok = await context.read<FriendProvider>().declineRequest(
+                actorId,
+              );
               if (ok && mounted) {
                 setState(() => _state = 'declined');
               }
@@ -684,29 +902,60 @@ class _BadgeData {
 _BadgeData _badge(String type, PintTheme t) {
   switch (type) {
     case 'cheers':
-      return _BadgeData(icon: Icons.sports_bar_outlined, bg: t.goldSoft, fg: t.goldText);
+      return _BadgeData(
+        icon: Icons.sports_bar_outlined,
+        bg: t.goldSoft,
+        fg: t.goldText,
+      );
     case 'comment':
-      return _BadgeData(icon: Icons.chat_bubble_outline_rounded, bg: t.surfaceWeak, fg: t.text);
+      return _BadgeData(
+        icon: Icons.chat_bubble_outline_rounded,
+        bg: t.surfaceWeak,
+        fg: t.text,
+      );
     case 'request':
-      return _BadgeData(icon: Icons.person_add_outlined, bg: t.goldSoft, fg: t.goldText);
+      return _BadgeData(
+        icon: Icons.person_add_outlined,
+        bg: t.goldSoft,
+        fg: t.goldText,
+      );
     case 'accepted':
-      return _BadgeData(icon: Icons.check_rounded, bg: t.goldSoft, fg: t.goldText);
+      return _BadgeData(
+        icon: Icons.check_rounded,
+        bg: t.goldSoft,
+        fg: t.goldText,
+      );
     case 'bingo_line':
-      return _BadgeData(icon: Icons.grid_on_rounded, bg: t.goldSoft, fg: t.goldText);
+      return _BadgeData(
+        icon: Icons.grid_on_rounded,
+        bg: t.goldSoft,
+        fg: t.goldText,
+      );
     case 'poured':
     default:
-      return _BadgeData(icon: Icons.sports_bar_outlined, bg: t.surfaceWeak, fg: t.text);
+      return _BadgeData(
+        icon: Icons.sports_bar_outlined,
+        bg: t.surfaceWeak,
+        fg: t.text,
+      );
   }
 }
 
 String _body(String type) {
   switch (type) {
-    case 'cheers': return 'hat auf deinen Beitrag reagiert';
-    case 'comment': return 'hat deinen Beitrag kommentiert';
-    case 'request': return 'möchte mit dir befreundet sein.';
-    case 'accepted': return 'hat deine Freundschaftsanfrage angenommen.';
-    case 'poured': return 'hat gerade gezapft!';
-    case 'bingo_line': return 'hat eine Bingo-Zeile komplett! 🎰';
-    default: return '';
+    case 'cheers':
+      return 'hat auf deinen Beitrag reagiert';
+    case 'comment':
+      return 'hat deinen Beitrag kommentiert';
+    case 'request':
+      return 'möchte mit dir befreundet sein.';
+    case 'accepted':
+      return 'hat deine Freundschaftsanfrage angenommen.';
+    case 'poured':
+      return 'hat gerade gezapft!';
+    case 'bingo_line':
+      return 'hat eine Bingo-Zeile komplett! 🎰';
+    default:
+      return '';
   }
 }

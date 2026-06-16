@@ -58,6 +58,7 @@ const userSchema = new mongoose.Schema(
     },
     passwordResetToken: { type: String, default: null },
     passwordResetExpiry: { type: Date, default: null },
+    avatarCompressed: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

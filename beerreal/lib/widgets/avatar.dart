@@ -40,6 +40,8 @@ class PintAvatar extends StatelessWidget {
                 cacheManager: AppCacheManager.instance,
                 fit: BoxFit.cover,
                 fadeInDuration: Duration.zero,
+                memCacheWidth: (size * 3).ceil(),
+                memCacheHeight: (size * 3).ceil(),
                 errorWidget: (_, __, ___) => _buildColoredAvatar(),
               )
             : _buildColoredAvatar(),

@@ -23,6 +23,19 @@ class Achievement {
     this.hidden = false,
   });
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'icon': icon,
+        'name': name,
+        'blurb': blurb,
+        'earned': earned,
+        'have': have,
+        'goal': goal,
+        'statusLabel': statusLabel,
+        'earnedDate': earnedDate?.toIso8601String(),
+        'hidden': hidden,
+      };
+
   factory Achievement.fromJson(Map<String, dynamic> json) {
     final earnedDateValue = json['earnedDate'] as String?;
     return Achievement(
@@ -38,6 +51,48 @@ class Achievement {
           ? null
           : DateTime.tryParse(earnedDateValue),
       hidden: (json['hidden'] ?? false) as bool,
+    );
+  }
+}
+
+class FriendAchievementStanding {
+  final String userId;
+  final String username;
+  final String avatarColor;
+  final String avatarInitial;
+  final String? avatarUrl;
+  final bool isSelf;
+  final bool earned;
+  final DateTime? earnedDate;
+  final int have;
+  final int goal;
+
+  const FriendAchievementStanding({
+    required this.userId,
+    required this.username,
+    required this.avatarColor,
+    required this.avatarInitial,
+    this.avatarUrl,
+    required this.isSelf,
+    required this.earned,
+    this.earnedDate,
+    required this.have,
+    required this.goal,
+  });
+
+  factory FriendAchievementStanding.fromJson(Map<String, dynamic> j) {
+    final earnedDateRaw = j['earnedDate'] as String?;
+    return FriendAchievementStanding(
+      userId: (j['userId'] ?? '') as String,
+      username: (j['username'] ?? '') as String,
+      avatarColor: (j['avatarColor'] ?? '#F6B733') as String,
+      avatarInitial: (j['avatarInitial'] ?? '?') as String,
+      avatarUrl: j['avatarUrl'] as String?,
+      isSelf: (j['isSelf'] ?? false) as bool,
+      earned: (j['earned'] ?? false) as bool,
+      earnedDate: earnedDateRaw == null ? null : DateTime.tryParse(earnedDateRaw),
+      have: (j['have'] as num?)?.toInt() ?? 0,
+      goal: (j['goal'] as num?)?.toInt() ?? 1,
     );
   }
 }

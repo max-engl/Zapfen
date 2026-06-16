@@ -53,14 +53,22 @@ Future<void> showPostOptionsSheet(
                     ? 'Entfernt deinen Beitrag dauerhaft.'
                     : 'Schicke diesen Beitrag zur Admin-Prüfung.',
                 destructive: true,
-                onTap: () {
+                onTap: () async {
                   Navigator.of(sheetContext).pop();
                   if (onDelete != null) {
-                    onDelete();
+                    if (!context.mounted) return;
+                    final confirmed = await showPintConfirmDialog(
+                      context,
+                      title: 'Beitrag löschen?',
+                      message: 'Dieser Beitrag wird dauerhaft entfernt.',
+                      confirmLabel: 'Löschen',
+                      destructive: true,
+                    );
+                    if (confirmed) onDelete();
                   } else if (onReport != null) {
                     onReport();
                   } else {
-                    showReportPostReasonSheet(context, post: post);
+                    if (context.mounted) showReportPostReasonSheet(context, post: post);
                   }
                 },
               ),

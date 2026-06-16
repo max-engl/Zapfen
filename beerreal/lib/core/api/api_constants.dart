@@ -20,6 +20,7 @@ class ApiConstants {
   static const String login = '/auth/login';
   static const String register = '/auth/register';
   static const String me = '/auth/me';
+  static const String logout = '/auth/logout';
 
   // Postst
   static const String feed = '/posts';
@@ -89,6 +90,10 @@ class ApiConstants {
 
   // Recap
   static const String nightRecap = '/recap/night';
+
+  // Achievement friend standings
+  static String achievementFriendStandings(String achievementId) =>
+      '/achievements/$achievementId/friends';
 
   // Bingo
   static const String bingoCard = '/bingo/card';

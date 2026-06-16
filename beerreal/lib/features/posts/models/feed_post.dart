@@ -71,7 +71,11 @@ class FeedPost {
     final myReaction = json['myReaction'] as String?;
     final rawReactions = json['reactions'] as List<dynamic>? ?? [];
     return FeedPost(
-      id: (json['id'] ?? json['_id'] ?? '') as String,
+      id: () {
+        final v = (json['id'] ?? json['_id'] ?? '') as String;
+        assert(v.isNotEmpty, 'FeedPost: server returned a post with no id');
+        return v;
+      }(),
       userId: (user['_id'] ?? user['id'] ?? '') as String,
       username: (user['username'] ?? '') as String,
       avatarUrl: user['avatarUrl'] as String?,
@@ -224,6 +228,23 @@ class FeedPost {
       return m > 0 ? '${diff.inHours}h ${m}m' : '${diff.inHours}h';
     }
     return '${diff.inDays}d';
+  }
+
+  static const _monthNames = [
+    'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez',
+  ];
+
+  String get formattedDateTime {
+    final h = createdAt.hour.toString().padLeft(2, '0');
+    final m = createdAt.minute.toString().padLeft(2, '0');
+    final mon = _monthNames[createdAt.month - 1];
+    final now = DateTime.now();
+    final isThisYear = createdAt.year == now.year;
+    final datePart = isThisYear
+        ? '${createdAt.day}. $mon'
+        : '${createdAt.day}. $mon ${createdAt.year}';
+    return '$h:$m · $datePart';
   }
 }
 

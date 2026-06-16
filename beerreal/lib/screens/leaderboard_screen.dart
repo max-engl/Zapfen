@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoSliverRefreshControl;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme.dart';
@@ -5,8 +6,11 @@ import '../features/leaderboard/models/leaderboard_entry.dart';
 import '../features/leaderboard/providers/leaderboard_provider.dart';
 import '../widgets/avatar.dart';
 import '../widgets/img_placeholder.dart';
+import '../widgets/pint_refresh_logo.dart';
 import '../widgets/shimmer_box.dart';
 import '../widgets/stagger_item.dart';
+import '../features/friends/models/api_friend.dart';
+import 'friend_profile_screen.dart';
 import 'stats_screen.dart';
 
 class LeaderboardScreen extends StatefulWidget {
@@ -92,45 +96,57 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                           message: provider.error!,
                           onRetry: () => provider.refresh(),
                         )
-                      : RefreshIndicator(
-                          color: t.gold,
-                          onRefresh: () => provider.refresh(),
-                          child: SingleChildScrollView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.only(bottom: 130),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _BoardToggle(
-                                  board: _board,
-                                  onChanged: (b) => setState(() => _board = b),
-                                ),
-                                _Subtitle(
-                                  board: _board,
-                                  countLabel: countLabel,
-                                  periodLabel: periodLabel,
-                                ),
-                                _MetricChips(
-                                  metric: _metric,
-                                  onChanged: (m) => setState(() => _metric = m),
-                                ),
-
-                                if (top3.isNotEmpty)
-                                  _Podium(top3: top3, metric: _metric),
-                                _SectionLabel(t: t),
-                                ...rest.asMap().entries.map(
-                                  (e) => StaggerItem(
-                                    index: e.key,
-                                    child: _RankRow(
-                                      entry: e.value,
-                                      rank: e.key + 4,
-                                      metric: _metric,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                      : CustomScrollView(
+                          physics: const BouncingScrollPhysics(
+                            parent: AlwaysScrollableScrollPhysics(),
                           ),
+                          slivers: [
+                            CupertinoSliverRefreshControl(
+                              onRefresh: () => provider.refresh(),
+                              builder: (_, state, pulledExtent, triggerDistance, __) =>
+                                  PintRefreshLogo(
+                                    state: state,
+                                    pulledExtent: pulledExtent,
+                                    triggerDistance: triggerDistance,
+                                  ),
+                            ),
+                            SliverPadding(
+                              padding: const EdgeInsets.only(bottom: 130),
+                              sliver: SliverToBoxAdapter(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _BoardToggle(
+                                      board: _board,
+                                      onChanged: (b) => setState(() => _board = b),
+                                    ),
+                                    _Subtitle(
+                                      board: _board,
+                                      countLabel: countLabel,
+                                      periodLabel: periodLabel,
+                                    ),
+                                    _MetricChips(
+                                      metric: _metric,
+                                      onChanged: (m) => setState(() => _metric = m),
+                                    ),
+                                    if (top3.isNotEmpty)
+                                      _Podium(top3: top3, metric: _metric),
+                                    _SectionLabel(t: t),
+                                    ...rest.asMap().entries.map(
+                                      (e) => StaggerItem(
+                                        index: e.key,
+                                        child: _RankRow(
+                                          entry: e.value,
+                                          rank: e.key + 4,
+                                          metric: _metric,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                   if (youEntry != null)
                     _YouBar(
@@ -689,10 +705,25 @@ class _RankRow extends StatelessWidget {
     required this.metric,
   });
 
+  void _openProfile(BuildContext context) {
+    final friend = ApiFriend(
+      id: entry.userId,
+      username: entry.username,
+      avatarUrl: entry.avatarUrl,
+      avatarColor: entry.avatarColor,
+      avatarInitial: entry.avatarInitial,
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => FriendProfileScreen(friend: friend)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = PintThemeProvider.of(context);
-    return Container(
+    return GestureDetector(
+      onTap: entry.isYou ? null : () => _openProfile(context),
+      child: Container(
       margin: entry.isYou
           ? const EdgeInsets.symmetric(horizontal: 10, vertical: 2)
           : EdgeInsets.zero,
@@ -771,6 +802,7 @@ class _RankRow extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }

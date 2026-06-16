@@ -18,6 +18,7 @@ const { getFriendIds } = require("../utils/friends");
 const Block = require("../models/Block");
 const User = require("../models/User");
 const { buildBingoCardForUser } = require("../utils/bingo");
+const { getBerlinOffsetMinutes, localDayStart, toGermanLocalIso } = require("../utils/localTime");
 
 const router = express.Router();
 const ALLOWED_REACTIONS = new Set(["🍺", "🔥", "😍", "💀", "😂"]);
@@ -76,7 +77,7 @@ function formatPost(post, imageUrl, selfieUrl, likedByMe = false, myReaction = n
         likedByMe,
         myReaction,
         reactions,
-        createdAt: post.createdAt,
+        createdAt: toGermanLocalIso(post.createdAt),
     };
     if (post.location && post.location.coordinates && post.location.coordinates.length === 2) {
         result.lat = post.location.coordinates[1];
@@ -184,7 +185,7 @@ router.post(
                 await r2.send(new DeleteObjectsCommand({
                     Bucket: process.env.R2_POST_BUCKET,
                     Delete: { Objects: [{ Key: storagePath }, { Key: selfieStoragePath }], Quiet: true },
-                })).catch(() => {});
+                })).catch(() => { });
                 return res.status(500).json({ message: "Image upload failed", error: uploadErr.message });
             }
 
@@ -208,7 +209,7 @@ router.post(
                 rating: hasRating ? parsedRating : null,
                 country: country?.trim() || null,
                 drink: {
-                    name:  drinkName?.trim()  || "",
+                    name: drinkName?.trim() || "",
                     emoji: drinkEmoji?.trim() || "",
                 },
                 ...(hasLocation && {
@@ -237,7 +238,7 @@ router.post(
             const actorAvatarColor = req.user.avatarColor ?? null;
             const actorAvatarInitial = req.user.avatarInitial ?? null;
 
-            checkBingoAfterPost(req.user._id, actorUsername, actorAvatarUrl, actorAvatarColor, actorAvatarInitial).catch(() => {});
+            checkBingoAfterPost(req.user._id, actorUsername, actorAvatarUrl, actorAvatarColor, actorAvatarInitial).catch(() => { });
             const postId = post._id.toString();
             getFriendIds(req.user._id).then(async (friendIds) => {
                 if (!friendIds.length) return;
@@ -259,8 +260,7 @@ router.post(
                 });
 
                 // If 4+ friends have posted today, nudge the ones who haven't yet
-                const todayStart = new Date();
-                todayStart.setUTCHours(0, 0, 0, 0);
+                const todayStart = localDayStart(new Date(), getBerlinOffsetMinutes());
 
                 const friendsWhoPostedToday = await Post.find({
                     user: { $in: friendIds },
@@ -586,7 +586,7 @@ router.post("/:id/reactions", authMiddleware, async (req, res) => {
                     title: `@${req.user.username} ${myReaction}`,
                     body: "hat auf deinen Beitrag reagiert",
                     data: { type: "post", postId: updatedPost._id.toString() },
-                }).catch(() => {});
+                }).catch(() => { });
                 saveNotification(updatedPost.user, {
                     type: 'cheers',
                     actorId: req.user._id,
@@ -596,8 +596,8 @@ router.post("/:id/reactions", authMiddleware, async (req, res) => {
                     actorAvatarInitial: req.user.avatarInitial ?? null,
                     postId: updatedPost._id,
                     postThumbPath: post.storagePath ?? null,
-                }).catch(() => {});
-            }).catch(() => {});
+                }).catch(() => { });
+            }).catch(() => { });
         }
     } catch (error) {
         res.status(500).json({ message: "Could not toggle reaction", error: error.message });

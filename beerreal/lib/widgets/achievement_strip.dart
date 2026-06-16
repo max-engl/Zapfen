@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../features/achievements/models/achievement.dart';
+import '../features/achievements/services/achievement_service.dart';
 import '../theme.dart';
 import 'shimmer_box.dart';
 
@@ -177,8 +179,9 @@ class _AchievementStripState extends State<AchievementStrip> {
                   t: t,
                   selected: achievement.id == _selectedId,
                   onTap: () => setState(() {
-                    _selectedId =
-                        _selectedId == achievement.id ? null : achievement.id;
+                    _selectedId = _selectedId == achievement.id
+                        ? null
+                        : achievement.id;
                   }),
                 );
               },
@@ -307,7 +310,11 @@ class AchievementBadgeMedal extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: mystery ? t.textFaint : locked ? t.textFaint : t.text,
+                  color: mystery
+                      ? t.textFaint
+                      : locked
+                      ? t.textFaint
+                      : t.text,
                   fontSize: 10.5,
                   fontWeight: FontWeight.w700,
                   height: 1.15,
@@ -337,7 +344,7 @@ class AchievementBadgeMedal extends StatelessWidget {
 
 // ── Detail card ───────────────────────────────────────────────────────────────
 
-class AchievementDetailCard extends StatelessWidget {
+class AchievementDetailCard extends StatefulWidget {
   final Achievement achievement;
   final PintTheme t;
 
@@ -348,12 +355,62 @@ class AchievementDetailCard extends StatelessWidget {
   });
 
   @override
+  State<AchievementDetailCard> createState() => _AchievementDetailCardState();
+}
+
+class _AchievementDetailCardState extends State<AchievementDetailCard> {
+  bool _showFriends = false;
+  bool _loadingFriends = false;
+  List<FriendAchievementStanding>? _standings;
+
+  @override
+  void didUpdateWidget(AchievementDetailCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.achievement.id != widget.achievement.id) {
+      setState(() {
+        _showFriends = false;
+        _standings = null;
+        _loadingFriends = false;
+      });
+    }
+  }
+
+  Future<void> _toggleFriends() async {
+    if (_showFriends) {
+      setState(() => _showFriends = false);
+      return;
+    }
+    setState(() => _showFriends = true);
+    if (_standings != null) return;
+    setState(() => _loadingFriends = true);
+    try {
+      final standings = await context
+          .read<AchievementService>()
+          .fetchFriendStandings(widget.achievement.id);
+      if (mounted)
+        setState(() {
+          _standings = standings;
+          _loadingFriends = false;
+        });
+    } catch (_) {
+      if (mounted)
+        setState(() {
+          _standings = [];
+          _loadingFriends = false;
+        });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final achievement = widget.achievement;
+    final t = widget.t;
     final earned = achievement.earned;
     final mystery = achievement.hidden && !earned;
     final goal = achievement.goal <= 0 ? 1 : achievement.goal;
     final progress = (achievement.have / goal).clamp(0.0, 1.0).toDouble();
     final statusLabel = achievementStatusLabel(achievement);
+    final showFriendsButton = !mystery;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(18, 10, 18, 0),
@@ -366,16 +423,23 @@ class AchievementDetailCard extends StatelessWidget {
             : t.surfaceWeaker,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: mystery ? t.border : earned ? t.goldBorder : t.border,
+          color: mystery
+              ? t.border
+              : earned
+              ? t.goldBorder
+              : t.border,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header row
           Row(
             children: [
               Icon(
-                mystery ? Icons.lock_outline_rounded : achievementBadgeIcon(achievement.icon),
+                mystery
+                    ? Icons.lock_outline_rounded
+                    : achievementBadgeIcon(achievement.icon),
                 size: 16,
                 color: mystery ? t.textFaint : t.goldText,
               ),
@@ -429,7 +493,355 @@ class AchievementDetailCard extends StatelessWidget {
               ),
             ),
           ],
+
+          // Friends standings toggle button
+          if (showFriendsButton) ...[
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: _toggleFriends,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 9,
+                ),
+                decoration: BoxDecoration(
+                  color: t.surfaceWeaker,
+                  borderRadius: BorderRadius.circular(11),
+                  border: Border.all(color: t.border),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.people_outline_rounded,
+                      size: 14,
+                      color: t.goldText,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Wie machen sich deine Freunde?',
+                        style: TextStyle(
+                          color: t.text,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.1,
+                        ),
+                      ),
+                    ),
+                    AnimatedRotation(
+                      turns: _showFriends ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 180),
+                      child: Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 18,
+                        color: t.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (_showFriends)
+              _FriendStandingsList(
+                standings: _standings,
+                loading: _loadingFriends,
+                t: t,
+              ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+// ── Friend standings list ─────────────────────────────────────────────────────
+
+class _FriendStandingsList extends StatelessWidget {
+  final List<FriendAchievementStanding>? standings;
+  final bool loading;
+  final PintTheme t;
+
+  const _FriendStandingsList({
+    required this.standings,
+    required this.loading,
+    required this.t,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 14),
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    final rows = standings ?? [];
+    if (rows.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Text(
+          'Noch keine Freunde vorhanden.',
+          style: TextStyle(
+            color: t.textFaint,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+
+    final selfIndex = rows.indexWhere((r) => r.isSelf);
+    final selfRank = selfIndex + 1;
+
+    // Find the leading friend (not self, earned or highest progress)
+    FriendAchievementStanding? leader;
+    for (final r in rows) {
+      if (!r.isSelf) {
+        leader = r;
+        break;
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 12),
+        // Section header
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'DEIN KREIS',
+              style: TextStyle(
+                color: t.textMuted,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.4,
+              ),
+            ),
+            if (selfRank > 0)
+              Text(
+                'Du bist #$selfRank von ${rows.length}',
+                style: TextStyle(
+                  color: t.goldText,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.4,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // Rows
+        ...rows.asMap().entries.map((entry) {
+          final i = entry.key;
+          final r = entry.value;
+          return _StandingRow(rank: i + 1, standing: r, t: t);
+        }),
+        // Footer note
+        if (leader != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            leader.earned
+                ? '${leader.username.split(' ').first} hat es schon geschafft.'
+                : '${leader.username.split(' ').first} führt deinen Kreis an.',
+            style: TextStyle(
+              color: t.textFaint,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _StandingRow extends StatelessWidget {
+  final int rank;
+  final FriendAchievementStanding standing;
+  final PintTheme t;
+
+  const _StandingRow({
+    required this.rank,
+    required this.standing,
+    required this.t,
+  });
+
+  String _earnedAgo(DateTime date) {
+    final days = DateTime.now().difference(date).inDays;
+    if (days <= 0) return 'heute';
+    if (days == 1) return 'gestern';
+    if (days < 7) return 'vor ${days}T';
+    if (days < 56) return 'vor ${(days / 7).floor()}W';
+    return 'vor längerem';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final goal = standing.goal <= 0 ? 1 : standing.goal;
+    final pct = standing.earned ? 1.0 : (standing.have / goal).clamp(0.0, 1.0);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+      decoration: BoxDecoration(
+        color: standing.isSelf ? t.goldFaint : Colors.transparent,
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(
+          color: standing.isSelf ? t.goldBorder : Colors.transparent,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Rank number
+          SizedBox(
+            width: 18,
+            child: Text(
+              '$rank',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: rank == 1 ? t.goldText : t.textFaint,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Avatar
+          _MiniAvatar(standing: standing, t: t),
+          const SizedBox(width: 10),
+          // Name + progress bar
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  standing.isSelf
+                      ? '${standing.username} · du'
+                      : standing.username,
+                  style: TextStyle(
+                    color: t.text,
+                    fontSize: 13,
+                    fontWeight: standing.isSelf
+                        ? FontWeight.w800
+                        : FontWeight.w600,
+                    letterSpacing: -0.1,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: pct,
+                    minHeight: 4,
+                    backgroundColor: t.surfaceWeak,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      standing.earned
+                          ? t.gold
+                          : (standing.isSelf ? t.gold : t.goldText),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Status
+          if (standing.earned)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check_rounded, size: 11, color: t.goldText),
+                const SizedBox(width: 3),
+                Text(
+                  standing.earnedDate != null
+                      ? _earnedAgo(standing.earnedDate!)
+                      : 'Erhalten',
+                  style: TextStyle(
+                    color: t.goldText,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            )
+          else
+            Text(
+              '${standing.have}/$goal',
+              style: TextStyle(
+                color: t.textMuted,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniAvatar extends StatelessWidget {
+  final FriendAchievementStanding standing;
+  final PintTheme t;
+
+  const _MiniAvatar({required this.standing, required this.t});
+
+  @override
+  Widget build(BuildContext context) {
+    final url = standing.avatarUrl;
+    if (url != null && url.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          url,
+          width: 28,
+          height: 28,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _InitialsAvatar(standing: standing),
+        ),
+      );
+    }
+    return _InitialsAvatar(standing: standing);
+  }
+}
+
+class _InitialsAvatar extends StatelessWidget {
+  final FriendAchievementStanding standing;
+
+  const _InitialsAvatar({required this.standing});
+
+  @override
+  Widget build(BuildContext context) {
+    Color bg;
+    try {
+      final hex = standing.avatarColor.replaceFirst('#', '');
+      bg = Color(int.parse('FF$hex', radix: 16));
+    } catch (_) {
+      bg = const Color(0xFFF6B733);
+    }
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+      child: Center(
+        child: Text(
+          standing.avatarInitial.toUpperCase(),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
       ),
     );
   }

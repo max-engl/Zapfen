@@ -3,19 +3,23 @@ const cron = require("node-cron");
 const Post = require("../models/Post");
 const User = require("../models/User");
 const authMiddleware = require("../middleware/authMiddleware");
+const { getBerlinOffsetMinutes } = require("../utils/localTime");
 const admin = require("../config/firebase");
 
 const router = express.Router();
 
-// Night session window: 2 PM (14:00) yesterday → 6 AM (06:00) today.
-// This captures "a night out" for Central European timezones regardless of DST.
-function getNightWindow(now) {
-  const sessionEnd = new Date(now);
-  sessionEnd.setHours(6, 0, 0, 0);
+// Night session window: 2 PM (14:00) yesterday → 6 AM (06:00) today in the user's local timezone.
+function getNightWindow(now, offsetMinutes = 0) {
+  const localNow = new Date(now.getTime() + offsetMinutes * 60 * 1000);
+  const y = localNow.getUTCFullYear();
+  const mo = localNow.getUTCMonth();
+  const d = localNow.getUTCDate();
+  const offsetMs = offsetMinutes * 60 * 1000;
 
-  const sessionStart = new Date(now);
-  sessionStart.setDate(sessionStart.getDate() - 1);
-  sessionStart.setHours(14, 0, 0, 0);
+  // Local 06:00 today → UTC
+  const sessionEnd = new Date(Date.UTC(y, mo, d, 6, 0, 0, 0) - offsetMs);
+  // Local 14:00 yesterday → UTC
+  const sessionStart = new Date(Date.UTC(y, mo, d - 1, 14, 0, 0, 0) - offsetMs);
 
   return { sessionStart, sessionEnd };
 }
@@ -66,7 +70,7 @@ async function buildRecap(userId, sessionStart, sessionEnd) {
 // GET /recap/night — last-night recap for the authenticated user
 router.get("/night", authMiddleware, async (req, res) => {
   try {
-    const { sessionStart, sessionEnd } = getNightWindow(new Date());
+    const { sessionStart, sessionEnd } = getNightWindow(new Date(), getBerlinOffsetMinutes());
     const recap = await buildRecap(req.user._id, sessionStart, sessionEnd);
     if (!recap) return res.json({ hasRecap: false });
     res.json({ hasRecap: true, ...recap });
@@ -81,7 +85,7 @@ router.get("/night", authMiddleware, async (req, res) => {
 // Called by the daily 9 AM cron job in server.js.
 async function sendNightRecapNotifications() {
   const now = new Date();
-  const { sessionStart, sessionEnd } = getNightWindow(now);
+  const { sessionStart, sessionEnd } = getNightWindow(now, getBerlinOffsetMinutes(now));
 
   const activeUserIds = await Post.distinct("user", {
     createdAt: { $gte: sessionStart, $lt: sessionEnd },
