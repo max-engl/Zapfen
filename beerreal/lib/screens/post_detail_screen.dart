@@ -253,31 +253,6 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
                     ),
                   ),
                 ),
-                if (_post.selfieReactions.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: Container(
-                      color: t.bg,
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                      child: Row(
-                        children: [
-                          Text(
-                            'Selfie-Reaktionen',
-                            style: TextStyle(
-                              color: t.textMuted,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const Spacer(),
-                          SelfieAvatarStack(
-                            reactions: _post.selfieReactions,
-                            myUserId: currentUserId,
-                            t: t,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
 
                 // Caption + meta
                 SliverToBoxAdapter(
@@ -379,7 +354,7 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 5),
                           Row(
                             children: [
                               Icon(
@@ -393,7 +368,7 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
                                 style: TextStyle(
                                   color: t.textMuted,
                                   fontSize: 11,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                               const SizedBox(width: 14),
@@ -402,7 +377,7 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
                                 style: TextStyle(
                                   color: t.textMuted,
                                   fontSize: 11,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                               const SizedBox(width: 14),
@@ -411,7 +386,7 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
                                 style: TextStyle(
                                   color: t.textMuted,
                                   fontSize: 11,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ],
@@ -428,12 +403,14 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
                 // Reactions bar
                 SliverToBoxAdapter(
                   child: _ReactionBar(
+                    post: _post,
                     reactions: _post.reactions,
                     myReaction: _post.myReaction,
                     selfieReactions: _post.selfieReactions,
                     onReact: _onReact,
                     onSelfieReact: _onSelfieReact,
                     onRemoveSelfieReaction: _onRemoveSelfieReaction,
+                    currentUserId: currentUserId!,
                   ),
                 ),
 
@@ -1035,20 +1012,23 @@ class _ZoomablePhotoState extends State<_ZoomablePhoto>
 // ── Reaction bar ──────────────────────────────────────────────────────────────
 
 class _ReactionBar extends StatelessWidget {
+  final FeedPost post;
   final List<PostReaction> reactions;
   final String? myReaction;
   final List<SelfieReaction> selfieReactions;
   final void Function(String emoji) onReact;
   final VoidCallback onSelfieReact;
   final Future<void> Function(String reactionId) onRemoveSelfieReaction;
-
+  final String currentUserId;
   const _ReactionBar({
+    required this.post,
     required this.reactions,
     required this.myReaction,
     required this.selfieReactions,
     required this.onReact,
     required this.onSelfieReact,
     required this.onRemoveSelfieReaction,
+    required this.currentUserId,
   });
 
   @override
@@ -1091,6 +1071,13 @@ class _ReactionBar extends StatelessWidget {
             onRemove: onRemoveSelfieReaction,
             t: t,
           ),
+          SizedBox(width: 10),
+          if (post.selfieReactions.isNotEmpty)
+            SelfieAvatarStack(
+              reactions: post.selfieReactions,
+              myUserId: currentUserId,
+              t: t,
+            ),
         ],
       ),
     );

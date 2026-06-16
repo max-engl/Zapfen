@@ -293,7 +293,7 @@ const HIDDEN_ACHIEVEMENTS = [
         getProgress: (posts, offsetMinutes = 0) => ({
             earned: posts.some((p) => {
                 return localDow(new Date(p.createdAt), offsetMinutes) === 1 &&
-                       localHour(new Date(p.createdAt), offsetMinutes) < 9;
+                    localHour(new Date(p.createdAt), offsetMinutes) < 9;
             }),
         }),
     },
@@ -335,18 +335,27 @@ const HIDDEN_ACHIEVEMENTS = [
 function computeStreak(posts, offsetMinutes = 0) {
     if (!posts.length) return 0;
 
-    const daySet = new Set(posts.map((p) => localDayKey(new Date(p.createdAt), offsetMinutes)));
+    const days = [...new Set(
+        posts.map((p) => localDayKey(new Date(p.createdAt), offsetMinutes))
+    )]
+        .map((key) => new Date(`${key}T00:00:00Z`))
+        .sort((a, b) => a - b);
 
-    let streak = 0;
-    for (let i = 0; i <= 365; i++) {
-        const key = localDayKey(new Date(Date.now() - i * 86400000), offsetMinutes);
-        if (daySet.has(key)) {
+    let streak = 1;
+    let maxStreak = 1;
+
+    for (let i = 1; i < days.length; i++) {
+        const diffDays = Math.round((days[i] - days[i - 1]) / 86400000);
+
+        if (diffDays === 1) {
             streak++;
-        } else if (i > 0) {
-            break;
+            maxStreak = Math.max(maxStreak, streak);
+        } else if (diffDays > 1) {
+            streak = 1;
         }
     }
-    return streak;
+
+    return maxStreak;
 }
 
 function countUniqueSpots(posts) {

@@ -795,7 +795,7 @@ class SelfieAvatarStack extends StatelessWidget {
     this.maxVisible = 3,
   });
 
-  static const _circleSize = 46.0;
+  static const _circleSize = 50.0;
   static const _overlap = 28.0;
 
   @override
@@ -884,8 +884,8 @@ class _SelfieAvatarCircle extends StatelessWidget {
           shape: BoxShape.circle,
           color: t.surfaceWeak,
           border: Border.all(
-            color: isMine ? t.gold : Colors.black,
-            width: isMine ? 3 : 2,
+            color: isMine ? t.gold : t.gold,
+            width: isMine ? 1 : 1,
           ),
         ),
         child: ClipOval(
