@@ -9,6 +9,8 @@ import '../widgets/img_placeholder.dart';
 import '../widgets/pint_refresh_logo.dart';
 import '../widgets/shimmer_box.dart';
 import '../widgets/stagger_item.dart';
+import '../features/friends/models/api_friend.dart';
+import 'friend_profile_screen.dart';
 import 'stats_screen.dart';
 
 class LeaderboardScreen extends StatefulWidget {
@@ -703,10 +705,25 @@ class _RankRow extends StatelessWidget {
     required this.metric,
   });
 
+  void _openProfile(BuildContext context) {
+    final friend = ApiFriend(
+      id: entry.userId,
+      username: entry.username,
+      avatarUrl: entry.avatarUrl,
+      avatarColor: entry.avatarColor,
+      avatarInitial: entry.avatarInitial,
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => FriendProfileScreen(friend: friend)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = PintThemeProvider.of(context);
-    return Container(
+    return GestureDetector(
+      onTap: entry.isYou ? null : () => _openProfile(context),
+      child: Container(
       margin: entry.isYou
           ? const EdgeInsets.symmetric(horizontal: 10, vertical: 2)
           : EdgeInsets.zero,
@@ -785,6 +802,7 @@ class _RankRow extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }

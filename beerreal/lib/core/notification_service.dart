@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -6,6 +7,7 @@ import 'api/api_client.dart';
 
 class NotificationService {
   static final _localNotifications = FlutterLocalNotificationsPlugin();
+  static StreamSubscription<String>? _tokenRefreshSub;
 
   /// Call once from main() after Firebase.initializeApp().
   /// Wires up local notification display for foreground messages.
@@ -64,8 +66,11 @@ class NotificationService {
       await _registerToken(apiClient, fcm);
     }
 
-    // Re-register whenever the token rotates.
-    messaging.onTokenRefresh.listen((newToken) => _registerToken(apiClient, newToken));
+    // Re-register whenever the token rotates. Cancel any previous listener first.
+    await _tokenRefreshSub?.cancel();
+    _tokenRefreshSub = messaging.onTokenRefresh.listen(
+      (newToken) => _registerToken(apiClient, newToken),
+    );
   }
 
   static Future<void> _registerToken(ApiClient apiClient, String token) async {

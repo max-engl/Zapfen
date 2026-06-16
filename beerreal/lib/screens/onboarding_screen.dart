@@ -57,15 +57,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   AnimatedOpacity(
                     opacity: _page < _total - 1 ? 1.0 : 0.0,
                     duration: const Duration(milliseconds: 200),
-                    child: GestureDetector(
-                      onTap: _page < _total - 1 ? widget.onComplete : null,
-                      child: Text(
-                        'Überspringen',
-                        style: TextStyle(
-                          color: t.textMuted,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: -0.1,
+                    child: IgnorePointer(
+                      ignoring: _page >= _total - 1,
+                      child: GestureDetector(
+                        onTap: widget.onComplete,
+                        child: Text(
+                          'Überspringen',
+                          style: TextStyle(
+                            color: t.textMuted,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -0.1,
+                          ),
                         ),
                       ),
                     ),

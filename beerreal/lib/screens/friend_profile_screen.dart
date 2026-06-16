@@ -742,6 +742,17 @@ class _BlockMenuButton extends StatelessWidget {
                     destructive: !isBlocked,
                     onTap: () async {
                       Navigator.of(sheetCtx).pop();
+                      if (!isBlocked) {
+                        if (!context.mounted) return;
+                        final confirmed = await showPintConfirmDialog(
+                          context,
+                          title: '@$username blockieren?',
+                          message: 'Du wirst keine Beiträge von @$username mehr sehen.',
+                          confirmLabel: 'Blockieren',
+                          destructive: true,
+                        );
+                        if (!confirmed) return;
+                      }
                       try {
                         if (isBlocked) {
                           await blockProvider.unblockUser(userId);

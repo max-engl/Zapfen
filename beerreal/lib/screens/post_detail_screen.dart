@@ -19,6 +19,7 @@ import '../features/posts/providers/profile_posts_provider.dart';
 import '../features/posts/services/comment_service.dart';
 import '../features/posts/services/post_service.dart';
 import '../widgets/avatar.dart';
+import '../widgets/pint_dialogs.dart';
 import '../widgets/post_card.dart'
     show BounceTap, CheersButton, ReactButton, ReactorsSheet;
 import '../widgets/report_post_sheet.dart';
@@ -1242,7 +1243,18 @@ class _CommentRow extends StatelessWidget {
                     const Spacer(),
                     if (onDelete != null)
                       GestureDetector(
-                        onTap: onDelete,
+                        onTap: () async {
+                          final confirmed = await showPintConfirmDialog(
+                            context,
+                            title: 'Kommentar löschen?',
+                            message: 'Dieser Kommentar wird dauerhaft entfernt.',
+                            confirmLabel: 'Löschen',
+                            destructive: true,
+                          );
+                          if (!confirmed || !context.mounted) return;
+                          onDelete!();
+                          showPintSnackBar(context, 'Kommentar gelöscht.');
+                        },
                         child: Icon(Icons.close, size: 14, color: t.textFaint),
                       ),
                   ],

@@ -531,12 +531,45 @@ class _CaptureScreenState extends State<CaptureScreen>
         Expanded(
           child: Center(
             child: _initError != null
-                ? Text(
-                    _initError!,
-                    style: const TextStyle(
-                      color: Color(0x8CFFFFFF),
-                      fontSize: 14,
-                    ),
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _initError!,
+                        style: const TextStyle(
+                          color: Color(0x8CFFFFFF),
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() => _initError = null);
+                          _initCameras();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: const Text(
+                            'Erneut versuchen',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   )
                 : const PintLogoLoaderInline(size: 48),
           ),
