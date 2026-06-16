@@ -5,6 +5,7 @@ class SelfieReaction {
   final String? avatarUrl;
   final String? avatarColor;
   final String? avatarInitial;
+  final String? emoji;
   final String imageUrl;
   final String? imagePath;
   final DateTime createdAt;
@@ -16,6 +17,7 @@ class SelfieReaction {
     this.avatarUrl,
     this.avatarColor,
     this.avatarInitial,
+    this.emoji,
     required this.imageUrl,
     this.imagePath,
     required this.createdAt,
@@ -28,6 +30,7 @@ class SelfieReaction {
     avatarUrl: json['avatarUrl'] as String?,
     avatarColor: json['avatarColor'] as String?,
     avatarInitial: json['avatarInitial'] as String?,
+    emoji: json['emoji'] as String?,
     imageUrl: (json['imageUrl'] ?? '') as String,
     imagePath: json['imagePath'] as String?,
     createdAt: DateTime.parse(json['createdAt'] as String),
@@ -40,6 +43,7 @@ class SelfieReaction {
     'avatarUrl': avatarUrl,
     'avatarColor': avatarColor,
     'avatarInitial': avatarInitial,
+    'emoji': emoji,
     'imageUrl': imageUrl,
     'imagePath': imagePath,
     'createdAt': createdAt.toIso8601String(),

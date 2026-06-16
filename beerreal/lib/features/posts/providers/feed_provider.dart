@@ -211,11 +211,13 @@ class FeedProvider extends ChangeNotifier {
     String postId, {
     required List<int> imageBytes,
     required String filename,
+    String? emoji,
   }) async {
     final reaction = await _postService.sendSelfieReaction(
       postId,
       imageBytes: imageBytes,
       filename: filename,
+      emoji: emoji,
     );
     final idx = _posts.indexWhere((p) => p.id == postId);
     if (idx != -1) {

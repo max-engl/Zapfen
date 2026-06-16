@@ -137,9 +137,11 @@ class PostService {
     String postId, {
     required List<int> imageBytes,
     required String filename,
+    String? emoji,
   }) async {
     final formData = FormData.fromMap({
       'selfie': MultipartFile.fromBytes(imageBytes, filename: filename),
+      if (emoji != null && emoji.isNotEmpty) 'emoji': emoji,
     });
     final response = await _client.dio.post(
       ApiConstants.selfieReactToPost(postId),

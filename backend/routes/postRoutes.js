@@ -25,6 +25,7 @@ const { getBerlinOffsetMinutes, localDayStart, toGermanLocalIso } = require("../
 const router = express.Router();
 // Posts can only carry a "cheers" reaction or a selfie reaction (see SelfieReaction model).
 const ALLOWED_REACTIONS = new Set(["🍺"]);
+const ALLOWED_SELFIE_REACTION_EMOJIS = new Set(["🍺", "😂", "😍", "😮", "🔥"]);
 
 function getFileExtension(filename) {
     return filename.split(".").pop().toLowerCase();
@@ -90,6 +91,7 @@ async function formatSelfieReactions(rawList) {
             avatarUrl: r.user.avatarUrl ?? null,
             avatarColor: r.user.avatarColor ?? null,
             avatarInitial: r.user.avatarInitial ?? null,
+            emoji: ALLOWED_SELFIE_REACTION_EMOJIS.has(r.emoji) ? r.emoji : null,
             imageUrl: await createSignedPostUrl(r.storagePath),
             imagePath: r.storagePath,
             createdAt: toGermanLocalIso(r.createdAt),
@@ -650,6 +652,11 @@ router.post("/:id/selfie-reaction", authMiddleware, upload.single("selfie"), asy
     try {
         const file = req.file;
         if (!file) return res.status(400).json({ message: "No selfie image uploaded" });
+        const rawEmoji = typeof req.body?.emoji === "string" ? req.body.emoji.trim() : "";
+        const emoji = rawEmoji.length > 0 ? rawEmoji : null;
+        if (emoji !== null && !ALLOWED_SELFIE_REACTION_EMOJIS.has(emoji)) {
+            return res.status(400).json({ message: "Unsupported selfie reaction emoji" });
+        }
 
         const post = await Post.findById(req.params.id).select("_id user storagePath");
         if (!post) return res.status(404).json({ message: "Post not found" });
@@ -692,6 +699,7 @@ router.post("/:id/selfie-reaction", authMiddleware, upload.single("selfie"), asy
             post: post._id,
             user: req.user._id,
             storagePath,
+            emoji,
         });
 
         const imageUrl = await createSignedPostUrl(storagePath);
@@ -704,6 +712,7 @@ router.post("/:id/selfie-reaction", authMiddleware, upload.single("selfie"), asy
                 avatarUrl: req.user.avatarUrl ?? null,
                 avatarColor: req.user.avatarColor ?? null,
                 avatarInitial: req.user.avatarInitial ?? null,
+                emoji: reaction.emoji,
                 imageUrl,
                 imagePath: storagePath,
                 createdAt: toGermanLocalIso(reaction.createdAt),

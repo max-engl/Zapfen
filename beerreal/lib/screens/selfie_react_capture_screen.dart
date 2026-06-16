@@ -21,7 +21,7 @@ enum _Stage { initializing, aim, flash, review }
 /// with a selfie. Mirrors the design in selfieui/app (3).jsx exactly:
 /// aim → flash → review, with a 268×268 gold-ringed circular frame.
 class SelfieReactCaptureScreen extends StatefulWidget {
-  final Future<void> Function(Uint8List bytes) onSend;
+  final Future<void> Function(Uint8List bytes, String? emoji) onSend;
 
   const SelfieReactCaptureScreen({super.key, required this.onSend});
 
@@ -39,7 +39,10 @@ class _SelfieReactCaptureScreenState extends State<SelfieReactCaptureScreen>
   bool _capturing = false;
   bool _sending = false;
   String? _sendError;
+  String? _selectedEmoji;
   late final AnimationController _ringPulseCtrl;
+
+  static const _selfieReactionEmojis = ['🍺', '😂', '😍', '😮', '🔥'];
 
   @override
   void initState() {
@@ -133,7 +136,7 @@ class _SelfieReactCaptureScreenState extends State<SelfieReactCaptureScreen>
       _sendError = null;
     });
     try {
-      await widget.onSend(bytes);
+      await widget.onSend(bytes, _selectedEmoji);
       HapticFeedback.mediumImpact();
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
@@ -224,22 +227,64 @@ class _SelfieReactCaptureScreenState extends State<SelfieReactCaptureScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  AnimatedBuilder(
-                    animation: _ringPulseCtrl,
-                    builder: (_, child) => _Circle(
-                      t: t,
-                      pulse: _stage == _Stage.aim ? _ringPulseCtrl.value : 0,
-                      review: _stage == _Stage.review,
-                      child: child!,
-                    ),
-                    child: _buildCircleContent(t),
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      AnimatedBuilder(
+                        animation: _ringPulseCtrl,
+                        builder: (_, child) => _Circle(
+                          t: t,
+                          pulse: _stage == _Stage.aim
+                              ? _ringPulseCtrl.value
+                              : 0,
+                          review: _stage == _Stage.review,
+                          child: child!,
+                        ),
+                        child: _buildCircleContent(t),
+                      ),
+                      if (_stage == _Stage.review)
+                        Positioned(
+                          left: 2,
+                          top: -8,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 150),
+                            transitionBuilder: (child, animation) =>
+                                ScaleTransition(
+                                  scale: CurvedAnimation(
+                                    parent: animation,
+                                    curve: Curves.easeOutBack,
+                                  ),
+                                  child: child,
+                                ),
+                            child: _selectedEmoji == null
+                                ? const SizedBox.shrink(key: ValueKey('none'))
+                                : _SelfieEmojiBadge(
+                                    key: ValueKey(_selectedEmoji),
+                                    emoji: _selectedEmoji!,
+                                    size: 74,
+                                  ),
+                          ),
+                        ),
+                    ],
                   ),
+                  if (_stage == _Stage.review) ...[
+                    const SizedBox(height: 16),
+                    _EmojiPicker(
+                      emojis: _selfieReactionEmojis,
+                      selectedEmoji: _selectedEmoji,
+                      onSelect: (emoji) {
+                        HapticFeedback.selectionClick();
+                        setState(() => _selectedEmoji = emoji);
+                      },
+                      t: t,
+                    ),
+                  ],
                   const SizedBox(height: 18),
                   SizedBox(
                     width: 240,
                     child: Text(
                       _stage == _Stage.review
-                          ? 'Sieht gut aus — Reaktion senden'
+                          ? 'Optional Emoji wählen und Reaktion senden'
                           : 'Tippe den Auslöser, um mit einem Selfie zu reagieren',
                       textAlign: TextAlign.center,
                       style: TextStyle(
@@ -343,7 +388,7 @@ class _SelfieReactCaptureScreenState extends State<SelfieReactCaptureScreen>
                         color: t.goldInk,
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
-                        letterSpacing: -0.16,
+                        letterSpacing: 0,
                       ),
                     ),
             ),
@@ -370,7 +415,89 @@ class _ReviewShot extends StatelessWidget {
         scale: 0.88 + 0.12 * value,
         child: Opacity(opacity: value.clamp(0.0, 1.0), child: child),
       ),
-      child: SizedBox.expand(child: Image.memory(bytes, fit: BoxFit.cover)),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [Image.memory(bytes, fit: BoxFit.cover)],
+      ),
+    );
+  }
+}
+
+class _EmojiPicker extends StatelessWidget {
+  final List<String> emojis;
+  final String? selectedEmoji;
+  final ValueChanged<String?> onSelect;
+  final PintTheme t;
+
+  const _EmojiPicker({
+    required this.emojis,
+    required this.selectedEmoji,
+    required this.onSelect,
+    required this.t,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 10,
+      children: emojis
+          .map(
+            (emoji) => _BouncyControl(
+              onTap: () => onSelect(selectedEmoji == emoji ? null : emoji),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: selectedEmoji == emoji
+                      ? t.gold
+                      : Colors.white.withValues(alpha: 0.12),
+                  border: Border.all(
+                    color: selectedEmoji == emoji
+                        ? Colors.white.withValues(alpha: 0.85)
+                        : Colors.white.withValues(alpha: 0.18),
+                    width: selectedEmoji == emoji ? 2 : 1,
+                  ),
+                ),
+                child: Text(emoji, style: const TextStyle(fontSize: 22)),
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class _SelfieEmojiBadge extends StatelessWidget {
+  final String emoji;
+  final double size;
+
+  const _SelfieEmojiBadge({super.key, required this.emoji, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Center(
+        child: Text(
+          emoji,
+          style: TextStyle(
+            fontSize: size * 0.78,
+            decoration: TextDecoration.none,
+            shadows: const [
+              Shadow(
+                color: Color(0x99000000),
+                blurRadius: 10,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

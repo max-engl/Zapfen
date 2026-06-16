@@ -309,10 +309,11 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                 onSelfieReact: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => SelfieReactCaptureScreen(
-                      onSend: (bytes) => feed.sendSelfieReaction(
+                      onSend: (bytes, emoji) => feed.sendSelfieReaction(
                         p.id,
                         imageBytes: bytes,
                         filename: 'selfie_reaction.jpg',
+                        emoji: emoji,
                       ),
                     ),
                   ),

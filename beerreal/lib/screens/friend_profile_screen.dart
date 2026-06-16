@@ -366,11 +366,13 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
   Future<void> _sendSelfieReactionForPost(
     String postId,
     List<int> bytes,
+    String? emoji,
   ) async {
     final reaction = await context.read<FeedProvider>().sendSelfieReaction(
       postId,
       imageBytes: bytes,
       filename: 'selfie_reaction.jpg',
+      emoji: emoji,
     );
     if (!mounted) return;
     final idx = _posts.indexWhere((p) => p.id == postId);
@@ -802,8 +804,12 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
                       onSelfieReact: () => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => SelfieReactCaptureScreen(
-                            onSend: (bytes) =>
-                                _sendSelfieReactionForPost(e.value.id, bytes),
+                            onSend: (bytes, emoji) =>
+                                _sendSelfieReactionForPost(
+                                  e.value.id,
+                                  bytes,
+                                  emoji,
+                                ),
                           ),
                         ),
                       ),

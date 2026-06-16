@@ -111,6 +111,7 @@ Future<void> _main() async {
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
   );
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   final tokenStorage = TokenStorage();
   final apiClient = ApiClient(tokenStorage);

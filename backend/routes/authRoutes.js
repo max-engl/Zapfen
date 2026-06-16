@@ -17,8 +17,7 @@ const LATEST_CLIENT_VERSION = '1.5';
 
 const PATCH_NOTES = [
     'Bug fixes und co.',
-    'Statistiken sind jetzt übersichtlicher.',
-    'Die Post-Zeiten sind jetzt korrekt'
+    'Reactions sind jetzt selfie reactions!',
 ];
 
 function parseVersion(v) {

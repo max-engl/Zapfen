@@ -124,13 +124,14 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SelfieReactCaptureScreen(
-          onSend: (bytes) async {
+          onSend: (bytes, emoji) async {
             final reaction = await context
                 .read<FeedProvider>()
                 .sendSelfieReaction(
                   _post.id,
                   imageBytes: bytes,
                   filename: 'selfie_reaction.jpg',
+                  emoji: emoji,
                 );
             if (!mounted) return;
             final withoutMine = _post.selfieReactions

@@ -16,6 +16,10 @@ const selfieReactionSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        emoji: {
+            type: String,
+            default: null,
+        },
     },
     { timestamps: true }
 );

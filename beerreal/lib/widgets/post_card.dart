@@ -888,17 +888,35 @@ class _SelfieAvatarCircle extends StatelessWidget {
             width: isMine ? 1 : 1,
           ),
         ),
-        child: ClipOval(
-          child: reaction.imageUrl.isNotEmpty
-              ? CachedNetworkImage(
-                  imageUrl: reaction.imageUrl,
-                  cacheKey: reaction.cacheKey,
-                  cacheManager: AppCacheManager.instance,
-                  fit: BoxFit.cover,
-                  fadeInDuration: Duration.zero,
-                  errorWidget: (_, __, ___) => Container(color: t.surfaceWeak),
-                )
-              : Container(color: t.surfaceWeak),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
+              child: ClipOval(
+                child: reaction.imageUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: reaction.imageUrl,
+                        cacheKey: reaction.cacheKey,
+                        cacheManager: AppCacheManager.instance,
+                        fit: BoxFit.cover,
+                        fadeInDuration: Duration.zero,
+                        errorWidget: (_, __, ___) =>
+                            Container(color: t.surfaceWeak),
+                      )
+                    : Container(color: t.surfaceWeak),
+              ),
+            ),
+            if (reaction.emoji != null && reaction.emoji!.isNotEmpty)
+              Positioned(
+                left: -4,
+                top: -5,
+                child: _SelfieReactionEmojiBadge(
+                  emoji: reaction.emoji!,
+                  size: 28,
+                  fontSize: 20,
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -1079,17 +1097,69 @@ class _LargeSelfieReaction extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
       ),
-      child: ClipOval(
-        child: reaction.imageUrl.isNotEmpty
-            ? CachedNetworkImage(
-                imageUrl: reaction.imageUrl,
-                cacheKey: reaction.cacheKey,
-                cacheManager: AppCacheManager.instance,
-                fit: BoxFit.cover,
-                fadeInDuration: Duration.zero,
-                errorWidget: (_, __, ___) => Container(color: t.surfaceWeak),
-              )
-            : Container(color: t.surfaceWeak),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipOval(
+            child: reaction.imageUrl.isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: reaction.imageUrl,
+                    cacheKey: reaction.cacheKey,
+                    cacheManager: AppCacheManager.instance,
+                    fit: BoxFit.cover,
+                    fadeInDuration: Duration.zero,
+                    errorWidget: (_, __, ___) =>
+                        Container(color: t.surfaceWeak),
+                  )
+                : Container(color: t.surfaceWeak),
+          ),
+          if (reaction.emoji != null && reaction.emoji!.isNotEmpty)
+            Positioned(
+              left: 8,
+              top: 6,
+              child: _SelfieReactionEmojiBadge(
+                emoji: reaction.emoji!,
+                size: 104,
+                fontSize: 82,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SelfieReactionEmojiBadge extends StatelessWidget {
+  final String emoji;
+  final double size;
+  final double fontSize;
+
+  const _SelfieReactionEmojiBadge({
+    required this.emoji,
+    required this.size,
+    required this.fontSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Center(
+        child: Text(
+          emoji,
+          style: TextStyle(
+            fontSize: fontSize,
+            decoration: TextDecoration.none,
+            shadows: const [
+              Shadow(
+                color: Color(0x99000000),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
