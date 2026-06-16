@@ -30,22 +30,30 @@ class SelfieReactCaptureScreen extends StatefulWidget {
       _SelfieReactCaptureScreenState();
 }
 
-class _SelfieReactCaptureScreenState extends State<SelfieReactCaptureScreen> {
+class _SelfieReactCaptureScreenState extends State<SelfieReactCaptureScreen>
+    with SingleTickerProviderStateMixin {
   _Stage _stage = _Stage.initializing;
   String? _initError;
   CameraController? _frontCtrl;
   Uint8List? _shotBytes;
+  bool _capturing = false;
   bool _sending = false;
   String? _sendError;
+  late final AnimationController _ringPulseCtrl;
 
   @override
   void initState() {
     super.initState();
+    _ringPulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1150),
+    )..repeat(reverse: true);
     _initCamera();
   }
 
   @override
   void dispose() {
+    _ringPulseCtrl.dispose();
     _frontCtrl?.dispose();
     super.dispose();
   }
@@ -81,8 +89,12 @@ class _SelfieReactCaptureScreenState extends State<SelfieReactCaptureScreen> {
   Future<void> _shutter() async {
     final ctrl = _frontCtrl;
     if (ctrl == null || !ctrl.value.isInitialized) return;
-    if (_stage != _Stage.aim) return;
+    if (_stage != _Stage.aim || _capturing) return;
     HapticFeedback.heavyImpact();
+    setState(() {
+      _capturing = true;
+      _sendError = null;
+    });
     try {
       final file = await ctrl.takePicture();
       final raw = await file.readAsBytes();
@@ -94,11 +106,18 @@ class _SelfieReactCaptureScreenState extends State<SelfieReactCaptureScreen> {
       });
       await Future.delayed(const Duration(milliseconds: 200));
       if (!mounted) return;
-      setState(() => _stage = _Stage.review);
-    } catch (_) {}
+      HapticFeedback.mediumImpact();
+      setState(() {
+        _stage = _Stage.review;
+        _capturing = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _capturing = false);
+    }
   }
 
   void _retake() {
+    HapticFeedback.selectionClick();
     setState(() {
       _shotBytes = null;
       _sendError = null;
@@ -115,6 +134,7 @@ class _SelfieReactCaptureScreenState extends State<SelfieReactCaptureScreen> {
     });
     try {
       await widget.onSend(bytes);
+      HapticFeedback.mediumImpact();
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
       if (mounted) {
@@ -132,9 +152,7 @@ class _SelfieReactCaptureScreenState extends State<SelfieReactCaptureScreen> {
     return Material(
       color: Colors.black,
       child: SafeArea(
-        child: _stage == _Stage.initializing
-            ? _buildInit(t)
-            : _buildCapture(t),
+        child: _stage == _Stage.initializing ? _buildInit(t) : _buildCapture(t),
       ),
     );
   }
@@ -206,7 +224,16 @@ class _SelfieReactCaptureScreenState extends State<SelfieReactCaptureScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _Circle(t: t, child: _buildCircleContent(t)),
+                  AnimatedBuilder(
+                    animation: _ringPulseCtrl,
+                    builder: (_, child) => _Circle(
+                      t: t,
+                      pulse: _stage == _Stage.aim ? _ringPulseCtrl.value : 0,
+                      review: _stage == _Stage.review,
+                      child: child!,
+                    ),
+                    child: _buildCircleContent(t),
+                  ),
                   const SizedBox(height: 18),
                   SizedBox(
                     width: 240,
@@ -251,14 +278,26 @@ class _SelfieReactCaptureScreenState extends State<SelfieReactCaptureScreen> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (showShot)
-          Image.memory(_shotBytes!, fit: BoxFit.cover)
-        else if (_frontCtrl != null && _frontCtrl!.value.isInitialized)
-          _CamFill(ctrl: _frontCtrl!)
-        else
-          const ColoredBox(color: Colors.black),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 260),
+          switchInCurve: Curves.easeOutBack,
+          switchOutCurve: Curves.easeIn,
+          child: showShot
+              ? _ReviewShot(bytes: _shotBytes!)
+              : _frontCtrl != null && _frontCtrl!.value.isInitialized
+              ? _CamFill(ctrl: _frontCtrl!)
+              : const ColoredBox(color: Colors.black),
+        ),
         if (_stage == _Stage.flash)
           const Positioned.fill(child: ColoredBox(color: Colors.white)),
+        if (_capturing && _stage == _Stage.aim)
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.12),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -268,7 +307,7 @@ class _SelfieReactCaptureScreenState extends State<SelfieReactCaptureScreen> {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          GestureDetector(
+          _BouncyControl(
             onTap: _sending ? null : _retake,
             child: Container(
               width: 52,
@@ -285,13 +324,10 @@ class _SelfieReactCaptureScreenState extends State<SelfieReactCaptureScreen> {
             ),
           ),
           const SizedBox(width: 28),
-          GestureDetector(
+          _BouncyControl(
             onTap: _sending ? null : _send,
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 40,
-                vertical: 16,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
               decoration: BoxDecoration(
                 color: t.gold,
                 borderRadius: BorderRadius.circular(999),
@@ -315,19 +351,98 @@ class _SelfieReactCaptureScreenState extends State<SelfieReactCaptureScreen> {
         ],
       );
     }
+    return _ShutterButton(onTap: _shutter, capturing: _capturing, t: t);
+  }
+}
+
+class _ReviewShot extends StatelessWidget {
+  final Uint8List bytes;
+  const _ReviewShot({required this.bytes});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      key: const ValueKey('review-shot'),
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOutBack,
+      builder: (_, value, child) => Transform.scale(
+        scale: 0.88 + 0.12 * value,
+        child: Opacity(opacity: value.clamp(0.0, 1.0), child: child),
+      ),
+      child: SizedBox.expand(child: Image.memory(bytes, fit: BoxFit.cover)),
+    );
+  }
+}
+
+class _BouncyControl extends StatefulWidget {
+  final VoidCallback? onTap;
+  final Widget child;
+
+  const _BouncyControl({required this.onTap, required this.child});
+
+  @override
+  State<_BouncyControl> createState() => _BouncyControlState();
+}
+
+class _BouncyControlState extends State<_BouncyControl> {
+  bool _down = false;
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: _shutter,
-      child: Container(
-        width: 84,
-        height: 84,
+      onTapDown: widget.onTap == null
+          ? null
+          : (_) => setState(() => _down = true),
+      onTapCancel: () => setState(() => _down = false),
+      onTapUp: (_) => setState(() => _down = false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _down ? 0.94 : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutBack,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+class _ShutterButton extends StatelessWidget {
+  final VoidCallback onTap;
+  final bool capturing;
+  final PintTheme t;
+
+  const _ShutterButton({
+    required this.onTap,
+    required this.capturing,
+    required this.t,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _BouncyControl(
+      onTap: capturing ? null : onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 170),
+        curve: Curves.easeOutBack,
+        width: capturing ? 76 : 84,
+        height: capturing ? 76 : 84,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Colors.transparent,
-          border: Border.all(color: Colors.white, width: 4),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: capturing ? 0.65 : 1),
+            width: capturing ? 3 : 4,
+          ),
         ),
-        padding: const EdgeInsets.all(6),
-        child: Container(
-          decoration: BoxDecoration(shape: BoxShape.circle, color: t.gold),
+        padding: EdgeInsets.all(capturing ? 10 : 6),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 170),
+          curve: Curves.easeOutBack,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: capturing ? Colors.white : t.gold,
+          ),
         ),
       ),
     );
@@ -393,26 +508,43 @@ class _TopBar extends StatelessWidget {
 class _Circle extends StatelessWidget {
   final Widget child;
   final PintTheme t;
-  const _Circle({required this.child, required this.t});
+  final double pulse;
+  final bool review;
+  const _Circle({
+    required this.child,
+    required this.t,
+    required this.pulse,
+    required this.review,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 268,
-      height: 268,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.black,
-        border: Border.all(color: t.gold, width: 3),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x99000000),
-            blurRadius: 50,
-            offset: Offset(0, 18),
-          ),
-        ],
+    return AnimatedScale(
+      scale: review ? 1.035 : 1,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutBack,
+      child: Container(
+        width: 268,
+        height: 268,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.black,
+          border: Border.all(color: t.gold, width: 3 + pulse * 1.4),
+          boxShadow: [
+            BoxShadow(
+              color: t.gold.withValues(alpha: 0.18 + pulse * 0.16),
+              blurRadius: 24 + pulse * 18,
+              spreadRadius: pulse * 2,
+            ),
+            const BoxShadow(
+              color: Color(0x99000000),
+              blurRadius: 50,
+              offset: Offset(0, 18),
+            ),
+          ],
+        ),
+        child: ClipOval(child: child),
       ),
-      child: ClipOval(child: child),
     );
   }
 }
@@ -425,20 +557,25 @@ class _CamFill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final previewSize = ctrl.value.previewSize;
-    if (!ctrl.value.isInitialized || previewSize == null) {
+    if (!ctrl.value.isInitialized) {
       return const ColoredBox(color: Colors.black);
     }
-    return OverflowBox(
-      alignment: Alignment.center,
-      child: FittedBox(
-        fit: BoxFit.cover,
-        child: SizedBox(
-          width: previewSize.height,
-          height: previewSize.width,
-          child: CameraPreview(ctrl),
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final portraitAspect = 1 / ctrl.value.aspectRatio;
+        return ClipRect(
+          child: SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: constraints.maxWidth,
+                height: constraints.maxWidth / portraitAspect,
+                child: CameraPreview(ctrl),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

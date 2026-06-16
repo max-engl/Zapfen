@@ -278,14 +278,18 @@ class _PhotoState extends State<_Photo> with SingleTickerProviderStateMixin {
     );
     _cheersScale = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween(begin: 0.3, end: 2.2)
-            .chain(CurveTween(curve: Curves.elasticOut)),
+        tween: Tween(
+          begin: 0.3,
+          end: 2.2,
+        ).chain(CurveTween(curve: Curves.elasticOut)),
         weight: 45,
       ),
       TweenSequenceItem(tween: ConstantTween(2.2), weight: 20),
       TweenSequenceItem(
-        tween: Tween(begin: 2.2, end: 1.6)
-            .chain(CurveTween(curve: Curves.easeIn)),
+        tween: Tween(
+          begin: 2.2,
+          end: 1.6,
+        ).chain(CurveTween(curve: Curves.easeIn)),
         weight: 35,
       ),
     ]).animate(_cheersCtrl);
@@ -373,18 +377,16 @@ class _PhotoState extends State<_Photo> with SingleTickerProviderStateMixin {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final size = Size(constraints.maxWidth, constraints.maxHeight);
-            _selfiePos ??= Offset(
-              size.width - _overlayW - _pad,
-              size.height - _overlayH - _pad,
-            );
+            _selfiePos ??= const Offset(_pad, _pad);
 
             return Stack(
               children: [
                 Positioned.fill(
                   child: GestureDetector(
                     onTap: widget.onTap,
-                    onDoubleTap:
-                        widget.onDoubleTap != null ? _onDoubleTap : null,
+                    onDoubleTap: widget.onDoubleTap != null
+                        ? _onDoubleTap
+                        : null,
                     child: mainImage,
                   ),
                 ),
@@ -410,16 +412,6 @@ class _PhotoState extends State<_Photo> with SingleTickerProviderStateMixin {
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                if (post.selfieReactions.isNotEmpty)
-                  Positioned(
-                    right: 12,
-                    bottom: 12,
-                    child: SelfieAvatarStack(
-                      reactions: post.selfieReactions,
-                      myUserId: myUserId,
-                      t: t,
                     ),
                   ),
                 if (hasSelfie)
@@ -514,6 +506,16 @@ class _PhotoState extends State<_Photo> with SingleTickerProviderStateMixin {
                           ),
                         ),
                       ),
+                    ),
+                  ),
+                if (post.selfieReactions.isNotEmpty)
+                  Positioned(
+                    right: 12,
+                    bottom: 12,
+                    child: SelfieAvatarStack(
+                      reactions: post.selfieReactions,
+                      myUserId: myUserId,
+                      t: t,
                     ),
                   ),
               ],
@@ -715,24 +717,34 @@ class _SelfieReactButtonState extends State<SelfieReactButton> {
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: isActive ? t.goldBorderStrong : t.border),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.face_retouching_natural_outlined,
-              size: 15,
-              color: isActive ? t.goldText : t.text,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              isActive ? 'Reagiert' : 'Selfie',
-              style: TextStyle(
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          switchInCurve: Curves.easeOutBack,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, animation) => FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(scale: animation, child: child),
+          ),
+          child: Row(
+            key: ValueKey(isActive),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.face_retouching_natural_outlined,
+                size: 15,
                 color: isActive ? t.goldText : t.text,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
               ),
-            ),
-          ],
+              const SizedBox(width: 6),
+              Text(
+                isActive ? 'Reagiert' : 'Selfie',
+                style: TextStyle(
+                  color: isActive ? t.goldText : t.text,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -741,27 +753,60 @@ class _SelfieReactButtonState extends State<SelfieReactButton> {
 
 // ── Selfie reaction avatar stack ────────────────────────────────────────────
 
+class _SelfieStackEntrance extends StatelessWidget {
+  final int index;
+  final Widget child;
+
+  const _SelfieStackEntrance({required this.index, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(index),
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: 360 + index * 70),
+      curve: Curves.easeOutBack,
+      builder: (_, value, child) {
+        final opacity = value.clamp(0.0, 1.0);
+        return Opacity(
+          opacity: opacity,
+          child: Transform.translate(
+            offset: Offset(0, 10 * (1 - opacity)),
+            child: Transform.scale(scale: 0.72 + (0.28 * value), child: child),
+          ),
+        );
+      },
+      child: child,
+    );
+  }
+}
+
 class SelfieAvatarStack extends StatelessWidget {
   final List<SelfieReaction> reactions;
   final String? myUserId;
   final PintTheme t;
+  final int maxVisible;
 
   const SelfieAvatarStack({
     super.key,
     required this.reactions,
     required this.myUserId,
     required this.t,
+    this.maxVisible = 3,
   });
 
-  static const _circleSize = 38.0;
-  static const _overlap = 14.0;
+  static const _circleSize = 46.0;
+  static const _overlap = 28.0;
 
   @override
   Widget build(BuildContext context) {
     if (reactions.isEmpty) return const SizedBox.shrink();
-    final overflow = reactions.length > 4 ? reactions.length - 4 : 0;
+    final visibleCount = maxVisible.clamp(1, reactions.length);
+    final overflow = reactions.length > visibleCount
+        ? reactions.length - visibleCount
+        : 0;
     final display = overflow > 0
-        ? reactions.sublist(reactions.length - 4)
+        ? reactions.sublist(reactions.length - visibleCount)
         : reactions;
     final slots = display.length + (overflow > 0 ? 1 : 0);
     final width = _circleSize + (slots - 1) * _overlap;
@@ -772,7 +817,10 @@ class SelfieAvatarStack extends StatelessWidget {
         Positioned(
           right: display.length * _overlap,
           bottom: 0,
-          child: _OverflowBadge(count: overflow),
+          child: _SelfieStackEntrance(
+            index: 0,
+            child: _OverflowBadge(count: overflow),
+          ),
         ),
       );
     }
@@ -783,7 +831,23 @@ class SelfieAvatarStack extends StatelessWidget {
         Positioned(
           right: (display.length - 1 - i) * _overlap,
           bottom: 0,
-          child: _SelfieAvatarCircle(reaction: s, isMine: isMine, t: t),
+          child: _SelfieStackEntrance(
+            index: i + (overflow > 0 ? 1 : 0),
+            child: _SelfieAvatarCircle(
+              reaction: s,
+              isMine: isMine,
+              t: t,
+              onTap: () {
+                final index = reactions.indexWhere((r) => r.id == s.id);
+                _showSelfieReactionPreview(
+                  context,
+                  reactions,
+                  index < 0 ? 0 : index,
+                  t,
+                );
+              },
+            ),
+          ),
         ),
       );
     }
@@ -800,38 +864,226 @@ class _SelfieAvatarCircle extends StatelessWidget {
   final SelfieReaction reaction;
   final bool isMine;
   final PintTheme t;
+  final VoidCallback onTap;
 
   const _SelfieAvatarCircle({
     required this.reaction,
     required this.isMine,
     required this.t,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: SelfieAvatarStack._circleSize,
-      height: SelfieAvatarStack._circleSize,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: t.surfaceWeak,
-        border: Border.all(
-          color: isMine ? t.gold : Colors.black,
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(color: t.selfieOutline, spreadRadius: 1),
-          const BoxShadow(
-            color: Color(0x66000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
+    return BounceTap(
+      onTap: onTap,
+      child: Container(
+        width: SelfieAvatarStack._circleSize,
+        height: SelfieAvatarStack._circleSize,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: t.surfaceWeak,
+          border: Border.all(
+            color: isMine ? t.gold : Colors.black,
+            width: isMine ? 3 : 2,
           ),
-        ],
+        ),
+        child: ClipOval(
+          child: reaction.imageUrl.isNotEmpty
+              ? CachedNetworkImage(
+                  imageUrl: reaction.imageUrl,
+                  cacheKey: reaction.cacheKey,
+                  cacheManager: AppCacheManager.instance,
+                  fit: BoxFit.cover,
+                  fadeInDuration: Duration.zero,
+                  errorWidget: (_, __, ___) => Container(color: t.surfaceWeak),
+                )
+              : Container(color: t.surfaceWeak),
+        ),
+      ),
+    );
+  }
+}
+
+void _showSelfieReactionPreview(
+  BuildContext context,
+  List<SelfieReaction> reactions,
+  int initialIndex,
+  PintTheme t,
+) {
+  if (reactions.isEmpty) return;
+  HapticFeedback.selectionClick();
+  showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+    barrierColor: Colors.black.withValues(alpha: 0.82),
+    transitionDuration: const Duration(milliseconds: 260),
+    pageBuilder: (dialogContext, _, __) => _SelfieReactionPreviewGallery(
+      reactions: reactions,
+      initialIndex: initialIndex.clamp(0, reactions.length - 1),
+      t: t,
+      onClose: () => Navigator.of(dialogContext).pop(),
+    ),
+    transitionBuilder: (_, animation, __, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutBack,
+        reverseCurve: Curves.easeIn,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.88, end: 1).animate(curved),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+class _SelfieReactionPreviewGallery extends StatefulWidget {
+  final List<SelfieReaction> reactions;
+  final int initialIndex;
+  final PintTheme t;
+  final VoidCallback onClose;
+
+  const _SelfieReactionPreviewGallery({
+    required this.reactions,
+    required this.initialIndex,
+    required this.t,
+    required this.onClose,
+  });
+
+  @override
+  State<_SelfieReactionPreviewGallery> createState() =>
+      _SelfieReactionPreviewGalleryState();
+}
+
+class _SelfieReactionPreviewGalleryState
+    extends State<_SelfieReactionPreviewGallery> {
+  late final PageController _pageController;
+  late int _index;
+
+  @override
+  void initState() {
+    super.initState();
+    _index = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reactions = widget.reactions;
+    final t = widget.t;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onClose,
+      child: SafeArea(
+        child: Center(
+          child: GestureDetector(
+            onTap: () {},
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final avatarSize = constraints.maxWidth < 396
+                    ? constraints.maxWidth - 56
+                    : 340.0;
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      height: avatarSize,
+                      child: PageView.builder(
+                        controller: _pageController,
+                        itemCount: reactions.length,
+                        onPageChanged: (value) {
+                          HapticFeedback.selectionClick();
+                          setState(() {
+                            _index = value;
+                          });
+                        },
+                        itemBuilder: (_, index) => Center(
+                          child: SizedBox(
+                            width: avatarSize,
+                            height: avatarSize,
+                            child: _LargeSelfieReaction(
+                              reaction: reactions[index],
+                              t: t,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 160),
+                      child: Text(
+                        reactions[_index].username.isEmpty
+                            ? ''
+                            : '@${reactions[_index].username}',
+                        key: ValueKey(reactions[_index].id),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ),
+                    if (reactions.length > 1) ...[
+                      const SizedBox(height: 10),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 160),
+                        child: Text(
+                          '${_index + 1} / ${reactions.length}',
+                          key: ValueKey(_index),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.62),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LargeSelfieReaction extends StatelessWidget {
+  final SelfieReaction reaction;
+  final PintTheme t;
+
+  const _LargeSelfieReaction({required this.reaction, required this.t});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: t.surfaceWeak,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
       ),
       child: ClipOval(
         child: reaction.imageUrl.isNotEmpty
             ? CachedNetworkImage(
                 imageUrl: reaction.imageUrl,
+                cacheKey: reaction.cacheKey,
                 cacheManager: AppCacheManager.instance,
                 fit: BoxFit.cover,
                 fadeInDuration: Duration.zero,
@@ -945,13 +1197,17 @@ class _BounceTapState extends State<BounceTap>
     );
     _scale = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween(begin: 1.0, end: 1.28)
-            .chain(CurveTween(curve: Curves.easeOut)),
+        tween: Tween(
+          begin: 1.0,
+          end: 1.28,
+        ).chain(CurveTween(curve: Curves.easeOut)),
         weight: 30,
       ),
       TweenSequenceItem(
-        tween: Tween(begin: 1.28, end: 1.0)
-            .chain(CurveTween(curve: Curves.elasticOut)),
+        tween: Tween(
+          begin: 1.28,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.elasticOut)),
         weight: 70,
       ),
     ]).animate(_ctrl);

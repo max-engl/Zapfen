@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/app_cache_manager.dart';
 import '../../../core/feed_database.dart';
+import '../models/app_update_info.dart';
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
 
@@ -15,26 +16,36 @@ class AuthProvider extends ChangeNotifier {
   AuthStatus _status = AuthStatus.checking;
   AppUser? _user;
   String? _errorMessage;
-  bool _updateRequired = false;
-  List<String> _patchNotes = [];
+  AppUpdateInfo _updateInfo = AppUpdateInfo.none;
 
   AuthProvider(this._authService);
 
   AuthStatus get status => _status;
   AppUser? get user => _user;
   String? get errorMessage => _errorMessage;
-  bool get updateRequired => _updateRequired;
-  List<String> get patchNotes => _patchNotes;
+  AppUpdateInfo get updateInfo => _updateInfo;
+  bool get updateRequired => _updateInfo.updateRequired;
+  bool get updateRecommended => _updateInfo.updateRecommended;
+  List<String> get patchNotes => _updateInfo.patchNotes;
+  String get latestVersion => _updateInfo.latestVersion;
+  String get recommendedVersion => _updateInfo.recommendedVersion;
+  String get mandatoryVersion => _updateInfo.mandatoryVersion;
 
   Future<void> checkAuth() async {
     debugPrint('[startup] checkAuth start');
     _status = AuthStatus.checking;
     notifyListeners();
     try {
+      try {
+        _updateInfo = await _authService.versionPolicy();
+      } catch (e) {
+        debugPrint('[startup] version policy error: $e');
+      }
       final result = await _authService.me();
       _user = result.user;
-      _updateRequired = result.updateRequired;
-      _patchNotes = result.patchNotes;
+      if (result.updateInfo.currentVersion.isNotEmpty) {
+        _updateInfo = result.updateInfo;
+      }
       _status = _user != null
           ? AuthStatus.authenticated
           : AuthStatus.unauthenticated;
@@ -57,8 +68,7 @@ class AuthProvider extends ChangeNotifier {
         password: password,
       );
       _user = result.user;
-      _updateRequired = result.updateRequired;
-      _patchNotes = result.patchNotes;
+      _updateInfo = result.updateInfo;
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
@@ -86,14 +96,15 @@ class AuthProvider extends ChangeNotifier {
         password: password,
       );
       _user = result.user;
-      _updateRequired = result.updateRequired;
-      _patchNotes = result.patchNotes;
+      _updateInfo = result.updateInfo;
       _status = AuthStatus.authenticated;
       notifyListeners();
       return true;
     } on DioException catch (e) {
       _errorMessage = _extractError(e);
-      debugPrint('[auth] register failed — status=${e.response?.statusCode} extracted="$_errorMessage" body=${e.response?.data}');
+      debugPrint(
+        '[auth] register failed — status=${e.response?.statusCode} extracted="$_errorMessage" body=${e.response?.data}',
+      );
       notifyListeners();
       return false;
     } catch (e) {
@@ -143,15 +154,19 @@ class AuthProvider extends ChangeNotifier {
     PaintingBinding.instance.imageCache.clear();
     await FeedDatabase.instance.clear();
     final prefs = await SharedPreferences.getInstance();
-    final keys = prefs.getKeys().where(
-      (k) => k.startsWith('pint_') && k != 'pint_theme_dark' && k != 'pint_onboarding_done',
-    ).toList();
+    final keys = prefs
+        .getKeys()
+        .where(
+          (k) =>
+              k.startsWith('pint_') &&
+              k != 'pint_theme_dark' &&
+              k != 'pint_onboarding_done',
+        )
+        .toList();
     for (final key in keys) {
       await prefs.remove(key);
     }
     _user = null;
-    _updateRequired = false;
-    _patchNotes = [];
     _status = AuthStatus.unauthenticated;
     notifyListeners();
   }
@@ -160,8 +175,6 @@ class AuthProvider extends ChangeNotifier {
   /// async side-effects so it's safe to call from a Dio interceptor.
   void forceLogout() {
     _user = null;
-    _updateRequired = false;
-    _patchNotes = [];
     _status = AuthStatus.unauthenticated;
     notifyListeners();
   }

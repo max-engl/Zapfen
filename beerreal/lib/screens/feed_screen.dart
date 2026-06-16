@@ -15,6 +15,7 @@ import '../widgets/shimmer_box.dart';
 import 'friend_profile_screen.dart';
 import 'post_detail_screen.dart';
 import 'profile_screen.dart';
+import 'selfie_react_capture_screen.dart';
 
 class FeedScreen extends StatefulWidget {
   final VoidCallback onCapture;
@@ -302,37 +303,48 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
               final p = feed.posts[postIndex];
               return PostCard(
                 key: ValueKey(p.id),
-                  post: p,
-                  enableHero: false,
-                  onReact: (emoji) => feed.toggleReaction(p.id, emoji),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => PostDetailScreen(post: p),
+                post: p,
+                enableHero: false,
+                onReact: (emoji) => feed.toggleReaction(p.id, emoji),
+                onSelfieReact: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => SelfieReactCaptureScreen(
+                      onSend: (bytes) => feed.sendSelfieReaction(
+                        p.id,
+                        imageBytes: bytes,
+                        filename: 'selfie_reaction.jpg',
+                      ),
                     ),
                   ),
-                  onDelete: p.userId == currentUserId
-                      ? () => feed.deletePost(p.id)
-                      : null,
-                  onProfileTap: p.userId == currentUserId
-                      ? () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                const ProfileScreen(standaloneRoute: true),
-                          ),
-                        )
-                      : () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => FriendProfileScreen(
-                              friend: ApiFriend(
-                                id: p.userId,
-                                username: p.username,
-                                avatarUrl: p.avatarUrl,
-                                avatarColor: p.avatarColor,
-                                avatarInitial: p.avatarInitial,
-                              ),
+                ),
+                onRemoveSelfieReaction: (reactionId) =>
+                    feed.removeSelfieReaction(p.id, reactionId),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => PostDetailScreen(post: p)),
+                ),
+                onDelete: p.userId == currentUserId
+                    ? () => feed.deletePost(p.id)
+                    : null,
+                onProfileTap: p.userId == currentUserId
+                    ? () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const ProfileScreen(standaloneRoute: true),
+                        ),
+                      )
+                    : () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => FriendProfileScreen(
+                            friend: ApiFriend(
+                              id: p.userId,
+                              username: p.username,
+                              avatarUrl: p.avatarUrl,
+                              avatarColor: p.avatarColor,
+                              avatarInitial: p.avatarInitial,
                             ),
                           ),
                         ),
+                      ),
               );
             }, childCount: feed.posts.length + 2),
           ),

@@ -11,7 +11,9 @@ const { generateAvatarColor, getAvatarInitial } = require("../utils/avatarUtil")
 
 const router = express.Router();
 
-const MIN_CLIENT_VERSION = '1.4';
+const RECOMMENDED_CLIENT_VERSION = '1.5';
+const MANDATORY_CLIENT_VERSION = '1.5';
+const LATEST_CLIENT_VERSION = '1.5';
 
 const PATCH_NOTES = [
     'Bug fixes und co.',
@@ -23,9 +25,9 @@ function parseVersion(v) {
     return String(v || '0').split('.').map(n => parseInt(n, 10) || 0);
 }
 
-function isOutdated(clientVersion) {
+function isOlderThan(clientVersion, targetVersion) {
     const client = parseVersion(clientVersion);
-    const min = parseVersion(MIN_CLIENT_VERSION);
+    const min = parseVersion(targetVersion);
     const len = Math.max(client.length, min.length);
     for (let i = 0; i < len; i++) {
         const c = client[i] ?? 0;
@@ -34,6 +36,21 @@ function isOutdated(clientVersion) {
         if (c > m) return false;
     }
     return false;
+}
+
+function clientVersionPolicy(clientVersion) {
+    const currentVersion = String(clientVersion || '0');
+    const updateRequired = isOlderThan(currentVersion, MANDATORY_CLIENT_VERSION);
+    const updateRecommended = isOlderThan(currentVersion, RECOMMENDED_CLIENT_VERSION);
+    return {
+        currentVersion,
+        latestVersion: LATEST_CLIENT_VERSION,
+        recommendedVersion: RECOMMENDED_CLIENT_VERSION,
+        mandatoryVersion: MANDATORY_CLIENT_VERSION,
+        updateRecommended,
+        updateRequired,
+        patchNotes: PATCH_NOTES,
+    };
 }
 
 function createToken(user) {
@@ -49,6 +66,11 @@ function createToken(user) {
         { expiresIn }
     );
 }
+
+// GET /auth/version
+router.get("/version", async (req, res) => {
+    res.json(clientVersionPolicy(req.query.v));
+});
 
 // POST /auth/register
 router.post("/register", async (req, res) => {
@@ -92,8 +114,7 @@ router.post("/register", async (req, res) => {
         res.status(201).json({
             message: "User registered successfully",
             token,
-            updateRequired: isOutdated(clientVersion),
-            patchNotes: PATCH_NOTES,
+            ...clientVersionPolicy(clientVersion),
             user: {
                 id: user._id,
                 username: user.username,
@@ -148,8 +169,7 @@ router.post("/login", async (req, res) => {
         res.json({
             message: "Login successful",
             token,
-            updateRequired: isOutdated(clientVersion),
-            patchNotes: PATCH_NOTES,
+            ...clientVersionPolicy(clientVersion),
             user: {
                 id: user._id,
                 username: user.username,
@@ -181,8 +201,7 @@ router.post("/logout", authMiddleware, async (req, res) => {
 // GET /auth/me
 router.get("/me", authMiddleware, async (req, res) => {
     res.json({
-        updateRequired: isOutdated(req.query.v),
-        patchNotes: PATCH_NOTES,
+        ...clientVersionPolicy(req.query.v),
         user: {
             id: req.user._id,
             username: req.user.username,

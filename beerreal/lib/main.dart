@@ -3,12 +3,15 @@ import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'firebase_options.dart';
+import 'core/app_version.dart';
 import 'core/notification_service.dart';
 import 'core/friend_database.dart';
 import 'core/json_cache.dart';
@@ -314,7 +317,7 @@ class _PintRootState extends State<PintRoot> {
   }
 
   void _showUpdateDialog(BuildContext context) {
-    final patchNotes = context.read<AuthProvider>().patchNotes;
+    final auth = context.read<AuthProvider>();
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -323,7 +326,10 @@ class _PintRootState extends State<PintRoot> {
       enableDrag: true,
       builder: (_) => _UpdateSheet(
         onDismiss: () => Navigator.of(context).pop(),
-        patchNotes: patchNotes,
+        patchNotes: auth.patchNotes,
+        targetVersion: auth.latestVersion.isNotEmpty
+            ? auth.latestVersion
+            : auth.recommendedVersion,
       ),
     );
   }
@@ -348,8 +354,12 @@ class _PintRootState extends State<PintRoot> {
     final authProvider = context.watch<AuthProvider>();
     final authStatus = authProvider.status;
 
+    final mandatoryUpdate = authProvider.updateRequired;
+    final recommendedUpdate =
+        authProvider.updateRecommended && !authProvider.updateRequired;
+
     if (authStatus == AuthStatus.authenticated &&
-        authProvider.updateRequired &&
+        recommendedUpdate &&
         !_updateDialogShown) {
       _updateDialogShown = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -361,7 +371,9 @@ class _PintRootState extends State<PintRoot> {
     // As soon as auth succeeds, kick off the SQLite preload exactly once.
     // The loading screen stays visible until preload finishes so the feed
     // screen never renders with an empty post list.
-    if (authStatus == AuthStatus.authenticated && !_preloadStarted) {
+    if (authStatus == AuthStatus.authenticated &&
+        !mandatoryUpdate &&
+        !_preloadStarted) {
       _preloadStarted = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         debugPrint('[startup] auth OK — starting cache preload');
@@ -376,6 +388,7 @@ class _PintRootState extends State<PintRoot> {
 
     final showApp =
         authStatus == AuthStatus.authenticated &&
+        !mandatoryUpdate &&
         _feedPreloaded &&
         _onboardingChecked;
 
@@ -411,6 +424,11 @@ class _PintRootState extends State<PintRoot> {
         ),
       ),
       home: switch (authStatus) {
+        _ when mandatoryUpdate => _MandatoryUpdateScreen(
+          latestVersion: authProvider.latestVersion,
+          mandatoryVersion: authProvider.mandatoryVersion,
+          patchNotes: authProvider.patchNotes,
+        ),
         AuthStatus.unauthenticated => const AuthScreen(),
         _ when showApp && !_onboardingDone => OnboardingScreen(
           onComplete: () => _completeOnboarding(),
@@ -438,6 +456,161 @@ class _LoadingScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: t.bg,
       body: const Center(child: PintLogoLoaderInline(size: 72)),
+    );
+  }
+}
+
+Future<void> _openUpdateStore() async {
+  final url = switch (defaultTargetPlatform) {
+    TargetPlatform.iOS => kIosTestFlightUrl,
+    TargetPlatform.android => kAndroidPlayStoreUrl,
+    _ => kAndroidPlayStoreUrl,
+  };
+  final uri = Uri.parse(url);
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
+
+class _MandatoryUpdateScreen extends StatelessWidget {
+  final String latestVersion;
+  final String mandatoryVersion;
+  final List<String> patchNotes;
+
+  const _MandatoryUpdateScreen({
+    required this.latestVersion,
+    required this.mandatoryVersion,
+    required this.patchNotes,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = PintThemeProvider.of(context);
+    final target = latestVersion.isNotEmpty ? latestVersion : mandatoryVersion;
+
+    return Scaffold(
+      backgroundColor: t.bg,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
+          child: Column(
+            children: [
+              const Spacer(),
+              const BrandMark(size: 58),
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: t.goldSoft,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: t.goldBorder),
+                ),
+                child: Text(
+                  'UPDATE ERFORDERLICH',
+                  style: TextStyle(
+                    color: t.goldText,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Bitte aktualisiere Zapfen',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: t.text,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.8,
+                  height: 1.08,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                target.isEmpty
+                    ? 'Diese Version wird nicht mehr unterstützt. Aktualisiere die App, um weiterzumachen.'
+                    : 'Diese Version wird nicht mehr unterstützt. Lade Version $target oder neuer herunter, um weiterzumachen.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: t.textMuted,
+                  fontSize: 14,
+                  height: 1.45,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (patchNotes.isNotEmpty) ...[
+                const SizedBox(height: 22),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: t.surfaceWeak,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: t.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (int i = 0; i < patchNotes.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 11),
+                        _NewLine(patchNotes[i]),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+              const Spacer(),
+              GestureDetector(
+                onTap: _openUpdateStore,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  decoration: BoxDecoration(
+                    color: t.gold,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.download_rounded, color: t.goldInk, size: 19),
+                      const SizedBox(width: 9),
+                      Text(
+                        target.isEmpty
+                            ? 'Update herunterladen'
+                            : 'Version $target herunterladen',
+                        style: TextStyle(
+                          color: t.goldInk,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Öffne TestFlight, den App Store oder den Play Store und starte Zapfen danach erneut.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: t.textFaint,
+                  fontSize: 12,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1268,7 +1441,12 @@ class _PasswordField extends StatelessWidget {
 class _UpdateSheet extends StatelessWidget {
   final VoidCallback onDismiss;
   final List<String> patchNotes;
-  const _UpdateSheet({required this.onDismiss, required this.patchNotes});
+  final String targetVersion;
+  const _UpdateSheet({
+    required this.onDismiss,
+    required this.patchNotes,
+    required this.targetVersion,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1371,7 +1549,9 @@ class _UpdateSheet extends StatelessWidget {
                     border: Border.all(color: t.goldBorder),
                   ),
                   child: Text(
-                    'NEUE VERSION',
+                    targetVersion.isEmpty
+                        ? 'NEUE VERSION'
+                        : 'VERSION $targetVersion',
                     style: TextStyle(
                       color: t.goldText,
                       fontSize: 11,
@@ -1398,7 +1578,9 @@ class _UpdateSheet extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6),
                   child: Text(
-                    'Eine neue Version von Zapfen ist bereit. Aktualisiere jetzt in Testflight (IOS) oder PlayStore, um deine Streak zu sichern.',
+                    targetVersion.isEmpty
+                        ? 'Eine neue Version von Zapfen ist bereit. Aktualisiere jetzt in TestFlight oder im Play Store, um deine Streak zu sichern.'
+                        : 'Version $targetVersion von Zapfen ist bereit. Aktualisiere jetzt in TestFlight oder im Play Store, um deine Streak zu sichern.',
                     style: TextStyle(
                       color: t.textMuted,
                       fontSize: 13.5,
@@ -1433,7 +1615,10 @@ class _UpdateSheet extends StatelessWidget {
                 const SizedBox(height: 20),
                 // Primary action
                 GestureDetector(
-                  onTap: onDismiss,
+                  onTap: () {
+                    _openUpdateStore();
+                    onDismiss();
+                  },
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 15),

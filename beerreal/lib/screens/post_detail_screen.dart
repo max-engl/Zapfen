@@ -10,6 +10,7 @@ import '../core/app_cache_manager.dart';
 import '../core/geocoding_service.dart';
 import '../theme.dart';
 import '../features/auth/providers/auth_provider.dart';
+import '../features/friends/models/api_friend.dart';
 import '../features/posts/models/comment.dart';
 import '../features/posts/models/feed_post.dart';
 import '../features/posts/models/post_reaction.dart';
@@ -22,9 +23,11 @@ import '../features/posts/services/post_service.dart';
 import '../widgets/avatar.dart';
 import '../widgets/pint_dialogs.dart';
 import '../widgets/post_card.dart'
-    show BounceTap, CheersButton, SelfieReactButton, SelfieAvatarStack;
+    show CheersButton, SelfieReactButton, SelfieAvatarStack;
 import '../widgets/report_post_sheet.dart';
 import '../widgets/shimmer_box.dart';
+import 'friend_profile_screen.dart';
+import 'profile_screen.dart';
 import 'selfie_react_capture_screen.dart';
 
 // ── Main screen ───────────────────────────────────────────────────────────────
@@ -85,14 +88,17 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
       final postService = context.read<PostService>();
       final fresh = await postService.getPostById(_post.id);
       if (mounted) {
-        setState(() => _post = _post.copyWith(
-          myReaction: fresh.myReaction,
-          clearMyReaction: fresh.myReaction == null,
-          reactions: fresh.reactions,
-          totalReactions: fresh.totalReactions,
-          likes: fresh.likes,
-          likedByMe: fresh.likedByMe,
-        ));
+        setState(
+          () => _post = _post.copyWith(
+            myReaction: fresh.myReaction,
+            clearMyReaction: fresh.myReaction == null,
+            reactions: fresh.reactions,
+            selfieReactions: fresh.selfieReactions,
+            totalReactions: fresh.totalReactions,
+            likes: fresh.likes,
+            likedByMe: fresh.likedByMe,
+          ),
+        );
       }
     } catch (_) {}
   }
@@ -119,11 +125,13 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
       MaterialPageRoute(
         builder: (_) => SelfieReactCaptureScreen(
           onSend: (bytes) async {
-            final reaction = await context.read<FeedProvider>().sendSelfieReaction(
-              _post.id,
-              imageBytes: bytes,
-              filename: 'selfie_reaction.jpg',
-            );
+            final reaction = await context
+                .read<FeedProvider>()
+                .sendSelfieReaction(
+                  _post.id,
+                  imageBytes: bytes,
+                  filename: 'selfie_reaction.jpg',
+                );
             if (!mounted) return;
             final withoutMine = _post.selfieReactions
                 .where((r) => r.userId != reaction.userId)
@@ -158,10 +166,6 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
     }
   }
 
-  void _focusComposer() {
-    _commentFocusNode.requestFocus();
-  }
-
   Future<void> _sendComment() async {
     final text = _commentController.text.trim();
     if (text.isEmpty) return;
@@ -194,12 +198,38 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
       Navigator.of(context).pop();
     }
 
+    void openProfile() {
+      if (isOwner) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const ProfileScreen(standaloneRoute: true),
+          ),
+        );
+        return;
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => FriendProfileScreen(
+            friend: ApiFriend(
+              id: _post.userId,
+              username: _post.username,
+              avatarUrl: _post.avatarUrl,
+              avatarColor: _post.avatarColor,
+              avatarInitial: _post.avatarInitial,
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: t.bg,
       resizeToAvoidBottomInset: true,
       appBar: _PostAppBar(
         post: _post,
         t: t,
+        onProfileTap: openProfile,
         onDelete: isOwner ? onDelete : null,
         onReport: isOwner
             ? null
@@ -223,6 +253,31 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
                     ),
                   ),
                 ),
+                if (_post.selfieReactions.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: Container(
+                      color: t.bg,
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Selfie-Reaktionen',
+                            style: TextStyle(
+                              color: t.textMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const Spacer(),
+                          SelfieAvatarStack(
+                            reactions: _post.selfieReactions,
+                            myUserId: currentUserId,
+                            t: t,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
                 // Caption + meta
                 SliverToBoxAdapter(
@@ -373,10 +428,12 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
                 // Reactions bar
                 SliverToBoxAdapter(
                   child: _ReactionBar(
-                    postId: _post.id,
                     reactions: _post.reactions,
                     myReaction: _post.myReaction,
+                    selfieReactions: _post.selfieReactions,
                     onReact: _onReact,
+                    onSelfieReact: _onSelfieReact,
+                    onRemoveSelfieReaction: _onRemoveSelfieReaction,
                   ),
                 ),
 
@@ -570,12 +627,14 @@ class _DetailRating extends StatelessWidget {
 class _PostAppBar extends StatelessWidget implements PreferredSizeWidget {
   final FeedPost post;
   final PintTheme t;
+  final VoidCallback onProfileTap;
   final VoidCallback? onDelete;
   final VoidCallback? onReport;
 
   const _PostAppBar({
     required this.post,
     required this.t,
+    required this.onProfileTap,
     this.onDelete,
     this.onReport,
   });
@@ -601,39 +660,43 @@ class _PostAppBar extends StatelessWidget implements PreferredSizeWidget {
           child: Icon(Icons.close, color: t.text, size: 18),
         ),
       ),
-      title: Row(
-        children: [
-          PintAvatar(
-            size: 34,
-            imageUrl: post.avatarUrl,
-            avatarColor: post.avatarColor,
-            initials: post.avatarInitial,
-            ring: true,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  post.username,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: t.text,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.14,
-                  ),
-                ),
-                Text(
-                  post.formattedDateTime,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: t.textMuted, fontSize: 11),
-                ),
-              ],
+      title: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onProfileTap,
+        child: Row(
+          children: [
+            PintAvatar(
+              size: 34,
+              imageUrl: post.avatarUrl,
+              avatarColor: post.avatarColor,
+              initials: post.avatarInitial,
+              ring: true,
             ),
-          ),
-        ],
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    post.username,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: t.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.14,
+                    ),
+                  ),
+                  Text(
+                    post.formattedDateTime,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: t.textMuted, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
       actions: [
         GestureDetector(
@@ -701,14 +764,18 @@ class _ZoomablePhotoState extends State<_ZoomablePhoto>
     );
     _cheersScale = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween(begin: 0.3, end: 2.2)
-            .chain(CurveTween(curve: Curves.elasticOut)),
+        tween: Tween(
+          begin: 0.3,
+          end: 2.2,
+        ).chain(CurveTween(curve: Curves.elasticOut)),
         weight: 45,
       ),
       TweenSequenceItem(tween: ConstantTween(2.2), weight: 20),
       TweenSequenceItem(
-        tween: Tween(begin: 2.2, end: 1.6)
-            .chain(CurveTween(curve: Curves.easeIn)),
+        tween: Tween(
+          begin: 2.2,
+          end: 1.6,
+        ).chain(CurveTween(curve: Curves.easeIn)),
         weight: 35,
       ),
     ]).animate(_cheersCtrl);
@@ -792,7 +859,7 @@ class _ZoomablePhotoState extends State<_ZoomablePhoto>
         child: LayoutBuilder(
           builder: (context, constraints) {
             final size = Size(constraints.maxWidth, constraints.maxHeight);
-            _selfiePos ??= Offset(size.width - _overlayW - _pad, _pad);
+            _selfiePos ??= const Offset(_pad, _pad);
 
             return Stack(
               fit: StackFit.expand,
@@ -968,88 +1035,41 @@ class _ZoomablePhotoState extends State<_ZoomablePhoto>
 // ── Reaction bar ──────────────────────────────────────────────────────────────
 
 class _ReactionBar extends StatelessWidget {
-  final String postId;
   final List<PostReaction> reactions;
   final String? myReaction;
+  final List<SelfieReaction> selfieReactions;
   final void Function(String emoji) onReact;
+  final VoidCallback onSelfieReact;
+  final Future<void> Function(String reactionId) onRemoveSelfieReaction;
 
   const _ReactionBar({
-    required this.postId,
     required this.reactions,
     required this.myReaction,
+    required this.selfieReactions,
     required this.onReact,
+    required this.onSelfieReact,
+    required this.onRemoveSelfieReaction,
   });
-
-  void _showReactors(BuildContext context) {
-    final svc = context.read<PostService>();
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => ReactorsSheet(
-        postId: postId,
-        reactions: reactions,
-        postService: svc,
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     final t = PintThemeProvider.of(context);
-    final totalReactions = reactions.fold(0, (sum, r) => sum + r.count);
+    final myUserId = context.watch<AuthProvider>().user?.id;
+    SelfieReaction? mySelfie;
+    if (myUserId != null) {
+      for (final reaction in selfieReactions) {
+        if (reaction.userId == myUserId) {
+          mySelfie = reaction;
+          break;
+        }
+      }
+    }
     final cheersCount = reactions
         .firstWhere(
           (r) => r.emoji == '🍺',
           orElse: () => const PostReaction(emoji: '🍺', count: 0),
         )
         .count;
-
-    final activePills = <Widget>[];
-    for (final emoji in kReactionEmojis.skip(1)) {
-      final r = reactions.firstWhere(
-        (r) => r.emoji == emoji,
-        orElse: () => PostReaction(emoji: emoji, count: 0),
-      );
-      if (r.count == 0) continue;
-      final isMine = myReaction == emoji;
-      activePills
-        ..add(const SizedBox(width: 8))
-        ..add(
-          BounceTap(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              onReact(emoji);
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-              decoration: BoxDecoration(
-                color: isMine ? t.goldSoft : t.surfaceWeak,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: isMine ? t.goldBorderStrong : t.border,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(emoji, style: const TextStyle(fontSize: 15)),
-                  const SizedBox(width: 5),
-                  Text(
-                    '${r.count}',
-                    style: TextStyle(
-                      color: isMine ? t.goldText : t.textMuted,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1064,45 +1084,13 @@ class _ReactionBar extends StatelessWidget {
             },
             t: t,
           ),
-          ...activePills,
-          if (myReaction == null) ...[
-            const SizedBox(width: 8),
-            ReactButton(
-              emojis: kReactionEmojis.skip(1).toList(),
-              myReaction: myReaction,
-              onReact: onReact,
-              t: t,
-            ),
-          ],
-          if (totalReactions > 0) ...[
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: () => _showReactors(context),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                decoration: BoxDecoration(
-                  color: t.surfaceWeak,
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: t.border),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.people_outline, size: 15, color: t.textMuted),
-                    const SizedBox(width: 5),
-                    Text(
-                      '$totalReactions',
-                      style: TextStyle(
-                        color: t.textMuted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+          const SizedBox(width: 10),
+          SelfieReactButton(
+            mySelfie: mySelfie,
+            onOpenCapture: onSelfieReact,
+            onRemove: onRemoveSelfieReaction,
+            t: t,
+          ),
         ],
       ),
     );
@@ -1299,7 +1287,8 @@ class _CommentRow extends StatelessWidget {
                           final confirmed = await showPintConfirmDialog(
                             context,
                             title: 'Kommentar löschen?',
-                            message: 'Dieser Kommentar wird dauerhaft entfernt.',
+                            message:
+                                'Dieser Kommentar wird dauerhaft entfernt.',
                             confirmLabel: 'Löschen',
                             destructive: true,
                           );

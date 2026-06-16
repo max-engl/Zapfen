@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pint. — Pour with your people</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --bg2: #0e0d0b;
+    --surface: #141414;
+    --surface2: #1a1916;
+    --cream: #f6f2ea;
+    --cream2: #efe9dc;
+    --text: #ffffff;
+    --muted: rgba(255,255,255,0.56);
+    --faint: rgba(255,255,255,0.40);
+    --border: rgba(255,255,255,0.09);
+    --borderWeak: rgba(255,255,255,0.05);
+    --gold: #F6B733;
+    --goldInk: #3a1f02;
+    --goldText: #F6B733;
+    --goldDeep: #d98a14;
+    --goldFaint: rgba(246,183,51,0.08);
+    --goldSoft: rgba(246,183,51,0.15);
+    --goldBorder: rgba(246,183,51,0.30);
+    --beer: linear-gradient(180deg, #ffe89a 0%, #f6b733 30%, #d98a14 65%, #7a3f06 100%);
+    --maxw: 1200px;
+    --font: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Monaco, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  img { max-width: 100%; display: block; }
+
+  /* selection */
+  ::selection { background: var(--gold); color: var(--goldInk); }
+
+  /* ── typography helpers ── */
+  .kicker {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--goldText);
+    font-weight: 600;
+  }
+  .kicker.dark-on-cream { color: var(--goldDeep); }
+
+  h1, h2, h3 { margin: 0; letter-spacing: -0.035em; font-weight: 800; line-height: 0.98; }
+  .display {
+    font-size: clamp(48px, 8.5vw, 116px);
+    font-weight: 800;
+    letter-spacing: -0.045em;
+    line-height: 0.92;
+  }
+  .h2 { font-size: clamp(34px, 5vw, 64px); letter-spacing: -0.04em; line-height: 0.98; }
+  .lede { font-size: clamp(17px, 1.5vw, 21px); line-height: 1.5; color: var(--muted); font-weight: 400; }
+
+  .gold-text { color: var(--goldText); }
+  .beer-clip {
+    background: var(--beer);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* ── layout ── */
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 28px; }
+  section { position: relative; }
+
+  /* ── buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 14px 22px; border-radius: 999px;
+    font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
+    cursor: pointer; border: 1px solid transparent;
+    transition: transform .18s ease, background .18s ease, box-shadow .18s ease;
+    white-space: nowrap;
+  }
+  .btn-gold { background: var(--gold); color: var(--goldInk); box-shadow: 0 8px 30px rgba(246,183,51,0.22); }
+  .btn-gold:hover { transform: translateY(-2px); box-shadow: 0 12px 38px rgba(246,183,51,0.34); }
+  .btn-ghost { background: rgba(255,255,255,0.05); color: var(--text); border-color: var(--border); }
+  .btn-ghost:hover { background: rgba(255,255,255,0.09); transform: translateY(-2px); }
+  .btn-dark { background: #0a0a0a; color: #fff; }
+  .btn-dark:hover { transform: translateY(-2px); }
+
+  /* store buttons */
+  .store-btn {
+    display: inline-flex; align-items: center; gap: 11px;
+    padding: 12px 20px 12px 17px; border-radius: 14px;
+    background: #fff; color: #0a0a0a;
+    border: 1px solid rgba(0,0,0,0.08);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .store-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(0,0,0,0.35); }
+  .store-btn .sb-sub { font-size: 10px; letter-spacing: 0.04em; opacity: 0.62; font-weight: 600; text-transform: uppercase; line-height: 1; }
+  .store-btn .sb-main { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+
+  /* ── brand mark ── */
+  .bmark {
+    position: relative; display: inline-grid; place-items: center;
+    background: #000; border-radius: 22.37%; overflow: hidden; flex: none;
+  }
+  .bmark .b {
+    font-family: var(--font); font-weight: 900; line-height: 0.82;
+    letter-spacing: -0.06em; background: var(--beer);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .bmark .foam { position: absolute; border-radius: 50%; background: #fff; }
+
+  /* ── device / glow ── */
+  .glow {
+    position: absolute; border-radius: 50%;
+    background: radial-gradient(circle, rgba(246,183,51,0.30), rgba(246,183,51,0) 70%);
+    filter: blur(20px); pointer-events: none; z-index: 0;
+  }
+  .phone-scale { transform-origin: top center; }
+
+  /* ── reveal animation ── */
+  .reveal { opacity: 0; transform: translateY(26px); transition: opacity .8s cubic-bezier(.2,.7,.2,1), transform .8s cubic-bezier(.2,.7,.2,1); }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1 !important; transform: none !important; transition: none; }
+    html { scroll-behavior: auto; }
+  }
+
+  /* ── chips / pills ── */
+  .pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 14px; border-radius: 999px;
+    font-size: 13px; font-weight: 600; letter-spacing: -0.01em;
+  }
+  .pill-gold { background: var(--goldSoft); color: var(--goldText); border: 1px solid var(--goldBorder); }
+  .pill-outline { background: rgba(255,255,255,0.04); color: var(--muted); border: 1px solid var(--border); }
+
+  .hr-gold { height: 1px; background: linear-gradient(90deg, transparent, var(--goldBorder), transparent); border: 0; }
+
+  #root { position: relative; z-index: 1; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" fill="#0a0a0a"/>
+    <rect x="30" y="30" width="40" height="40" rx="9" fill="#000"/>
+    <text x="50" y="64" font-family="Helvetica, Arial, sans-serif" font-size="40" font-weight="900" text-anchor="middle" fill="#f6b733" letter-spacing="-2">B</text>
+  </svg>
+</template>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<!-- Real app components (reused, authentic screens) -->
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+<script type="text/babel" src="bingo.jsx"></script>
+
+<!-- Landing page -->
+<script type="text/babel" src="pint-hero.jsx"></script>
+<script type="text/babel" src="pint-sections.jsx"></script>
+
+<script type="text/babel">
+  const { SiteHero, SiteSections } = window;
+
+  // Reveal-on-scroll, engineered to FAIL OPEN and FAST: content is never
+  // gated for more than a moment, even if IntersectionObserver never fires.
+  function useReveals() {
+    React.useEffect(() => {
+      const show = (el) => el.classList.add('in');
+      const all = () => Array.from(document.querySelectorAll('.reveal'));
+      const revealInView = () => {
+        const vh = window.innerHeight || document.documentElement.clientHeight;
+        all().forEach(el => {
+          if (el.classList.contains('in')) return;
+          const r = el.getBoundingClientRect();
+          if (r.top < vh * 0.95 && r.bottom > -40) show(el);
+        });
+      };
+
+      // Reveal in-view content as soon as layout is ready (two frames).
+      requestAnimationFrame(() => requestAnimationFrame(revealInView));
+
+      let io = null;
+      if ('IntersectionObserver' in window) {
+        io = new IntersectionObserver((entries) => {
+          entries.forEach(e => { if (e.isIntersecting) { show(e.target); io.unobserve(e.target); } });
+        }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+        all().forEach(el => { if (!el.classList.contains('in')) io.observe(el); });
+      }
+
+      const onScroll = () => revealInView();
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll);
+
+      // Guaranteed floor: nothing stays hidden longer than this, ever.
+      const t = setTimeout(() => all().forEach(show), 650);
+
+      return () => {
+        if (io) io.disconnect();
+        window.removeEventListener('scroll', onScroll);
+        window.removeEventListener('resize', onScroll);
+        clearTimeout(t);
+      };
+    }, []);
+  }
+
+  function Site() {
+    useReveals();
+    return (
+      <React.Fragment>
+        <SiteHero />
+        <SiteSections />
+      </React.Fragment>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById("root")).render(<Site />);
+</script>
+</body>
+</html>

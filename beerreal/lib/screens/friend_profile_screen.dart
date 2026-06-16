@@ -22,6 +22,7 @@ import '../widgets/shimmer_box.dart';
 import '../widgets/stagger_item.dart';
 import 'bingo_screen.dart';
 import 'post_detail_screen.dart';
+import 'selfie_react_capture_screen.dart';
 
 int _drinkLevel(int count) {
   if (count <= 0) return 0;
@@ -138,7 +139,11 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
     return set.toList()..sort();
   }
 
-  void _showCountries(BuildContext context, List<String> countries, PintTheme t) {
+  void _showCountries(
+    BuildContext context,
+    List<String> countries,
+    PintTheme t,
+  ) {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: t.surface,
@@ -157,7 +162,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
             children: [
               const SizedBox(height: 10),
               Container(
-                width: 36, height: 4,
+                width: 36,
+                height: 4,
                 decoration: BoxDecoration(
                   color: t.border,
                   borderRadius: BorderRadius.circular(2),
@@ -174,7 +180,11 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: t.goldBorder),
                       ),
-                      child: Icon(Icons.public_rounded, color: t.goldText, size: 16),
+                      child: Icon(
+                        Icons.public_rounded,
+                        color: t.goldText,
+                        size: 16,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Column(
@@ -183,14 +193,20 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
                         Text(
                           '${countries.length} ${countries.length == 1 ? 'Land' : 'Länder'}',
                           style: TextStyle(
-                            color: t.text, fontSize: 16,
-                            fontWeight: FontWeight.w700, letterSpacing: -0.3,
+                            color: t.text,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.3,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           'Länder, in denen ${widget.friend.username} getrunken hat',
-                          style: TextStyle(color: t.textMuted, fontSize: 12, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            color: t.textMuted,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ],
                     ),
@@ -204,7 +220,10 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
                   itemCount: countries.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 6),
                   itemBuilder: (_, i) => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 13,
+                    ),
                     decoration: BoxDecoration(
                       color: t.surfaceWeak,
                       borderRadius: BorderRadius.circular(12),
@@ -213,7 +232,8 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
                     child: Row(
                       children: [
                         Container(
-                          width: 28, height: 28,
+                          width: 28,
+                          height: 28,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: t.surfaceWeaker,
@@ -223,14 +243,20 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
                           child: Text(
                             '${i + 1}',
                             style: TextStyle(
-                              color: t.textMuted, fontSize: 12, fontWeight: FontWeight.w700,
+                              color: t.textMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Text(
                           countries[i],
-                          style: TextStyle(color: t.text, fontSize: 15, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            color: t.text,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ],
                     ),
@@ -259,7 +285,12 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
 
   Future<void> _geocodeMissingCountries() async {
     final missing = _posts
-        .where((p) => (p.country == null || p.country!.isEmpty) && p.lat != null && p.lng != null)
+        .where(
+          (p) =>
+              (p.country == null || p.country!.isEmpty) &&
+              p.lat != null &&
+              p.lng != null,
+        )
         .toList();
     if (missing.isEmpty) return;
 
@@ -291,6 +322,104 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
     }
   }
 
+  Future<void> _togglePostReaction(String postId, String emoji) async {
+    final idx = _posts.indexWhere((p) => p.id == postId);
+    if (idx == -1) return;
+
+    final original = _posts[idx];
+    final isRemoving = original.myReaction == emoji;
+    final optimisticTotal =
+        original.totalReactions +
+        (isRemoving ? -1 : (original.myReaction == null ? 1 : 0));
+    setState(() {
+      _posts = List.of(_posts)
+        ..[idx] = original.copyWith(
+          myReaction: isRemoving ? null : emoji,
+          clearMyReaction: isRemoving,
+          totalReactions: optimisticTotal,
+        );
+    });
+
+    try {
+      final result = await context.read<PostService>().toggleReaction(
+        postId,
+        emoji,
+      );
+      if (!mounted) return;
+      setState(() {
+        _posts = List.of(_posts)
+          ..[idx] = _posts[idx].copyWith(
+            myReaction: result.myReaction,
+            clearMyReaction: result.myReaction == null,
+            reactions: result.reactions,
+            totalReactions: result.totalReactions,
+          );
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _posts = List.of(_posts)..[idx] = original;
+      });
+    }
+  }
+
+  Future<void> _sendSelfieReactionForPost(
+    String postId,
+    List<int> bytes,
+  ) async {
+    final reaction = await context.read<FeedProvider>().sendSelfieReaction(
+      postId,
+      imageBytes: bytes,
+      filename: 'selfie_reaction.jpg',
+    );
+    if (!mounted) return;
+    final idx = _posts.indexWhere((p) => p.id == postId);
+    if (idx == -1) return;
+    final post = _posts[idx];
+    final withoutMine = post.selfieReactions
+        .where((r) => r.userId != reaction.userId)
+        .toList();
+    setState(() {
+      _posts = List.of(_posts)
+        ..[idx] = post.copyWith(selfieReactions: [...withoutMine, reaction]);
+    });
+  }
+
+  Future<void> _removeSelfieReactionForPost(
+    String postId,
+    String reactionId,
+  ) async {
+    final idx = _posts.indexWhere((p) => p.id == postId);
+    if (idx == -1) {
+      await context.read<FeedProvider>().removeSelfieReaction(
+        postId,
+        reactionId,
+      );
+      return;
+    }
+
+    final original = _posts[idx];
+    setState(() {
+      _posts = List.of(_posts)
+        ..[idx] = original.copyWith(
+          selfieReactions: original.selfieReactions
+              .where((r) => r.id != reactionId)
+              .toList(),
+        );
+    });
+    try {
+      await context.read<FeedProvider>().removeSelfieReaction(
+        postId,
+        reactionId,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _posts = List.of(_posts)..[idx] = original;
+      });
+    }
+  }
+
   Future<void> _loadBingoCard() async {
     try {
       final card = await context.read<BingoService>().fetchCardForUser(
@@ -308,7 +437,6 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
   Widget build(BuildContext context) {
     final t = PintThemeProvider.of(context);
     final grid = buildHeatmapFromPosts(_posts);
-    final feed = context.watch<FeedProvider>();
 
     return Scaffold(
       backgroundColor: t.bg,
@@ -333,7 +461,11 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                     const Spacer(),
-                    _BlockMenuButton(userId: widget.friend.id, username: widget.friend.username, t: t),
+                    _BlockMenuButton(
+                      userId: widget.friend.id,
+                      username: widget.friend.username,
+                      t: t,
+                    ),
                   ],
                 ),
               ),
@@ -421,8 +553,14 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
                       child: _AnimatedTile(
                         animation: _statAnim(2),
                         child: GestureDetector(
-                          onTap: _countries.isEmpty ? null : () => _showCountries(context, _countries, t),
-                          child: _StatTile(value: _countries.length, label: 'Länder', t: t),
+                          onTap: _countries.isEmpty
+                              ? null
+                              : () => _showCountries(context, _countries, t),
+                          child: _StatTile(
+                            value: _countries.length,
+                            label: 'Länder',
+                            t: t,
+                          ),
                         ),
                       ),
                     ),
@@ -660,7 +798,17 @@ class _FriendProfileScreenState extends State<FriendProfileScreen>
                       post: e.value,
                       heroTagPrefix: 'fp_',
                       onReact: (emoji) =>
-                          feed.toggleReaction(e.value.id, emoji),
+                          _togglePostReaction(e.value.id, emoji),
+                      onSelfieReact: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => SelfieReactCaptureScreen(
+                            onSend: (bytes) =>
+                                _sendSelfieReactionForPost(e.value.id, bytes),
+                          ),
+                        ),
+                      ),
+                      onRemoveSelfieReaction: (reactionId) =>
+                          _removeSelfieReactionForPost(e.value.id, reactionId),
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => PostDetailScreen(
@@ -714,7 +862,9 @@ class _BlockMenuButton extends StatelessWidget {
                 border: Border.all(color: t.border),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: t.isDark ? 0.45 : 0.12),
+                    color: Colors.black.withValues(
+                      alpha: t.isDark ? 0.45 : 0.12,
+                    ),
                     blurRadius: 28,
                     offset: const Offset(0, 14),
                   ),
@@ -735,7 +885,9 @@ class _BlockMenuButton extends StatelessWidget {
                   _OptionTile(
                     t: t,
                     icon: isBlocked ? Icons.person_add_outlined : Icons.block,
-                    title: isBlocked ? 'Blockierung aufheben' : 'Nutzer blockieren',
+                    title: isBlocked
+                        ? 'Blockierung aufheben'
+                        : 'Nutzer blockieren',
                     subtitle: isBlocked
                         ? '@$username wird wieder sichtbar.'
                         : 'Beiträge von @$username ausblenden.',
@@ -747,7 +899,8 @@ class _BlockMenuButton extends StatelessWidget {
                         final confirmed = await showPintConfirmDialog(
                           context,
                           title: '@$username blockieren?',
-                          message: 'Du wirst keine Beiträge von @$username mehr sehen.',
+                          message:
+                              'Du wirst keine Beiträge von @$username mehr sehen.',
                           confirmLabel: 'Blockieren',
                           destructive: true,
                         );
@@ -756,17 +909,29 @@ class _BlockMenuButton extends StatelessWidget {
                       try {
                         if (isBlocked) {
                           await blockProvider.unblockUser(userId);
-                          if (context.mounted) showPintSnackBar(context, '@$username wurde entsperrt.');
+                          if (context.mounted) {
+                            showPintSnackBar(
+                              context,
+                              '@$username wurde entsperrt.',
+                            );
+                          }
                         } else {
                           await blockProvider.blockUser(userId);
                           if (context.mounted) {
-                            showPintSnackBar(context, '@$username wurde blockiert.');
+                            showPintSnackBar(
+                              context,
+                              '@$username wurde blockiert.',
+                            );
                             Navigator.of(context).pop();
                           }
                         }
                       } catch (_) {
                         if (context.mounted) {
-                          showPintSnackBar(context, 'Aktion fehlgeschlagen.', isError: true);
+                          showPintSnackBar(
+                            context,
+                            'Aktion fehlgeschlagen.',
+                            isError: true,
+                          );
                         }
                       }
                     },

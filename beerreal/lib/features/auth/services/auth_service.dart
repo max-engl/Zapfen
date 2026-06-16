@@ -3,6 +3,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/api/api_constants.dart';
 import '../../../core/app_version.dart';
 import '../../../core/storage/token_storage.dart';
+import '../models/app_update_info.dart';
 import '../models/app_user.dart';
 
 class AuthService {
@@ -11,7 +12,7 @@ class AuthService {
 
   AuthService(this._client, this._tokenStorage);
 
-  Future<({AppUser user, bool updateRequired, List<String> patchNotes})> login({
+  Future<({AppUser user, AppUpdateInfo updateInfo})> login({
     required String emailOrUsername,
     required String password,
   }) async {
@@ -25,16 +26,17 @@ class AuthService {
     );
     final token = response.data['token'] as String;
     await _tokenStorage.saveAccessToken(token);
-    final user = AppUser.fromJson(response.data['user'] as Map<String, dynamic>);
+    final user = AppUser.fromJson(
+      response.data['user'] as Map<String, dynamic>,
+    );
     await _tokenStorage.saveUser(user.toJson());
     return (
       user: user,
-      updateRequired: response.data['updateRequired'] as bool? ?? false,
-      patchNotes: _parsePatchNotes(response.data['patchNotes']),
+      updateInfo: AppUpdateInfo.fromJson(response.data as Map<String, dynamic>),
     );
   }
 
-  Future<({AppUser user, bool updateRequired, List<String> patchNotes})> register({
+  Future<({AppUser user, AppUpdateInfo updateInfo})> register({
     required String username,
     required String email,
     required String password,
@@ -50,55 +52,62 @@ class AuthService {
     );
     final token = response.data['token'] as String;
     await _tokenStorage.saveAccessToken(token);
-    final user = AppUser.fromJson(response.data['user'] as Map<String, dynamic>);
+    final user = AppUser.fromJson(
+      response.data['user'] as Map<String, dynamic>,
+    );
     await _tokenStorage.saveUser(user.toJson());
     return (
       user: user,
-      updateRequired: response.data['updateRequired'] as bool? ?? false,
-      patchNotes: _parsePatchNotes(response.data['patchNotes']),
+      updateInfo: AppUpdateInfo.fromJson(response.data as Map<String, dynamic>),
     );
   }
 
-  Future<({AppUser? user, bool updateRequired, List<String> patchNotes})> me() async {
+  Future<AppUpdateInfo> versionPolicy() async {
+    final response = await _client.dio.get(
+      ApiConstants.authVersion,
+      queryParameters: {'v': kAppVersion},
+    );
+    return AppUpdateInfo.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<({AppUser? user, AppUpdateInfo updateInfo})> me() async {
     final token = await _tokenStorage.getAccessToken();
-    if (token == null) return (user: null, updateRequired: false, patchNotes: <String>[]);
+    if (token == null) {
+      return (user: null, updateInfo: AppUpdateInfo.none);
+    }
     try {
       final response = await _client.dio.get(
         ApiConstants.me,
         queryParameters: {'v': kAppVersion},
       );
-      final user = AppUser.fromJson(response.data['user'] as Map<String, dynamic>);
+      final user = AppUser.fromJson(
+        response.data['user'] as Map<String, dynamic>,
+      );
       await _tokenStorage.saveUser(user.toJson());
       return (
         user: user,
-        updateRequired: response.data['updateRequired'] as bool? ?? false,
-        patchNotes: _parsePatchNotes(response.data['patchNotes']),
+        updateInfo: AppUpdateInfo.fromJson(
+          response.data as Map<String, dynamic>,
+        ),
       );
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
         // Token rejected by server — clear everything and force login.
         await _tokenStorage.clear();
-        return (user: null, updateRequired: false, patchNotes: <String>[]);
+        return (user: null, updateInfo: AppUpdateInfo.none);
       }
       // Network error (server offline, timeout, etc.) — use cached user so the
       // app can run in offline mode with the last-known identity.
       final cached = await _tokenStorage.loadUser();
       if (cached != null) {
-        return (
-          user: AppUser.fromJson(cached),
-          updateRequired: false,
-          patchNotes: <String>[],
-        );
+        return (user: AppUser.fromJson(cached), updateInfo: AppUpdateInfo.none);
       }
-      return (user: null, updateRequired: false, patchNotes: <String>[]);
+      return (user: null, updateInfo: AppUpdateInfo.none);
     }
   }
 
   Future<void> requestPasswordReset(String email) async {
-    await _client.dio.post(
-      ApiConstants.forgotPassword,
-      data: {'email': email},
-    );
+    await _client.dio.post(ApiConstants.forgotPassword, data: {'email': email});
   }
 
   Future<void> resetPassword({
@@ -118,10 +127,5 @@ class AuthService {
       // Best-effort — if the request fails (offline, 401) we still clear locally.
     }
     await _tokenStorage.clear();
-  }
-
-  static List<String> _parsePatchNotes(dynamic raw) {
-    if (raw is! List) return [];
-    return raw.whereType<String>().toList();
   }
 }

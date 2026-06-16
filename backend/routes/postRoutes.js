@@ -12,6 +12,7 @@ const AppNotification = require("../models/AppNotification");
 const r2 = require("../config/r2");
 const { PutObjectCommand, DeleteObjectsCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+const sharp = require("sharp");
 const upload = require("../middleware/uploadMiddleware");
 const authMiddleware = require("../middleware/authMiddleware");
 const { sendToUsers, sendToUser, saveNotification, saveNotifications } = require("../services/notificationService");
@@ -90,6 +91,7 @@ async function formatSelfieReactions(rawList) {
             avatarColor: r.user.avatarColor ?? null,
             avatarInitial: r.user.avatarInitial ?? null,
             imageUrl: await createSignedPostUrl(r.storagePath),
+            imagePath: r.storagePath,
             createdAt: toGermanLocalIso(r.createdAt),
         }))
     );
@@ -652,15 +654,26 @@ router.post("/:id/selfie-reaction", authMiddleware, upload.single("selfie"), asy
         const post = await Post.findById(req.params.id).select("_id user storagePath");
         if (!post) return res.status(404).json({ message: "Post not found" });
 
-        const ext = getFileExtension(file.originalname);
-        const storagePath = `${req.user._id}/reaction_${uuidv4()}.${ext}`;
+        let compressed;
+        try {
+            compressed = await sharp(file.buffer)
+                .rotate()
+                .resize(512, 512, { fit: "inside", withoutEnlargement: true })
+                .jpeg({ quality: 84, mozjpeg: true })
+                .toBuffer();
+        } catch (imageErr) {
+            return res.status(400).json({ message: "Invalid selfie reaction image", error: imageErr.message });
+        }
+
+        const storagePath = `${req.user._id}/reaction_${uuidv4()}.jpg`;
 
         try {
             await r2.send(new PutObjectCommand({
                 Bucket: process.env.R2_POST_BUCKET,
                 Key: storagePath,
-                Body: file.buffer,
-                ContentType: file.mimetype,
+                Body: compressed,
+                ContentType: "image/jpeg",
+                CacheControl: "public, max-age=31536000, immutable",
             }));
         } catch (uploadErr) {
             return res.status(500).json({ message: "Selfie reaction upload failed", error: uploadErr.message });
@@ -692,6 +705,7 @@ router.post("/:id/selfie-reaction", authMiddleware, upload.single("selfie"), asy
                 avatarColor: req.user.avatarColor ?? null,
                 avatarInitial: req.user.avatarInitial ?? null,
                 imageUrl,
+                imagePath: storagePath,
                 createdAt: toGermanLocalIso(reaction.createdAt),
             },
         });

@@ -6,6 +6,7 @@ class SelfieReaction {
   final String? avatarColor;
   final String? avatarInitial;
   final String imageUrl;
+  final String? imagePath;
   final DateTime createdAt;
 
   const SelfieReaction({
@@ -16,6 +17,7 @@ class SelfieReaction {
     this.avatarColor,
     this.avatarInitial,
     required this.imageUrl,
+    this.imagePath,
     required this.createdAt,
   });
 
@@ -27,6 +29,7 @@ class SelfieReaction {
     avatarColor: json['avatarColor'] as String?,
     avatarInitial: json['avatarInitial'] as String?,
     imageUrl: (json['imageUrl'] ?? '') as String,
+    imagePath: json['imagePath'] as String?,
     createdAt: DateTime.parse(json['createdAt'] as String),
   );
 
@@ -38,6 +41,9 @@ class SelfieReaction {
     'avatarColor': avatarColor,
     'avatarInitial': avatarInitial,
     'imageUrl': imageUrl,
+    'imagePath': imagePath,
     'createdAt': createdAt.toIso8601String(),
   };
+
+  String get cacheKey => imagePath ?? id;
 }

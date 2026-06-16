@@ -387,17 +387,19 @@ class _AchievementDetailCardState extends State<AchievementDetailCard> {
       final standings = await context
           .read<AchievementService>()
           .fetchFriendStandings(widget.achievement.id);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _standings = standings;
           _loadingFriends = false;
         });
+      }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _standings = [];
           _loadingFriends = false;
         });
+      }
     }
   }
 

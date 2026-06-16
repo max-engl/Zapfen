@@ -52,6 +52,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     final sorted = provider.sorted(_board, _metric);
     final top3 = sorted.take(3).toList();
     final rest = sorted.length > 3 ? sorted.sublist(3) : <LeaderboardEntry>[];
+    final friendIds = provider.friendEntries
+        .where((e) => !e.isYou)
+        .map((e) => e.userId)
+        .toSet();
 
     final youEntry = provider.friendEntries
         .cast<LeaderboardEntry?>()
@@ -103,8 +107,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                           slivers: [
                             CupertinoSliverRefreshControl(
                               onRefresh: () => provider.refresh(),
-                              builder: (_, state, pulledExtent, triggerDistance, __) =>
-                                  PintRefreshLogo(
+                              builder:
+                                  (
+                                    _,
+                                    state,
+                                    pulledExtent,
+                                    triggerDistance,
+                                    __,
+                                  ) => PintRefreshLogo(
                                     state: state,
                                     pulledExtent: pulledExtent,
                                     triggerDistance: triggerDistance,
@@ -118,7 +128,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                                   children: [
                                     _BoardToggle(
                                       board: _board,
-                                      onChanged: (b) => setState(() => _board = b),
+                                      onChanged: (b) =>
+                                          setState(() => _board = b),
                                     ),
                                     _Subtitle(
                                       board: _board,
@@ -127,10 +138,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                                     ),
                                     _MetricChips(
                                       metric: _metric,
-                                      onChanged: (m) => setState(() => _metric = m),
+                                      onChanged: (m) =>
+                                          setState(() => _metric = m),
                                     ),
                                     if (top3.isNotEmpty)
-                                      _Podium(top3: top3, metric: _metric),
+                                      _Podium(
+                                        top3: top3,
+                                        metric: _metric,
+                                        friendIds: friendIds,
+                                      ),
                                     _SectionLabel(t: t),
                                     ...rest.asMap().entries.map(
                                       (e) => StaggerItem(
@@ -139,6 +155,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                                           entry: e.value,
                                           rank: e.key + 4,
                                           metric: _metric,
+                                          canOpenProfile:
+                                              friendIds.contains(
+                                                e.value.userId,
+                                              ) &&
+                                              !e.value.isYou,
                                         ),
                                       ),
                                     ),
@@ -216,6 +237,19 @@ class _LBHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+void _openLeaderboardProfile(BuildContext context, LeaderboardEntry entry) {
+  final friend = ApiFriend(
+    id: entry.userId,
+    username: entry.username,
+    avatarUrl: entry.avatarUrl,
+    avatarColor: entry.avatarColor,
+    avatarInitial: entry.avatarInitial,
+  );
+  Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => FriendProfileScreen(friend: friend)),
+  );
 }
 
 // ── Board toggle ──────────────────────────────────────────────────────────────
@@ -429,18 +463,41 @@ class _Chip extends StatelessWidget {
 class _Podium extends StatelessWidget {
   final List<LeaderboardEntry> top3;
   final String metric;
-  const _Podium({required this.top3, required this.metric});
+  final Set<String> friendIds;
+  const _Podium({
+    required this.top3,
+    required this.metric,
+    required this.friendIds,
+  });
 
   @override
   Widget build(BuildContext context) {
     // Visual order: 2nd (left), 1st (center), 3rd (right)
     final slots = [
       if (top3.length > 1)
-        _PodiumSlot(entry: top3[1], rank: 2, avatarSize: 60, pedestalH: 64),
+        _PodiumSlot(
+          entry: top3[1],
+          rank: 2,
+          avatarSize: 60,
+          pedestalH: 64,
+          canOpenProfile: friendIds.contains(top3[1].userId) && !top3[1].isYou,
+        ),
       if (top3.isNotEmpty)
-        _PodiumSlot(entry: top3[0], rank: 1, avatarSize: 78, pedestalH: 92),
+        _PodiumSlot(
+          entry: top3[0],
+          rank: 1,
+          avatarSize: 78,
+          pedestalH: 92,
+          canOpenProfile: friendIds.contains(top3[0].userId) && !top3[0].isYou,
+        ),
       if (top3.length > 2)
-        _PodiumSlot(entry: top3[2], rank: 3, avatarSize: 60, pedestalH: 50),
+        _PodiumSlot(
+          entry: top3[2],
+          rank: 3,
+          avatarSize: 60,
+          pedestalH: 50,
+          canOpenProfile: friendIds.contains(top3[2].userId) && !top3[2].isYou,
+        ),
     ];
     if (slots.isEmpty) return const SizedBox.shrink();
     return Padding(
@@ -465,11 +522,13 @@ class _PodiumSlot {
   final int rank;
   final double avatarSize;
   final double pedestalH;
+  final bool canOpenProfile;
   const _PodiumSlot({
     required this.entry,
     required this.rank,
     required this.avatarSize,
     required this.pedestalH,
+    required this.canOpenProfile,
   });
 }
 
@@ -506,105 +565,118 @@ class _PodiumColumn extends StatelessWidget {
           child: child,
         ),
       ),
-      child: Column(
-        children: [
-          // Crown for 1st
-          SizedBox(
-            height: 28,
-            child: isFirst
-                ? Icon(Icons.workspace_premium_rounded, size: 24, color: t.gold)
-                : null,
-          ),
-          // Avatar + rank badge
-          Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.bottomCenter,
-            children: [
-              Container(
-                width: slot.avatarSize,
-                height: slot.avatarSize,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: ringColor, width: isFirst ? 3 : 2),
-                ),
-                child: ClipOval(
-                  child: PintAvatar(
-                    size: slot.avatarSize,
-                    imageUrl: slot.entry.avatarUrl,
-                    avatarColor: slot.entry.avatarColor,
-                    initials: slot.entry.avatarInitial,
-                    tone: ImgTone.avatar,
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: -4,
-                child: Container(
-                  width: 22,
-                  height: 22,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: slot.canOpenProfile
+            ? () => _openLeaderboardProfile(context, slot.entry)
+            : null,
+        child: Column(
+          children: [
+            // Crown for 1st
+            SizedBox(
+              height: 28,
+              child: isFirst
+                  ? Icon(
+                      Icons.workspace_premium_rounded,
+                      size: 24,
+                      color: t.gold,
+                    )
+                  : null,
+            ),
+            // Avatar + rank badge
+            Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.bottomCenter,
+              children: [
+                Container(
+                  width: slot.avatarSize,
+                  height: slot.avatarSize,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: isFirst ? t.gold : t.surface,
-                    border: Border.all(color: t.bg, width: 2),
+                    border: Border.all(
+                      color: ringColor,
+                      width: isFirst ? 3 : 2,
+                    ),
                   ),
-                  child: Center(
-                    child: Text(
-                      '${slot.rank}',
-                      style: TextStyle(
-                        color: isFirst ? t.goldInk : t.text,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
+                  child: ClipOval(
+                    child: PintAvatar(
+                      size: slot.avatarSize,
+                      imageUrl: slot.entry.avatarUrl,
+                      avatarColor: slot.entry.avatarColor,
+                      initials: slot.entry.avatarInitial,
+                      tone: ImgTone.avatar,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: -4,
+                  child: Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isFirst ? t.gold : t.surface,
+                      border: Border.all(color: t.bg, width: 2),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${slot.rank}',
+                        style: TextStyle(
+                          color: isFirst ? t.goldInk : t.text,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          // Name
-          Text(
-            slot.entry.username.split(' ').first,
-            style: TextStyle(
-              color: t.text,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.1,
+              ],
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 3),
-          _MetricVal(entry: slot.entry, metric: metric, big: isFirst),
-          const SizedBox(height: 10),
-          // Pedestal
-          Container(
-            height: slot.pedestalH,
-            decoration: BoxDecoration(
-              color: isFirst ? t.gold : t.surfaceWeak,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(12),
+            const SizedBox(height: 10),
+            // Name
+            Text(
+              slot.entry.username.split(' ').first,
+              style: TextStyle(
+                color: t.text,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.1,
               ),
-              border: isFirst ? null : Border.all(color: t.border),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
             ),
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  '${slot.rank}',
-                  style: TextStyle(
-                    color: isFirst ? t.goldInk : t.textFaint,
-                    fontSize: isFirst ? 30 : 22,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -1.5,
+            const SizedBox(height: 3),
+            _MetricVal(entry: slot.entry, metric: metric, big: isFirst),
+            const SizedBox(height: 10),
+            // Pedestal
+            Container(
+              height: slot.pedestalH,
+              decoration: BoxDecoration(
+                color: isFirst ? t.gold : t.surfaceWeak,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(12),
+                ),
+                border: isFirst ? null : Border.all(color: t.border),
+              ),
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    '${slot.rank}',
+                    style: TextStyle(
+                      color: isFirst ? t.goldInk : t.textFaint,
+                      fontSize: isFirst ? 30 : 22,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -1.5,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -699,110 +771,104 @@ class _RankRow extends StatelessWidget {
   final LeaderboardEntry entry;
   final int rank;
   final String metric;
+  final bool canOpenProfile;
   const _RankRow({
     required this.entry,
     required this.rank,
     required this.metric,
+    required this.canOpenProfile,
   });
-
-  void _openProfile(BuildContext context) {
-    final friend = ApiFriend(
-      id: entry.userId,
-      username: entry.username,
-      avatarUrl: entry.avatarUrl,
-      avatarColor: entry.avatarColor,
-      avatarInitial: entry.avatarInitial,
-    );
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => FriendProfileScreen(friend: friend)),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     final t = PintThemeProvider.of(context);
     return GestureDetector(
-      onTap: entry.isYou ? null : () => _openProfile(context),
+      behavior: HitTestBehavior.opaque,
+      onTap: canOpenProfile
+          ? () => _openLeaderboardProfile(context, entry)
+          : null,
       child: Container(
-      margin: entry.isYou
-          ? const EdgeInsets.symmetric(horizontal: 10, vertical: 2)
-          : EdgeInsets.zero,
-      decoration: BoxDecoration(
-        color: entry.isYou ? t.goldFaint : Colors.transparent,
-        borderRadius: entry.isYou ? BorderRadius.circular(14) : null,
-        border: entry.isYou
-            ? Border.all(color: t.goldBorder)
-            : Border(bottom: BorderSide(color: t.divider)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 22,
-            child: Text(
-              '$rank',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: entry.isYou ? t.goldText : t.textMuted,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.3,
+        margin: entry.isYou
+            ? const EdgeInsets.symmetric(horizontal: 10, vertical: 2)
+            : EdgeInsets.zero,
+        decoration: BoxDecoration(
+          color: entry.isYou ? t.goldFaint : Colors.transparent,
+          borderRadius: entry.isYou ? BorderRadius.circular(14) : null,
+          border: entry.isYou
+              ? Border.all(color: t.goldBorder)
+              : Border(bottom: BorderSide(color: t.divider)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 22,
+              child: Text(
+                '$rank',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: entry.isYou ? t.goldText : t.textMuted,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: entry.isYou ? Border.all(color: t.gold, width: 2) : null,
-            ),
-            child: ClipOval(
-              child: PintAvatar(
-                size: 42,
-                imageUrl: entry.avatarUrl,
-                avatarColor: entry.avatarColor,
-                initials: entry.avatarInitial,
-                tone: ImgTone.avatar,
+            const SizedBox(width: 12),
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: entry.isYou
+                    ? Border.all(color: t.gold, width: 2)
+                    : null,
+              ),
+              child: ClipOval(
+                child: PintAvatar(
+                  size: 42,
+                  imageUrl: entry.avatarUrl,
+                  avatarColor: entry.avatarColor,
+                  initials: entry.avatarInitial,
+                  tone: ImgTone.avatar,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  entry.isYou ? '${entry.username} · Du' : entry.username,
-                  style: TextStyle(
-                    color: t.text,
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.1,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    entry.isYou ? '${entry.username} · Du' : entry.username,
+                    style: TextStyle(
+                      color: t.text,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.1,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  '@${entry.username}',
-                  style: TextStyle(color: t.textMuted, fontSize: 12),
-                ),
-              ],
+                  Text(
+                    '@${entry.username}',
+                    style: TextStyle(color: t.textMuted, fontSize: 12),
+                  ),
+                ],
+              ),
             ),
-          ),
-          _MoveDelta(move: entry.moveFor(metric), isNew: entry.isNew),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 64,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: _MetricVal(entry: entry, metric: metric),
+            _MoveDelta(move: entry.moveFor(metric), isNew: entry.isNew),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 64,
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: _MetricVal(entry: entry, metric: metric),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
     );
   }
 }

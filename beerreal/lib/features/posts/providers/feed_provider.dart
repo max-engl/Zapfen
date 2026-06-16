@@ -224,9 +224,7 @@ class FeedProvider extends ChangeNotifier {
           .where((r) => r.userId != reaction.userId)
           .toList();
       _posts = List.of(_posts)
-        ..[idx] = post.copyWith(
-          selfieReactions: [...withoutMine, reaction],
-        );
+        ..[idx] = post.copyWith(selfieReactions: [...withoutMine, reaction]);
       notifyListeners();
       _feedDb.savePosts(_posts);
     }
@@ -280,6 +278,13 @@ class FeedProvider extends ChangeNotifier {
               key: post.selfiePath ?? '${post.id}_selfie',
             )
             .then<void>((_) {}, onError: (_) {});
+      }
+      for (final reaction in post.selfieReactions) {
+        if (reaction.imageUrl.isNotEmpty) {
+          AppCacheManager.instance
+              .downloadFile(reaction.imageUrl, key: reaction.cacheKey)
+              .then<void>((_) {}, onError: (_) {});
+        }
       }
       final avatar = post.avatarUrl;
       if (avatar != null && avatar.isNotEmpty) {
