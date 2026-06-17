@@ -827,6 +827,39 @@ router.post("/:id/view", authMiddleware, async (req, res) => {
     }
 });
 
+// PATCH /posts/:id  —  edit own post caption / drink
+router.patch("/:id", authMiddleware, async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id).select("user");
+        if (!post) return res.status(404).json({ message: "Post not found" });
+        if (post.user.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: "Not your post" });
+        }
+
+        const { caption, drinkName, drinkEmoji } = req.body;
+        const update = {};
+        if (caption !== undefined) update.caption = String(caption).slice(0, 300);
+        if (drinkName !== undefined) update["drink.name"] = String(drinkName).slice(0, 100);
+        if (drinkEmoji !== undefined) update["drink.emoji"] = String(drinkEmoji).slice(0, 10);
+
+        const updated = await Post.findByIdAndUpdate(
+            post._id,
+            { $set: update },
+            { new: true }
+        ).populate("user", "username avatarUrl avatarColor avatarInitial");
+
+        const [likedSet, reactionDataMap, selfieReactionDataMap] = await Promise.all([
+            getLikedSet(req.user._id, [updated._id]),
+            getReactionData(req.user._id, [updated._id]),
+            getSelfieReactionData([updated._id]),
+        ]);
+        const formatted = await formatPostWithUrls(updated, likedSet, reactionDataMap, selfieReactionDataMap);
+        res.json({ post: formatted });
+    } catch (error) {
+        res.status(500).json({ message: "Could not update post", error: error.message });
+    }
+});
+
 // DELETE /posts/:id  —  delete own post
 router.delete("/:id", authMiddleware, async (req, res) => {
     try {

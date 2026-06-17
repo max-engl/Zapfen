@@ -24,11 +24,18 @@ class ProfilePostsProvider extends ChangeNotifier {
     if (_posts.isEmpty) return 0;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final days = _posts
-        .map((p) => DateTime(p.createdAt.year, p.createdAt.month, p.createdAt.day))
-        .toSet()
-        .toList()
-      ..sort((a, b) => b.compareTo(a));
+    final days =
+        _posts
+            .map(
+              (p) => DateTime(
+                p.createdAt.year,
+                p.createdAt.month,
+                p.createdAt.day,
+              ),
+            )
+            .toSet()
+            .toList()
+          ..sort((a, b) => b.compareTo(a));
     if (today.difference(days.first).inDays > 1) return 0;
     int count = 1;
     for (int i = 1; i < days.length; i++) {
@@ -41,6 +48,37 @@ class ProfilePostsProvider extends ChangeNotifier {
     return count;
   }
 
+  int get postsToday {
+    final now = DateTime.now();
+    return _posts.where((p) {
+      final d = p.createdAt;
+      return d.year == now.year && d.month == now.month && d.day == now.day;
+    }).length;
+  }
+
+  /// Posts within the last 24 hours, each as a fractional local hour-of-day
+  /// (0–24) — feeds the "Last 24h" widget's timeline track.
+  List<double> get last24hHours {
+    final cutoff = DateTime.now().subtract(const Duration(hours: 24));
+    return _posts
+        .where((p) => p.createdAt.isAfter(cutoff))
+        .map((p) => p.createdAt.hour + p.createdAt.minute / 60.0)
+        .toList();
+  }
+
+  /// Last 3 weeks of activity bucketed into 4 intensity levels (0–3) for the
+  /// "Streak" widget's mini grid. Last entry is today.
+  List<int> get widgetStreakGrid {
+    final grid = heatmapGrid; // 84 days, oldest..today
+    final last21 = grid.sublist(grid.length - 21);
+    return last21.map((count) {
+      if (count <= 0) return 0;
+      if (count == 1) return 1;
+      if (count <= 3) return 2;
+      return 3;
+    }).toList();
+  }
+
   List<String> get countries {
     final set = <String>{};
     for (final p in _posts) {
@@ -51,7 +89,12 @@ class ProfilePostsProvider extends ChangeNotifier {
 
   Future<void> _geocodeMissingCountries() async {
     final missing = _posts
-        .where((p) => (p.country == null || p.country!.isEmpty) && p.lat != null && p.lng != null)
+        .where(
+          (p) =>
+              (p.country == null || p.country!.isEmpty) &&
+              p.lat != null &&
+              p.lng != null,
+        )
         .toList();
     if (missing.isEmpty) return;
 
@@ -120,6 +163,14 @@ class ProfilePostsProvider extends ChangeNotifier {
   Future<void> deletePost(String postId) async {
     await _postService.deletePost(postId);
     _posts = _posts.where((p) => p.id != postId).toList();
+    notifyListeners();
+    _db.saveProfilePosts(_posts);
+  }
+
+  void applyUpdate(FeedPost updated) {
+    final idx = _posts.indexWhere((p) => p.id == updated.id);
+    if (idx == -1) return;
+    _posts = List.of(_posts)..[idx] = updated;
     notifyListeners();
     _db.saveProfilePosts(_posts);
   }

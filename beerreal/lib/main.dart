@@ -28,6 +28,8 @@ import 'features/posts/providers/feed_provider.dart';
 import 'features/posts/providers/profile_posts_provider.dart';
 import 'features/friends/services/friend_service.dart';
 import 'features/friends/providers/friend_provider.dart';
+import 'features/friends/providers/friends_today_provider.dart';
+import 'core/widget_sync_service.dart';
 import 'features/profile/services/profile_service.dart';
 import 'features/drinks/services/drink_service.dart';
 import 'features/drinks/providers/drink_provider.dart';
@@ -163,6 +165,9 @@ Future<void> _main() async {
         ),
         ChangeNotifierProvider<FriendProvider>(
           create: (_) => FriendProvider(friendService, FriendDatabase.instance),
+        ),
+        ChangeNotifierProvider<FriendsTodayProvider>(
+          create: (_) => FriendsTodayProvider(friendService),
         ),
         Provider<DrinkService>.value(value: drinkService),
         ChangeNotifierProvider<DrinkProvider>(
@@ -643,7 +648,22 @@ class _PintAppState extends State<PintApp> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<NotificationProvider>().load();
       context.read<BlockProvider>().load();
+      _refreshWidgetData();
     });
+  }
+
+  /// Refreshes the data the iOS home-screen widgets depend on and pushes a
+  /// fresh snapshot to the native side once everything has loaded.
+  Future<void> _refreshWidgetData() async {
+    if (!mounted) return;
+    final posts = context.read<ProfilePostsProvider>();
+    final leaderboard = context.read<LeaderboardProvider>();
+    final friendsToday = context.read<FriendsTodayProvider>();
+
+    // Push whatever's already cached immediately, then again once fresh.
+    WidgetSyncService.push(context);
+    await Future.wait([posts.load(), leaderboard.load(), friendsToday.load()]);
+    if (mounted) WidgetSyncService.push(context);
   }
 
   void _setupNotificationTapHandlers() {
@@ -828,6 +848,7 @@ class _PintAppState extends State<PintApp> {
                       if (previousStreak < 5 && profilePosts.streak >= 5) {
                         HapticFeedback.mediumImpact();
                       }
+                      WidgetSyncService.push(context);
                       context.read<AchievementProvider>().refresh();
                       setState(() => _screen = PintScreen.feed);
                     },

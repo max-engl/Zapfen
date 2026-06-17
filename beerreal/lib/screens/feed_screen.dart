@@ -12,6 +12,7 @@ import '../widgets/pint_loading.dart';
 import '../widgets/post_card.dart';
 import '../widgets/pint_refresh_logo.dart';
 import '../widgets/shimmer_box.dart';
+import 'edit_post_screen.dart';
 import 'friend_profile_screen.dart';
 import 'post_detail_screen.dart';
 import 'profile_screen.dart';
@@ -307,8 +308,9 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                 enableHero: false,
                 onReact: (emoji) => feed.toggleReaction(p.id, emoji),
                 onSelfieReact: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => SelfieReactCaptureScreen(
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) =>
+                        SelfieReactCaptureScreen(
                       onSend: (bytes, emoji) => feed.sendSelfieReaction(
                         p.id,
                         imageBytes: bytes,
@@ -316,6 +318,16 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                         emoji: emoji,
                       ),
                     ),
+                    transitionsBuilder:
+                        (context, animation, secondaryAnimation, child) {
+                      final tween = Tween(
+                        begin: const Offset(0.0, 1.0),
+                        end: Offset.zero,
+                      ).chain(CurveTween(curve: Curves.easeOutCubic));
+                      return SlideTransition(
+                          position: animation.drive(tween), child: child);
+                    },
+                    transitionDuration: const Duration(milliseconds: 350),
                   ),
                 ),
                 onRemoveSelfieReaction: (reactionId) =>
@@ -325,6 +337,31 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                 ),
                 onDelete: p.userId == currentUserId
                     ? () => feed.deletePost(p.id)
+                    : null,
+                onEdit: p.userId == currentUserId
+                    ? () => Navigator.of(context).push(
+                        PageRouteBuilder(
+                          pageBuilder: (context, animation, secondaryAnimation) =>
+                              EditPostScreen(
+                            post: p,
+                            onSave: ({required caption, required drinkName, required drinkEmoji}) =>
+                                feed.updatePost(
+                              p.id,
+                              caption: caption,
+                              drinkName: drinkName,
+                              drinkEmoji: drinkEmoji,
+                            ),
+                          ),
+                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                            final tween = Tween(
+                              begin: const Offset(0.0, 1.0),
+                              end: Offset.zero,
+                            ).chain(CurveTween(curve: Curves.easeOutCubic));
+                            return SlideTransition(position: animation.drive(tween), child: child);
+                          },
+                          transitionDuration: const Duration(milliseconds: 350),
+                        ),
+                      )
                     : null,
                 onProfileTap: p.userId == currentUserId
                     ? () => Navigator.of(context).push(

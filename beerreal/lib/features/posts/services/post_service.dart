@@ -103,6 +103,19 @@ class PostService {
     await _client.dio.delete(ApiConstants.deletePost(postId));
   }
 
+  Future<FeedPost> updatePost(
+    String postId, {
+    required String caption,
+    required String drinkName,
+    required String drinkEmoji,
+  }) async {
+    final response = await _client.dio.patch(
+      ApiConstants.updatePost(postId),
+      data: {'caption': caption, 'drinkName': drinkName, 'drinkEmoji': drinkEmoji},
+    );
+    return FeedPost.fromJson(response.data['post'] as Map<String, dynamic>);
+  }
+
   Future<List<ReactionActor>> getPostReactions(String postId) async {
     final response = await _client.dio.get(ApiConstants.reactToPost(postId));
     final list = response.data as List<dynamic>;

@@ -3,9 +3,11 @@ const crypto = require("crypto");
 
 const Friend = require("../models/Friend");
 const User = require("../models/User");
+const Post = require("../models/Post");
 const authMiddleware = require("../middleware/authMiddleware");
 const { sendToUser, saveNotification } = require("../services/notificationService");
-const { getRecommendations } = require("../utils/friends");
+const { getRecommendations, getFriendIds } = require("../utils/friends");
+const { getBerlinOffsetMinutes, localDayStart } = require("../utils/localTime");
 
 const router = express.Router();
 
@@ -65,7 +67,7 @@ router.post("/request/:userId", authMiddleware, async (req, res) => {
                 ...(req.user.avatarColor && { actorAvatarColor: req.user.avatarColor }),
                 ...(req.user.avatarInitial && { actorAvatarInitial: req.user.avatarInitial }),
             },
-        }).catch(() => {});
+        }).catch(() => { });
         saveNotification(recipientId, {
             type: 'request',
             actorId: req.user._id,
@@ -73,7 +75,7 @@ router.post("/request/:userId", authMiddleware, async (req, res) => {
             actorAvatarUrl: req.user.avatarUrl ?? null,
             actorAvatarColor: req.user.avatarColor ?? null,
             actorAvatarInitial: req.user.avatarInitial ?? null,
-        }).catch(() => {});
+        }).catch(() => { });
     } catch (error) {
         res.status(500).json({ message: "Could not send friend request", error: error.message });
     }
@@ -111,7 +113,7 @@ router.post("/accept/:userId", authMiddleware, async (req, res) => {
                 ...(req.user.avatarColor && { actorAvatarColor: req.user.avatarColor }),
                 ...(req.user.avatarInitial && { actorAvatarInitial: req.user.avatarInitial }),
             },
-        }).catch(() => {});
+        }).catch(() => { });
         saveNotification(requesterId, {
             type: 'accepted',
             actorId: req.user._id,
@@ -119,7 +121,7 @@ router.post("/accept/:userId", authMiddleware, async (req, res) => {
             actorAvatarUrl: req.user.avatarUrl ?? null,
             actorAvatarColor: req.user.avatarColor ?? null,
             actorAvatarInitial: req.user.avatarInitial ?? null,
-        }).catch(() => {});
+        }).catch(() => { });
     } catch (error) {
         res.status(500).json({ message: "Could not accept friend request", error: error.message });
     }
@@ -169,6 +171,52 @@ router.get("/", authMiddleware, async (req, res) => {
         res.json({ friends });
     } catch (error) {
         res.status(500).json({ message: "Could not fetch friends", error: error.message });
+    }
+});
+
+// GET /friends/poured-today  —  which friends have posted today (for the home-screen widget)
+router.get("/poured-today", authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const friendIds = await getFriendIds(userId);
+        const total = friendIds.length;
+
+        if (total === 0) {
+            return res.json({ count: 0, total: 0, friends: [] });
+        }
+
+        const offsetMinutes = getBerlinOffsetMinutes();
+        const todayStart = localDayStart(new Date(), offsetMinutes);
+
+        const postsToday = await Post.find({
+            user: { $in: friendIds },
+            createdAt: { $gte: todayStart },
+        })
+            .sort({ createdAt: -1 })
+            .select("user");
+
+        const orderedIds = [];
+        const seen = new Set();
+        for (const post of postsToday) {
+            const id = post.user.toString();
+            if (!seen.has(id)) {
+                seen.add(id);
+                orderedIds.push(id);
+            }
+        }
+
+        const previewUsers = await User.find({ _id: { $in: orderedIds.slice(0, 5) } })
+            .select("username avatarUrl avatarColor avatarInitial");
+        const userMap = {};
+        for (const u of previewUsers) userMap[u._id.toString()] = u;
+        const friends = orderedIds
+            .slice(0, 5)
+            .map((id) => userMap[id])
+            .filter(Boolean);
+
+        res.json({ count: orderedIds.length, total, friends });
+    } catch (error) {
+        res.status(500).json({ message: "Could not fetch today's pours", error: error.message });
     }
 });
 
@@ -247,6 +295,7 @@ router.get("/recommendations", authMiddleware, async (req, res) => {
         res.status(500).json({ message: "Could not fetch recommendations", error: error.message });
     }
 });
+
 
 // GET /friends/invite  —  get (or lazily create) the caller's invite token
 router.get("/invite", authMiddleware, async (req, res) => {
@@ -329,7 +378,7 @@ router.post("/invite/:token/accept", authMiddleware, async (req, res) => {
                 ...(req.user.avatarColor && { actorAvatarColor: req.user.avatarColor }),
                 ...(req.user.avatarInitial && { actorAvatarInitial: req.user.avatarInitial }),
             },
-        }).catch(() => {});
+        }).catch(() => { });
         saveNotification(recipientId, {
             type: "request",
             actorId: req.user._id,
@@ -337,7 +386,7 @@ router.post("/invite/:token/accept", authMiddleware, async (req, res) => {
             actorAvatarUrl: req.user.avatarUrl ?? null,
             actorAvatarColor: req.user.avatarColor ?? null,
             actorAvatarInitial: req.user.avatarInitial ?? null,
-        }).catch(() => {});
+        }).catch(() => { });
     } catch (error) {
         res.status(500).json({ message: "Could not accept invite", error: error.message });
     }

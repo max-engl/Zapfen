@@ -15,6 +15,7 @@ Future<void> showPostOptionsSheet(
   required FeedPost post,
   VoidCallback? onDelete,
   VoidCallback? onReport,
+  VoidCallback? onEdit,
 }) {
   final t = PintThemeProvider.of(context);
   return showModalBottomSheet<void>(
@@ -43,6 +44,19 @@ Future<void> showPostOptionsSheet(
             children: [
               _SheetHandle(t: t),
               const SizedBox(height: 8),
+              if (onEdit != null) ...[
+                _PostOptionButton(
+                  t: t,
+                  icon: Icons.edit_outlined,
+                  title: 'Beitrag bearbeiten',
+                  subtitle: 'Beschreibung und Getränk ändern.',
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    onEdit();
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
               _PostOptionButton(
                 t: t,
                 icon: onDelete != null

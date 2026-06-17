@@ -1,0 +1,19 @@
+{
+  "" : {
+    "diagnostics" : "/Users/maxengl/Documents/RandomProgramming/BierchenClone/beerreal/ios/build/Runner.build/Debug-iphonesimulator/BeerrealWidgetExtension.build/Objects-normal/arm64/BeerrealWidgetExtension-primary.dia",
+    "emit-module-dependencies" : "/Users/maxengl/Documents/RandomProgramming/BierchenClone/beerreal/ios/build/Runner.build/Debug-iphonesimulator/BeerrealWidgetExtension.build/Objects-normal/arm64/BeerrealWidgetExtension-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/maxengl/Documents/RandomProgramming/BierchenClone/beerreal/ios/build/Runner.build/Debug-iphonesimulator/BeerrealWidgetExtension.build/Objects-normal/arm64/BeerrealWidgetExtension-primary-emit-module.dia",
+    "pch" : "/Users/maxengl/Documents/RandomProgramming/BierchenClone/beerreal/ios/build/Runner.build/Debug-iphonesimulator/BeerrealWidgetExtension.build/Objects-normal/arm64/BeerrealWidgetExtension-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/maxengl/Documents/RandomProgramming/BierchenClone/beerreal/ios/build/Runner.build/Debug-iphonesimulator/BeerrealWidgetExtension.build/Objects-normal/arm64/BeerrealWidgetExtension-primary.swiftdeps"
+  },
+  "/Users/maxengl/Documents/RandomProgramming/BierchenClone/beerreal/ios/BeerrealWidgetExtension/BeerrealWidget.swift" : {
+    "const-values" : "/Users/maxengl/Documents/RandomProgramming/BierchenClone/beerreal/ios/build/Runner.build/Debug-iphonesimulator/BeerrealWidgetExtension.build/Objects-normal/arm64/BeerrealWidget.swiftconstvalues",
+    "dependencies" : "/Users/maxengl/Documents/RandomProgramming/BierchenClone/beerreal/ios/build/Runner.build/Debug-iphonesimulator/BeerrealWidgetExtension.build/Objects-normal/arm64/BeerrealWidget.d",
+    "diagnostics" : "/Users/maxengl/Documents/RandomProgramming/BierchenClone/beerreal/ios/build/Runner.build/Debug-iphonesimulator/BeerrealWidgetExtension.build/Objects-normal/arm64/BeerrealWidget.dia",
+    "index-unit-output-path" : "/Runner.build/Debug-iphonesimulator/BeerrealWidgetExtension.build/Objects-normal/arm64/BeerrealWidget.o",
+    "llvm-bc" : "/Users/maxengl/Documents/RandomProgramming/BierchenClone/beerreal/ios/build/Runner.build/Debug-iphonesimulator/BeerrealWidgetExtension.build/Objects-normal/arm64/BeerrealWidget.bc",
+    "object" : "/Users/maxengl/Documents/RandomProgramming/BierchenClone/beerreal/ios/build/Runner.build/Debug-iphonesimulator/BeerrealWidgetExtension.build/Objects-normal/arm64/BeerrealWidget.o",
+    "swift-dependencies" : "/Users/maxengl/Documents/RandomProgramming/BierchenClone/beerreal/ios/build/Runner.build/Debug-iphonesimulator/BeerrealWidgetExtension.build/Objects-normal/arm64/BeerrealWidget.swiftdeps",
+    "swiftmodule" : "/Users/maxengl/Documents/RandomProgramming/BierchenClone/beerreal/ios/build/Runner.build/Debug-iphonesimulator/BeerrealWidgetExtension.build/Objects-normal/arm64/BeerrealWidget~partial.swiftmodule"
+  }
+}

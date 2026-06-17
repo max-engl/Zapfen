@@ -1,6 +1,7 @@
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_constants.dart';
 import '../models/api_friend.dart';
+import '../models/friends_today.dart';
 
 class FriendService {
   final ApiClient _client;
@@ -59,6 +60,11 @@ class FriendService {
 
   Future<void> acceptInviteToken(String token) async {
     await _client.dio.post(ApiConstants.acceptInvite(token));
+  }
+
+  Future<FriendsToday> getFriendsPouredToday() async {
+    final response = await _client.dio.get(ApiConstants.friendsPouredToday);
+    return FriendsToday.fromJson(response.data as Map<String, dynamic>);
   }
 
   Future<List<FriendRecommendation>> getRecommendations() async {

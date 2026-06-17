@@ -31,6 +31,7 @@ class ApiConstants {
   static String postById(String id) => '/posts/$id';
   static String userPosts(String userId) => '/posts/user/$userId';
   static String deletePost(String id) => '/posts/$id';
+  static String updatePost(String id) => '/posts/$id';
   static String likePost(String id) => '/posts/$id/like';
   static String viewPost(String id) => '/posts/$id/view';
 
@@ -42,6 +43,7 @@ class ApiConstants {
   static String acceptFriendRequest(String userId) => '/friends/accept/$userId';
   static String removeFriend(String userId) => '/friends/$userId';
   static const String friendRecommendations = '/friends/recommendations';
+  static const String friendsPouredToday = '/friends/poured-today';
   static const String myInvite = '/friends/invite';
   static String resolveInvite(String token) => '/friends/invite/$token';
   static String acceptInvite(String token) => '/friends/invite/$token/accept';

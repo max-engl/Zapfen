@@ -1,4 +1,4 @@
-const kAppVersion = '1.5';
+const kAppVersion = '1.6';
 
 const kIosTestFlightUrl = String.fromEnvironment(
   'IOS_TESTFLIGHT_URL',

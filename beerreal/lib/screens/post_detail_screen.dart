@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:sliver_tools/sliver_tools.dart';
 import '../core/app_cache_manager.dart';
 import '../core/geocoding_service.dart';
+import '../core/widget_sync_service.dart';
 import '../theme.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/friends/models/api_friend.dart';
@@ -26,6 +27,7 @@ import '../widgets/post_card.dart'
     show CheersButton, SelfieReactButton, SelfieAvatarStack;
 import '../widgets/report_post_sheet.dart';
 import '../widgets/shimmer_box.dart';
+import 'edit_post_screen.dart';
 import 'friend_profile_screen.dart';
 import 'profile_screen.dart';
 import 'selfie_react_capture_screen.dart';
@@ -122,8 +124,9 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
 
   Future<void> _onSelfieReact() async {
     await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => SelfieReactCaptureScreen(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            SelfieReactCaptureScreen(
           onSend: (bytes, emoji) async {
             final reaction = await context
                 .read<FeedProvider>()
@@ -144,6 +147,14 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
             });
           },
         ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final tween = Tween(
+            begin: const Offset(0.0, 1.0),
+            end: Offset.zero,
+          ).chain(CurveTween(curve: Curves.easeOutCubic));
+          return SlideTransition(position: animation.drive(tween), child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 350),
       ),
     );
   }
@@ -196,7 +207,37 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
     void onDelete() {
       context.read<FeedProvider>().deletePost(_post.id);
       context.read<ProfilePostsProvider>().deletePost(_post.id);
+      WidgetSyncService.push(context);
       Navigator.of(context).pop();
+    }
+
+    Future<void> onEdit() async {
+      final feedProvider = context.read<FeedProvider>();
+      final profileProvider = context.read<ProfilePostsProvider>();
+      final nav = Navigator.of(context);
+      final updated = await nav.push<FeedPost>(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => EditPostScreen(
+            post: _post,
+            onSave: ({required caption, required drinkName, required drinkEmoji}) =>
+                feedProvider.updatePost(
+                  _post.id,
+                  caption: caption,
+                  drinkName: drinkName,
+                  drinkEmoji: drinkEmoji,
+                ),
+          ),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            final tween = Tween(begin: const Offset(0.0, 1.0), end: Offset.zero)
+                .chain(CurveTween(curve: Curves.easeOutCubic));
+            return SlideTransition(position: animation.drive(tween), child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 350),
+        ),
+      );
+      if (!mounted || updated == null) return;
+      profileProvider.applyUpdate(updated);
+      setState(() => _post = updated);
     }
 
     void openProfile() {
@@ -232,6 +273,7 @@ class _PostDetailBodyState extends State<_PostDetailBody> {
         t: t,
         onProfileTap: openProfile,
         onDelete: isOwner ? onDelete : null,
+        onEdit: isOwner ? onEdit : null,
         onReport: isOwner
             ? null
             : () => showReportPostReasonSheet(context, post: _post),
@@ -607,6 +649,7 @@ class _PostAppBar extends StatelessWidget implements PreferredSizeWidget {
   final PintTheme t;
   final VoidCallback onProfileTap;
   final VoidCallback? onDelete;
+  final VoidCallback? onEdit;
   final VoidCallback? onReport;
 
   const _PostAppBar({
@@ -614,6 +657,7 @@ class _PostAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.t,
     required this.onProfileTap,
     this.onDelete,
+    this.onEdit,
     this.onReport,
   });
 
@@ -704,6 +748,7 @@ class _PostAppBar extends StatelessWidget implements PreferredSizeWidget {
       context,
       post: post,
       onDelete: onDelete,
+      onEdit: onEdit,
       onReport: onReport,
     );
   }

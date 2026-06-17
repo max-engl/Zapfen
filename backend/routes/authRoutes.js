@@ -17,7 +17,8 @@ const LATEST_CLIENT_VERSION = '1.5';
 
 const PATCH_NOTES = [
     'Bug fixes und co.',
-    'Reactions sind jetzt selfie reactions!',
+    'Selfie reactions haben jetzt emojis!',
+    'Für IOS gibt es jetzt Homescreen-Widgets!'
 ];
 
 function parseVersion(v) {

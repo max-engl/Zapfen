@@ -146,6 +146,27 @@ class FeedProvider extends ChangeNotifier {
     _feedDb.savePosts(_posts);
   }
 
+  Future<FeedPost> updatePost(
+    String postId, {
+    required String caption,
+    required String drinkName,
+    required String drinkEmoji,
+  }) async {
+    final updated = await _postService.updatePost(
+      postId,
+      caption: caption,
+      drinkName: drinkName,
+      drinkEmoji: drinkEmoji,
+    );
+    final idx = _posts.indexWhere((p) => p.id == postId);
+    if (idx != -1) {
+      _posts = List.of(_posts)..[idx] = updated;
+      notifyListeners();
+      _feedDb.savePosts(_posts);
+    }
+    return updated;
+  }
+
   Future<void> toggleLike(String postId) async {
     final idx = _posts.indexWhere((p) => p.id == postId);
     if (idx == -1) return;

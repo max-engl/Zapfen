@@ -21,6 +21,7 @@ class PostCard extends StatelessWidget {
   final VoidCallback? onProfileTap;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
+  final VoidCallback? onEdit;
   final String heroTagPrefix;
   final bool enableHero;
 
@@ -33,6 +34,7 @@ class PostCard extends StatelessWidget {
     this.onProfileTap,
     this.onTap,
     this.onDelete,
+    this.onEdit,
     this.heroTagPrefix = '',
     this.enableHero = true,
   });
@@ -50,6 +52,7 @@ class PostCard extends StatelessWidget {
             t: t,
             onProfileTap: onProfileTap,
             onDelete: onDelete,
+            onEdit: onEdit,
           ),
           const SizedBox(height: 10),
           _Photo(
@@ -84,11 +87,13 @@ class _Header extends StatelessWidget {
   final PintTheme t;
   final VoidCallback? onProfileTap;
   final VoidCallback? onDelete;
+  final VoidCallback? onEdit;
   const _Header({
     required this.post,
     required this.t,
     this.onProfileTap,
     this.onDelete,
+    this.onEdit,
   });
 
   @override
@@ -201,7 +206,7 @@ class _Header extends StatelessWidget {
   }
 
   void _showOptionsSheet(BuildContext context) {
-    showPostOptionsSheet(context, post: post, onDelete: onDelete);
+    showPostOptionsSheet(context, post: post, onDelete: onDelete, onEdit: onEdit);
   }
 }
 
