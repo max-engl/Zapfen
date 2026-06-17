@@ -1015,7 +1015,7 @@ class _HandleStepState extends State<_HandleStep> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Dein Handle ist, wie Freunde dich finden und in Bieren markieren. Kleinbuchstaben, Zahlen, Unterstriche.',
+                    'Dein Handle ist, wie Freunde dich finden und in Drinks markieren. Kleinbuchstaben, Zahlen, Unterstriche.',
                     style: TextStyle(
                       color: t.textMuted,
                       fontSize: 14,

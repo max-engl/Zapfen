@@ -1,5 +1,5 @@
 const express = require("express");
-const archiver = require("archiver");
+const { ZipArchive } = require("archiver");
 const bcrypt = require("bcrypt");
 const { Resend } = require("resend");
 const Post = require("../models/Post");
@@ -290,40 +290,78 @@ adminRouter.delete("/posts/:postId", async (req, res) => {
 
 // GET /admin/users/:userId/export — stream all photos + selfies as a ZIP
 adminRouter.get("/users/:userId/export", async (req, res) => {
+    const tag = `[export:${req.params.userId.slice(-6)}]`;
+    console.log(`${tag} start`);
     try {
         const user = await User.findById(req.params.userId).select("username").lean();
-        if (!user) return res.status(404).json({ message: "User not found" });
+        if (!user) {
+            console.log(`${tag} user not found`);
+            return res.status(404).json({ message: "User not found" });
+        }
+        console.log(`${tag} user=${user.username}`);
 
         const posts = await Post.find({ user: req.params.userId })
             .select("storagePath selfieStoragePath createdAt")
             .sort({ createdAt: 1 })
             .lean();
+        console.log(`${tag} posts=${posts.length}`);
+
+        if (posts.length === 0) {
+            return res.status(404).json({ message: "No posts found" });
+        }
 
         const safeUsername = (user.username || req.params.userId).replace(/[^a-z0-9_-]/gi, "_");
         res.setHeader("Content-Type", "application/zip");
         res.setHeader("Content-Disposition", `attachment; filename="${safeUsername}_photos.zip"`);
 
-        const archive = archiver("zip", { zlib: { level: 1 } });
-        archive.on("error", (err) => { if (!res.headersSent) res.status(500).end(); console.error("ZIP error:", err); });
+        const archive = new ZipArchive({ zlib: { level: 1 } });
+        archive.on("error", (err) => {
+            console.error(`${tag} archive error:`, err.message, err.stack);
+            if (!res.headersSent) res.status(500).end();
+        });
         archive.pipe(res);
+        console.log(`${tag} archive piped, fetching files...`);
+
+        const toBuffer = async (stream) => {
+            const chunks = [];
+            for await (const chunk of stream) chunks.push(chunk);
+            return Buffer.concat(chunks);
+        };
+        const ext = (s) => (s?.split(".").pop()?.split("?")[0] || "jpg").toLowerCase();
 
         for (let i = 0; i < posts.length; i++) {
             const post = posts[i];
             const dateStr = new Date(post.createdAt).toISOString().slice(0, 10);
             const n = String(i + 1).padStart(3, "0");
-            const ext = (s) => (s?.split(".").pop()?.split("?")[0] || "jpg").toLowerCase();
 
-            const photoRes = await r2.send(new GetObjectCommand({ Bucket: process.env.R2_POST_BUCKET, Key: post.storagePath }));
-            archive.append(photoRes.Body, { name: `${n}_${dateStr}_photo.${ext(post.storagePath)}` });
+            try {
+                console.log(`${tag} [${n}] fetching photo: ${post.storagePath}`);
+                const { Body } = await r2.send(new GetObjectCommand({ Bucket: process.env.R2_POST_BUCKET, Key: post.storagePath }));
+                const buf = await toBuffer(Body);
+                console.log(`${tag} [${n}] photo ok, ${buf.length} bytes`);
+                archive.append(buf, { name: `${n}_${dateStr}_photo.${ext(post.storagePath)}` });
+            } catch (err) {
+                console.error(`${tag} [${n}] photo FAILED (${post.storagePath}):`, err.message, err.code);
+            }
 
             if (post.selfieStoragePath) {
-                const selfieRes = await r2.send(new GetObjectCommand({ Bucket: process.env.R2_POST_BUCKET, Key: post.selfieStoragePath }));
-                archive.append(selfieRes.Body, { name: `${n}_${dateStr}_selfie.${ext(post.selfieStoragePath)}` });
+                try {
+                    console.log(`${tag} [${n}] fetching selfie: ${post.selfieStoragePath}`);
+                    const { Body } = await r2.send(new GetObjectCommand({ Bucket: process.env.R2_POST_BUCKET, Key: post.selfieStoragePath }));
+                    const buf = await toBuffer(Body);
+                    console.log(`${tag} [${n}] selfie ok, ${buf.length} bytes`);
+                    archive.append(buf, { name: `${n}_${dateStr}_selfie.${ext(post.selfieStoragePath)}` });
+                } catch (err) {
+                    console.error(`${tag} [${n}] selfie FAILED (${post.selfieStoragePath}):`, err.message, err.code);
+                }
             }
         }
 
+        console.log(`${tag} all files appended, finalizing...`);
         await archive.finalize();
+        console.log(`${tag} done`);
     } catch (error) {
+        console.error(`${tag} OUTER catch:`, error.message, error.stack);
         if (!res.headersSent) res.status(500).json({ message: "Export failed", error: error.message });
     }
 });

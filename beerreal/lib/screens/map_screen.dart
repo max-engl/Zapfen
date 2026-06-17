@@ -400,7 +400,7 @@ class _MapScreenState extends State<MapScreen> {
                   Text('😢', style: const TextStyle(fontSize: 32)),
                   const SizedBox(height: 10),
                   Text(
-                    'Noch keine Biere auf der Karte.',
+                    'Noch keine Drinks auf der Karte.',
                     style: TextStyle(
                       color: t.text,
                       fontSize: 15,

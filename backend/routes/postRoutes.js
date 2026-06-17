@@ -25,7 +25,7 @@ const { getBerlinOffsetMinutes, localDayStart, toGermanLocalIso } = require("../
 const router = express.Router();
 // Posts can only carry a "cheers" reaction or a selfie reaction (see SelfieReaction model).
 const ALLOWED_REACTIONS = new Set(["🍺"]);
-const ALLOWED_SELFIE_REACTION_EMOJIS = new Set(["🍺", "😂", "😍", "😮", "🔥"]);
+const ALLOWED_SELFIE_REACTION_EMOJIS = new Set(["🍺", "😂", "😍", "💀", "🔥"]);
 
 function getFileExtension(filename) {
     return filename.split(".").pop().toLowerCase();

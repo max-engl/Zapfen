@@ -42,7 +42,7 @@ class _SelfieReactCaptureScreenState extends State<SelfieReactCaptureScreen>
   String? _selectedEmoji;
   late final AnimationController _ringPulseCtrl;
 
-  static const _selfieReactionEmojis = ['🍺', '😂', '😍', '😮', '🔥'];
+  static const _selfieReactionEmojis = ['🍺', '😂', '😍', '💀', '🔥'];
 
   @override
   void initState() {

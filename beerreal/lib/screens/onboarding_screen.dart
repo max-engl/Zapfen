@@ -98,7 +98,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     illustration: _FeedIllustration(active: _page == 2),
                     headline: 'Sieh deinen\nKreis.',
                     body:
-                        'Was trinken deine Freunde? Im Feed siehst du Biere in Echtzeit – reagiere, kommentiere, prosit.',
+                        'Was trinken deine Freunde? Im Feed siehst du Drinks in Echtzeit – reagiere, kommentiere, prosit.',
                   ),
                   _OPage(
                     illustration: _LeaderboardIllustration(active: _page == 3),

@@ -11,7 +11,6 @@ import '../features/posts/providers/feed_provider.dart';
 import '../widgets/pint_loading.dart';
 import '../widgets/post_card.dart';
 import '../widgets/pint_refresh_logo.dart';
-import '../widgets/shimmer_box.dart';
 import 'edit_post_screen.dart';
 import 'friend_profile_screen.dart';
 import 'post_detail_screen.dart';
@@ -120,7 +119,7 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
     final feed = context.watch<FeedProvider>();
 
     if (feed.loading && feed.posts.isEmpty) {
-      return _ShimmerFeed(t: t);
+      return const Center(child: PintLogoLoaderInline(size: 72));
     }
 
     if (feed.error != null && feed.posts.isEmpty) {
@@ -181,7 +180,7 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 6),
               Text(
-                'Freunde hinzufügen, um ihre Biere hier zu sehen.',
+                'Freunde hinzufügen, um ihre Drinks hier zu sehen.',
                 style: TextStyle(color: t.textMuted, fontSize: 14),
                 textAlign: TextAlign.center,
               ),
@@ -236,7 +235,7 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
             delegate: SliverChildBuilderDelegate((context, index) {
               if (index == 0) {
                 return Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
                   child: Row(
                     children: [
                       SizedBox(height: 20),
@@ -311,22 +310,24 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                   PageRouteBuilder(
                     pageBuilder: (context, animation, secondaryAnimation) =>
                         SelfieReactCaptureScreen(
-                      onSend: (bytes, emoji) => feed.sendSelfieReaction(
-                        p.id,
-                        imageBytes: bytes,
-                        filename: 'selfie_reaction.jpg',
-                        emoji: emoji,
-                      ),
-                    ),
+                          onSend: (bytes, emoji) => feed.sendSelfieReaction(
+                            p.id,
+                            imageBytes: bytes,
+                            filename: 'selfie_reaction.jpg',
+                            emoji: emoji,
+                          ),
+                        ),
                     transitionsBuilder:
                         (context, animation, secondaryAnimation, child) {
-                      final tween = Tween(
-                        begin: const Offset(0.0, 1.0),
-                        end: Offset.zero,
-                      ).chain(CurveTween(curve: Curves.easeOutCubic));
-                      return SlideTransition(
-                          position: animation.drive(tween), child: child);
-                    },
+                          final tween = Tween(
+                            begin: const Offset(0.0, 1.0),
+                            end: Offset.zero,
+                          ).chain(CurveTween(curve: Curves.easeOutCubic));
+                          return SlideTransition(
+                            position: animation.drive(tween),
+                            child: child,
+                          );
+                        },
                     transitionDuration: const Duration(milliseconds: 350),
                   ),
                 ),
@@ -341,24 +342,33 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
                 onEdit: p.userId == currentUserId
                     ? () => Navigator.of(context).push(
                         PageRouteBuilder(
-                          pageBuilder: (context, animation, secondaryAnimation) =>
-                              EditPostScreen(
-                            post: p,
-                            onSave: ({required caption, required drinkName, required drinkEmoji}) =>
-                                feed.updatePost(
-                              p.id,
-                              caption: caption,
-                              drinkName: drinkName,
-                              drinkEmoji: drinkEmoji,
-                            ),
-                          ),
-                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                            final tween = Tween(
-                              begin: const Offset(0.0, 1.0),
-                              end: Offset.zero,
-                            ).chain(CurveTween(curve: Curves.easeOutCubic));
-                            return SlideTransition(position: animation.drive(tween), child: child);
-                          },
+                          pageBuilder:
+                              (context, animation, secondaryAnimation) =>
+                                  EditPostScreen(
+                                    post: p,
+                                    onSave:
+                                        ({
+                                          required caption,
+                                          required drinkName,
+                                          required drinkEmoji,
+                                        }) => feed.updatePost(
+                                          p.id,
+                                          caption: caption,
+                                          drinkName: drinkName,
+                                          drinkEmoji: drinkEmoji,
+                                        ),
+                                  ),
+                          transitionsBuilder:
+                              (context, animation, secondaryAnimation, child) {
+                                final tween = Tween(
+                                  begin: const Offset(0.0, 1.0),
+                                  end: Offset.zero,
+                                ).chain(CurveTween(curve: Curves.easeOutCubic));
+                                return SlideTransition(
+                                  position: animation.drive(tween),
+                                  child: child,
+                                );
+                              },
                           transitionDuration: const Duration(milliseconds: 350),
                         ),
                       )
@@ -388,64 +398,6 @@ class _FeedScreenState extends State<FeedScreen> with WidgetsBindingObserver {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ShimmerFeed extends StatelessWidget {
-  const _ShimmerFeed({required this.t});
-  final PintTheme t;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 100),
-      itemCount: 4,
-      itemBuilder: (_, __) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const SizedBox(
-                  width: 36,
-                  height: 36,
-                  child: ShimmerBox.circle(),
-                ),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 100,
-                      height: 13,
-                      child: ShimmerBox(borderRadius: BorderRadius.circular(6)),
-                    ),
-                    const SizedBox(height: 4),
-                    SizedBox(
-                      width: 60,
-                      height: 11,
-                      child: ShimmerBox(borderRadius: BorderRadius.circular(6)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            AspectRatio(
-              aspectRatio: 3 / 4,
-              child: ShimmerBox(borderRadius: BorderRadius.circular(22)),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: 200,
-              height: 13,
-              child: ShimmerBox(borderRadius: BorderRadius.circular(6)),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

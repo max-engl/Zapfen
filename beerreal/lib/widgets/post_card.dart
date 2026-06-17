@@ -43,7 +43,7 @@ class PostCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = PintThemeProvider.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      padding: const EdgeInsets.fromLTRB(10, 0, 10, 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -109,23 +109,29 @@ class _Header extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    post.username,
-                    style: TextStyle(
-                      color: t.text,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.14,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        post.username,
+                        style: TextStyle(
+                          color: t.text,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.14,
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        post.formattedDateTime,
+                        style: TextStyle(color: t.textMuted, fontSize: 12),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 1),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        post.formattedDateTime,
-                        style: TextStyle(color: t.textMuted, fontSize: 12),
-                      ),
                       if (post.lat != null && post.lng != null)
                         FutureBuilder<String?>(
                           future: GeocodingService.cityName(
@@ -138,13 +144,6 @@ class _Header extends StatelessWidget {
                             return Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(
-                                  ' · ',
-                                  style: TextStyle(
-                                    color: t.textFaint,
-                                    fontSize: 12,
-                                  ),
-                                ),
                                 Icon(
                                   Icons.place_outlined,
                                   size: 11,
@@ -158,39 +157,53 @@ class _Header extends StatelessWidget {
                                     fontSize: 12,
                                   ),
                                 ),
+                                Text(
+                                  ' · ',
+                                  style: TextStyle(
+                                    color: t.textFaint,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                                if (post.drinkLabel.isNotEmpty ||
+                                    post.rating != null) ...[
+                                  const SizedBox(height: 2),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (post.drinkLabel.isNotEmpty)
+                                        Text(
+                                          post.drinkLabel,
+                                          style: TextStyle(
+                                            color: t.goldText,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: -0.1,
+                                          ),
+                                        ),
+                                      if (post.drinkLabel.isNotEmpty &&
+                                          post.rating != null) ...[
+                                        Text(
+                                          ' · ',
+                                          style: TextStyle(
+                                            color: t.textFaint,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                      if (post.rating != null)
+                                        _RatingStars(
+                                          rating: post.rating!,
+                                          size: 11,
+                                        ),
+                                    ],
+                                  ),
+                                ],
                               ],
                             );
                           },
                         ),
                     ],
                   ),
-                  if (post.drinkLabel.isNotEmpty || post.rating != null) ...[
-                    const SizedBox(height: 2),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (post.drinkLabel.isNotEmpty)
-                          Text(
-                            post.drinkLabel,
-                            style: TextStyle(
-                              color: t.goldText,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: -0.1,
-                            ),
-                          ),
-                        if (post.drinkLabel.isNotEmpty &&
-                            post.rating != null) ...[
-                          Text(
-                            ' · ',
-                            style: TextStyle(color: t.textFaint, fontSize: 11),
-                          ),
-                        ],
-                        if (post.rating != null)
-                          _RatingStars(rating: post.rating!, size: 11),
-                      ],
-                    ),
-                  ],
                 ],
               ),
             ],
@@ -206,7 +219,12 @@ class _Header extends StatelessWidget {
   }
 
   void _showOptionsSheet(BuildContext context) {
-    showPostOptionsSheet(context, post: post, onDelete: onDelete, onEdit: onEdit);
+    showPostOptionsSheet(
+      context,
+      post: post,
+      onDelete: onDelete,
+      onEdit: onEdit,
+    );
   }
 }
 
@@ -542,15 +560,6 @@ class _Caption extends StatelessWidget {
     return RichText(
       text: TextSpan(
         children: [
-          TextSpan(
-            text: '@${post.username} ',
-            style: TextStyle(
-              color: t.text,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -0.1,
-            ),
-          ),
           TextSpan(
             text: post.caption,
             style: TextStyle(

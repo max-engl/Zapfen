@@ -499,7 +499,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     else if (displayedPosts.isEmpty)
                       Text(
                         _selectedCell == null
-                            ? 'Noch keine Biere.'
+                            ? 'Noch keine Drinks.'
                             : 'Kein Bier an diesem Tag.',
                         style: TextStyle(color: t.textMuted, fontSize: 13),
                       )
@@ -958,7 +958,7 @@ class _DayTooltip extends StatelessWidget {
         ? 'kein Bier'
         : pintCount == 1
         ? '1 Bier'
-        : '$pintCount Biere';
+        : '$pintCount Drinks';
 
     return Container(
       margin: const EdgeInsets.only(top: 10),

@@ -724,7 +724,7 @@ class _MetricVal extends StatelessWidget {
         ),
         const SizedBox(width: 2),
         Text(
-          'Biere',
+          'Drinks',
           style: TextStyle(
             color: t.textFaint,
             fontSize: big ? 11 : 10,
@@ -1091,7 +1091,7 @@ class _YouBar extends StatelessWidget {
                     ),
                     const SizedBox(width: 2),
                     Text(
-                      'Biere',
+                      'Drinks',
                       style: const TextStyle(
                         color: Color(0x993A1F02),
                         fontSize: 10,

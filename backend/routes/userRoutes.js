@@ -141,7 +141,8 @@ router.patch(
             }
 
             const compressed = await sharp(req.file.buffer)
-                .resize(512, 512, { fit: "inside", withoutEnlargement: true })
+                .rotate()
+                .resize(512, 512, { fit: "cover", position: "centre" })
                 .jpeg({ quality: 85, progressive: true })
                 .toBuffer();
 
