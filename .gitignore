@@ -1,0 +1,80 @@
+# ── Secrets ───────────────────────────────────────────────────────────────
+# Never commit these. Copy backend/.env.example to backend/.env instead.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+serviceAccountKey.json
+*-firebase-adminsdk-*.json
+
+# ── Dependencies ──────────────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+
+# ── Build output ──────────────────────────────────────────────────────────
+build/
+dist/
+coverage/
+*.log
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+**/doc/api/
+app.*.symbols
+app.*.map.json
+
+# iOS / macOS
+**/Pods/
+**/.symlinks/
+**/Flutter/App.framework/
+**/Flutter/Flutter.framework/
+**/Flutter/Flutter.podspec
+**/Flutter/Generated.xcconfig
+**/Flutter/ephemeral/
+**/Flutter/flutter_export_environment.sh
+**/ServiceDefinitions.json
+**/xcuserdata/
+**/*.xcworkspace/xcshareddata/swiftpm/
+*.ipa
+*.dSYM/
+*.pcm
+
+# Android
+**/android/.gradle/
+**/android/captures/
+**/android/local.properties
+**/android/key.properties
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+*.apk
+*.aab
+
+# ── Local-only scratch ────────────────────────────────────────────────────
+# Standalone UI prototypes kept on disk, not part of the repo.
+/*.html
+/*.jsx
+/achievmentDesign/
+/newprofile/
+/selfieui/
+.claude/
+
+# ── Editors & OS ──────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+*.ipr
+*.iws
+*.swp
+.history

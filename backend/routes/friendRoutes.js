@@ -1,0 +1,395 @@
+const express = require("express");
+const crypto = require("crypto");
+
+const Friend = require("../models/Friend");
+const User = require("../models/User");
+const Post = require("../models/Post");
+const authMiddleware = require("../middleware/authMiddleware");
+const { sendToUser, saveNotification } = require("../services/notificationService");
+const { getRecommendations, getFriendIds } = require("../utils/friends");
+const { getBerlinOffsetMinutes, localDayStart } = require("../utils/localTime");
+
+const router = express.Router();
+
+// POST /friends/request/:userId  —  send a friend request
+router.post("/request/:userId", authMiddleware, async (req, res) => {
+    try {
+        const recipientId = req.params.userId;
+        const requesterId = req.user._id.toString();
+
+        if (recipientId === requesterId) {
+            return res.status(400).json({ message: "Cannot send a friend request to yourself" });
+        }
+
+        const recipient = await User.findById(recipientId);
+        if (!recipient) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Check if any relationship already exists in either direction
+        const existing = await Friend.findOne({
+            $or: [
+                { requester: requesterId, recipient: recipientId },
+                { requester: recipientId, recipient: requesterId },
+            ],
+        });
+
+        if (existing) {
+            const msg =
+                existing.status === "accepted"
+                    ? "You are already friends"
+                    : "Friend request already exists";
+            return res.status(409).json({ message: msg });
+        }
+
+        const friendship = await Friend.create({
+            requester: requesterId,
+            recipient: recipientId,
+        });
+
+        res.status(201).json({
+            message: "Friend request sent",
+            friendship: {
+                id: friendship._id,
+                recipient: recipientId,
+                status: friendship.status,
+            },
+        });
+
+        sendToUser(recipientId, {
+            title: `@${req.user.username}`,
+            body: "möchte mit dir befreundet sein",
+            data: {
+                type: "friend_request",
+                actorId: req.user._id.toString(),
+                actorUsername: req.user.username,
+                ...(req.user.avatarUrl && { actorAvatarUrl: req.user.avatarUrl }),
+                ...(req.user.avatarColor && { actorAvatarColor: req.user.avatarColor }),
+                ...(req.user.avatarInitial && { actorAvatarInitial: req.user.avatarInitial }),
+            },
+        }).catch(() => { });
+        saveNotification(recipientId, {
+            type: 'request',
+            actorId: req.user._id,
+            actorUsername: req.user.username,
+            actorAvatarUrl: req.user.avatarUrl ?? null,
+            actorAvatarColor: req.user.avatarColor ?? null,
+            actorAvatarInitial: req.user.avatarInitial ?? null,
+        }).catch(() => { });
+    } catch (error) {
+        res.status(500).json({ message: "Could not send friend request", error: error.message });
+    }
+});
+
+// POST /friends/accept/:userId  —  accept a pending request from userId
+router.post("/accept/:userId", authMiddleware, async (req, res) => {
+    try {
+        const requesterId = req.params.userId;
+        const recipientId = req.user._id.toString();
+
+        const friendship = await Friend.findOne({
+            requester: requesterId,
+            recipient: recipientId,
+            status: "pending",
+        });
+
+        if (!friendship) {
+            return res.status(404).json({ message: "No pending friend request from this user" });
+        }
+
+        friendship.status = "accepted";
+        await friendship.save();
+
+        res.json({ message: "Friend request accepted" });
+
+        sendToUser(requesterId, {
+            title: `@${req.user.username}`,
+            body: "hat deine Freundschaftsanfrage angenommen",
+            data: {
+                type: "friend_accepted",
+                actorId: req.user._id.toString(),
+                actorUsername: req.user.username,
+                ...(req.user.avatarUrl && { actorAvatarUrl: req.user.avatarUrl }),
+                ...(req.user.avatarColor && { actorAvatarColor: req.user.avatarColor }),
+                ...(req.user.avatarInitial && { actorAvatarInitial: req.user.avatarInitial }),
+            },
+        }).catch(() => { });
+        saveNotification(requesterId, {
+            type: 'accepted',
+            actorId: req.user._id,
+            actorUsername: req.user.username,
+            actorAvatarUrl: req.user.avatarUrl ?? null,
+            actorAvatarColor: req.user.avatarColor ?? null,
+            actorAvatarInitial: req.user.avatarInitial ?? null,
+        }).catch(() => { });
+    } catch (error) {
+        res.status(500).json({ message: "Could not accept friend request", error: error.message });
+    }
+});
+
+// DELETE /friends/:userId  —  decline a pending request OR remove an existing friend
+router.delete("/:userId", authMiddleware, async (req, res) => {
+    try {
+        const otherId = req.params.userId;
+        const meId = req.user._id.toString();
+
+        const friendship = await Friend.findOneAndDelete({
+            $or: [
+                { requester: meId, recipient: otherId },
+                { requester: otherId, recipient: meId },
+            ],
+        });
+
+        if (!friendship) {
+            return res.status(404).json({ message: "No friendship or request found" });
+        }
+
+        const msg = friendship.status === "accepted" ? "Friend removed" : "Friend request declined";
+        res.json({ message: msg });
+    } catch (error) {
+        res.status(500).json({ message: "Could not remove friend", error: error.message });
+    }
+});
+
+// GET /friends  —  list accepted friends
+router.get("/", authMiddleware, async (req, res) => {
+    try {
+        const meId = req.user._id;
+
+        const friendships = await Friend.find({
+            $or: [{ requester: meId }, { recipient: meId }],
+            status: "accepted",
+        })
+            .populate("requester", "username avatarUrl avatarColor avatarInitial")
+            .populate("recipient", "username avatarUrl avatarColor avatarInitial");
+
+        const friends = friendships.map((f) => {
+            const isRequester = f.requester._id.toString() === meId.toString();
+            return isRequester ? f.recipient : f.requester;
+        });
+
+        res.json({ friends });
+    } catch (error) {
+        res.status(500).json({ message: "Could not fetch friends", error: error.message });
+    }
+});
+
+// GET /friends/poured-today  —  which friends have posted today (for the home-screen widget)
+router.get("/poured-today", authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const friendIds = await getFriendIds(userId);
+        const total = friendIds.length;
+
+        if (total === 0) {
+            return res.json({ count: 0, total: 0, friends: [] });
+        }
+
+        const offsetMinutes = getBerlinOffsetMinutes();
+        const todayStart = localDayStart(new Date(), offsetMinutes);
+
+        const postsToday = await Post.find({
+            user: { $in: friendIds },
+            createdAt: { $gte: todayStart },
+        })
+            .sort({ createdAt: -1 })
+            .select("user");
+
+        const orderedIds = [];
+        const seen = new Set();
+        for (const post of postsToday) {
+            const id = post.user.toString();
+            if (!seen.has(id)) {
+                seen.add(id);
+                orderedIds.push(id);
+            }
+        }
+
+        const previewUsers = await User.find({ _id: { $in: orderedIds.slice(0, 5) } })
+            .select("username avatarUrl avatarColor avatarInitial");
+        const userMap = {};
+        for (const u of previewUsers) userMap[u._id.toString()] = u;
+        const friends = orderedIds
+            .slice(0, 5)
+            .map((id) => userMap[id])
+            .filter(Boolean);
+
+        res.json({ count: orderedIds.length, total, friends });
+    } catch (error) {
+        res.status(500).json({ message: "Could not fetch today's pours", error: error.message });
+    }
+});
+
+// GET /friends/sent-requests  —  list outgoing pending requests sent by the current user
+router.get("/sent-requests", authMiddleware, async (req, res) => {
+    try {
+        const requests = await Friend.find({
+            requester: req.user._id,
+            status: "pending",
+        }).populate("recipient", "username avatarUrl avatarColor avatarInitial");
+
+        const outgoing = requests.map((r) => ({
+            id: r._id,
+            to: r.recipient,
+            sentAt: r.createdAt,
+        }));
+
+        res.json({ requests: outgoing });
+    } catch (error) {
+        res.status(500).json({ message: "Could not fetch sent requests", error: error.message });
+    }
+});
+
+// GET /friends/requests  —  list incoming pending requests
+router.get("/requests", authMiddleware, async (req, res) => {
+    try {
+        const requests = await Friend.find({
+            recipient: req.user._id,
+            status: "pending",
+        }).populate("requester", "username avatarUrl avatarColor avatarInitial");
+
+        const incoming = requests.map((r) => ({
+            id: r._id,
+            from: r.requester,
+            sentAt: r.createdAt,
+        }));
+
+        res.json({ requests: incoming });
+    } catch (error) {
+        res.status(500).json({ message: "Could not fetch requests", error: error.message });
+    }
+});
+
+// GET /friends/recommendations  —  mutual-friend-based suggestions
+router.get("/recommendations", authMiddleware, async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+        const ranked = await getRecommendations(req.user._id, limit);
+
+        if (ranked.length === 0) {
+            return res.json({ recommendations: [] });
+        }
+
+        const ids = ranked.map(([id]) => id);
+        const users = await User.find({ _id: { $in: ids } }).select(
+            "username avatarUrl avatarColor avatarInitial"
+        );
+
+        const userMap = Object.fromEntries(users.map((u) => [u._id.toString(), u]));
+        const recommendations = ranked
+            .filter(([id]) => userMap[id])
+            .map(([id, mutual]) => {
+                const u = userMap[id];
+                return {
+                    id: u._id,
+                    username: u.username,
+                    avatarUrl: u.avatarUrl ?? null,
+                    avatarColor: u.avatarColor ?? null,
+                    avatarInitial: u.avatarInitial ?? null,
+                    mutualCount: mutual,
+                };
+            });
+
+        res.json({ recommendations });
+    } catch (error) {
+        res.status(500).json({ message: "Could not fetch recommendations", error: error.message });
+    }
+});
+
+
+// GET /friends/invite  —  get (or lazily create) the caller's invite token
+router.get("/invite", authMiddleware, async (req, res) => {
+    try {
+        let user = req.user;
+        if (!user.inviteToken) {
+            user = await User.findByIdAndUpdate(
+                user._id,
+                { inviteToken: crypto.randomUUID() },
+                { new: true }
+            );
+        }
+        const baseUrl = process.env.BASE_URL || "http://localhost:3000";
+        res.json({
+            token: user.inviteToken,
+            link: `${baseUrl}/invite/${user.inviteToken}`,
+        });
+    } catch (error) {
+        res.status(500).json({ message: "Could not get invite token", error: error.message });
+    }
+});
+
+// GET /friends/invite/:token  —  public: resolve a token to user info
+router.get("/invite/:token", async (req, res) => {
+    try {
+        const user = await User.findOne({ inviteToken: req.params.token });
+        if (!user) return res.status(404).json({ message: "Invite link not found" });
+        res.json({
+            userId: user._id,
+            username: user.username,
+            avatarUrl: user.avatarUrl ?? null,
+            avatarColor: user.avatarColor,
+            avatarInitial: user.avatarInitial,
+        });
+    } catch (error) {
+        res.status(500).json({ message: "Could not resolve invite", error: error.message });
+    }
+});
+
+// POST /friends/invite/:token/accept  —  send a friend request to the token's owner
+router.post("/invite/:token/accept", authMiddleware, async (req, res) => {
+    try {
+        const inviter = await User.findOne({ inviteToken: req.params.token });
+        if (!inviter) return res.status(404).json({ message: "Invite link not found" });
+
+        const recipientId = inviter._id.toString();
+        const requesterId = req.user._id.toString();
+
+        if (recipientId === requesterId) {
+            return res.status(400).json({ message: "Cannot send a friend request to yourself" });
+        }
+
+        const existing = await Friend.findOne({
+            $or: [
+                { requester: requesterId, recipient: recipientId },
+                { requester: recipientId, recipient: requesterId },
+            ],
+        });
+
+        if (existing) {
+            const msg = existing.status === "accepted" ? "You are already friends" : "Friend request already exists";
+            return res.status(409).json({ message: msg });
+        }
+
+        const friendship = await Friend.create({ requester: requesterId, recipient: recipientId });
+
+        res.status(201).json({
+            message: "Friend request sent",
+            friendship: { id: friendship._id, recipient: recipientId, status: friendship.status },
+        });
+
+        sendToUser(recipientId, {
+            title: `@${req.user.username}`,
+            body: "möchte mit dir befreundet sein",
+            data: {
+                type: "friend_request",
+                actorId: req.user._id.toString(),
+                actorUsername: req.user.username,
+                ...(req.user.avatarUrl && { actorAvatarUrl: req.user.avatarUrl }),
+                ...(req.user.avatarColor && { actorAvatarColor: req.user.avatarColor }),
+                ...(req.user.avatarInitial && { actorAvatarInitial: req.user.avatarInitial }),
+            },
+        }).catch(() => { });
+        saveNotification(recipientId, {
+            type: "request",
+            actorId: req.user._id,
+            actorUsername: req.user.username,
+            actorAvatarUrl: req.user.avatarUrl ?? null,
+            actorAvatarColor: req.user.avatarColor ?? null,
+            actorAvatarInitial: req.user.avatarInitial ?? null,
+        }).catch(() => { });
+    } catch (error) {
+        res.status(500).json({ message: "Could not accept invite", error: error.message });
+    }
+});
+
+module.exports = router;

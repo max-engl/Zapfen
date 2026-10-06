@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Impressum – Zapfen.</title>
+<link rel="icon" type="image/png" href="app_icon.png" />
+<link rel="apple-touch-icon" href="app_icon.png" />
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --text: #ffffff;
+    --muted: rgba(255,255,255,0.56);
+    --faint: rgba(255,255,255,0.30);
+    --border: rgba(255,255,255,0.09);
+    --gold: #F6B733;
+    --goldInk: #3a1f02;
+    --goldText: #F6B733;
+    --goldSoft: rgba(246,183,51,0.15);
+    --goldBorder: rgba(246,183,51,0.30);
+    --maxw: 720px;
+    --font: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Monaco, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: var(--goldText); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  ::selection { background: var(--gold); color: var(--goldInk); }
+
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,10,10,0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+  }
+  .nav-inner {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .back-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 14px; font-weight: 600; color: var(--muted);
+    transition: color .15s;
+  }
+  .back-btn:hover { color: var(--text); text-decoration: none; }
+  .back-btn svg { flex: none; }
+  .nav-title {
+    font-size: 15px; font-weight: 700; letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .nav-sep { color: var(--faint); font-size: 13px; }
+
+  main {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 48px 28px 80px;
+  }
+  .page-kicker {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--goldText);
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  h1 {
+    margin: 0 0 40px;
+    font-size: clamp(28px, 5vw, 42px);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+  }
+
+  .section { margin-bottom: 28px; }
+  .section h2 {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    margin: 0 0 8px;
+  }
+  .section p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--muted);
+    white-space: pre-line;
+  }
+
+  .divider { height: 1px; background: var(--border); margin: 32px 0; }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 28px;
+    text-align: center;
+  }
+  .footer-inner {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 20px;
+    font-size: 13px;
+    color: var(--faint);
+  }
+  .footer-inner a { color: var(--faint); }
+  .footer-inner a:hover { color: var(--muted); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a class="back-btn" href="/">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Zapfen.
+    </a>
+    <span class="nav-sep">/</span>
+    <span class="nav-title">Impressum</span>
+  </div>
+</nav>
+
+<main>
+  <div class="page-kicker">Rechtliches</div>
+  <h1>Impressum</h1>
+
+  <div class="section">
+    <p>Angaben gemäß § 5 DDG
+
+Maximilian Engl
+Am Tennenbach 26
+91080 Spardorf
+Deutschland
+
+E-Mail: <a href="mailto:engl.devmail@gmail.com">engl.devmail@gmail.com</a></p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>Verantwortlich für den Inhalt gemäß § 18 Abs. 2 MStV</h2>
+    <p>Maximilian Engl
+Am Tennenbach 26
+91080 Spardorf
+Deutschland</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>EU-Streitschlichtung</h2>
+    <p>Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit. Die Plattform ist unter folgendem Link erreichbar: <a href="https://ec.europa.eu/consumers/odr/" target="_blank" rel="noopener">https://ec.europa.eu/consumers/odr/</a>
+
+Wir sind nicht verpflichtet und nicht bereit, an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>Haftung für Inhalte</h2>
+    <p>Als Diensteanbieter bin ich gemäß § 7 Abs. 1 DDG für eigene Inhalte nach den allgemeinen Gesetzen verantwortlich. Für fremde Inhalte, insbesondere von Nutzern veröffentlichte Beiträge, Kommentare und Bilder, besteht keine allgemeine Pflicht zur Überwachung. Rechtswidrige oder gegen die Community-Regeln verstoßende Inhalte können gemeldet werden und werden nach Kenntnis geprüft.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>Kontakt</h2>
+    <p>Bei Fragen zur App Zapfen, zu rechtlichen Themen oder zur Meldung von Problemen kannst du dich per E-Mail an <a href="mailto:engl.devmail@gmail.com">engl.devmail@gmail.com</a> wenden.</p>
+  </div>
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <span>© 2026 Maximilian Engl</span>
+    <a href="/impressum">Impressum</a>
+    <a href="/datenschutz">Datenschutz</a>
+    <a href="/nutzungsbedingungen">Nutzungsbedingungen</a>
+    <a href="/community-regeln">Community-Regeln</a>
+  </div>
+</footer>
+
+</body>
+</html>

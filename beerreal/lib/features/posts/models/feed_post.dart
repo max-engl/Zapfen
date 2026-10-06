@@ -1,0 +1,311 @@
+import 'dart:convert';
+import 'post_mention.dart';
+import 'post_reaction.dart';
+import 'selfie_reaction.dart';
+
+class FeedPost {
+  final String id;
+  final String userId;
+  final String username;
+  final String? avatarUrl;
+  final String? avatarColor;
+  final String? avatarInitial;
+  final String caption;
+  final String drinkName;
+  final String drinkEmoji;
+  final int? rating;
+  final int likes;
+  final int comments;
+  final int totalReactions;
+  final int views;
+  final String imageUrl;
+  final String? imagePath;
+  final String selfieUrl;
+  final String? selfiePath;
+  final bool likedByMe;
+  final bool drinkingNow;
+  final String? myReaction;
+  final List<PostReaction> reactions;
+  final List<SelfieReaction> selfieReactions;
+  final List<PostMention> mentions;
+  final DateTime createdAt;
+  final double? lat;
+  final double? lng;
+  final String? country;
+
+  const FeedPost({
+    required this.id,
+    required this.userId,
+    required this.username,
+    this.avatarUrl,
+    this.avatarColor,
+    this.avatarInitial,
+    required this.caption,
+    this.drinkName = '',
+    this.drinkEmoji = '',
+    this.rating,
+    required this.likes,
+    required this.comments,
+    this.totalReactions = 0,
+    this.views = 0,
+    required this.imageUrl,
+    this.imagePath,
+    required this.selfieUrl,
+    this.selfiePath,
+    this.likedByMe = false,
+    this.drinkingNow = false,
+    this.myReaction,
+    this.reactions = const [],
+    this.selfieReactions = const [],
+    this.mentions = const [],
+    required this.createdAt,
+    this.lat,
+    this.lng,
+    this.country,
+  });
+
+  SelfieReaction? mySelfieReaction(String? myUserId) {
+    if (myUserId == null) return null;
+    for (final r in selfieReactions) {
+      if (r.userId == myUserId) return r;
+    }
+    return null;
+  }
+
+  String get drinkLabel {
+    if (drinkName.isEmpty) return '';
+    if (drinkEmoji.isNotEmpty) return '$drinkEmoji $drinkName';
+    return drinkName;
+  }
+
+  factory FeedPost.fromJson(Map<String, dynamic> json) {
+    final user = json['user'] as Map<String, dynamic>? ?? {};
+    final stats = json['stats'] as Map<String, dynamic>? ?? {};
+    final drink = json['drink'] as Map<String, dynamic>? ?? {};
+    final myReaction = json['myReaction'] as String?;
+    final rawReactions = json['reactions'] as List<dynamic>? ?? [];
+    final rawSelfieReactions = json['selfieReactions'] as List<dynamic>? ?? [];
+    return FeedPost(
+      id: () {
+        final v = (json['id'] ?? json['_id'] ?? '') as String;
+        assert(v.isNotEmpty, 'FeedPost: server returned a post with no id');
+        return v;
+      }(),
+      userId: (user['_id'] ?? user['id'] ?? '') as String,
+      username: (user['username'] ?? '') as String,
+      avatarUrl: user['avatarUrl'] as String?,
+      avatarColor: user['avatarColor'] as String?,
+      avatarInitial: user['avatarInitial'] as String?,
+      caption: (json['caption'] ?? '') as String,
+      drinkName: (drink['name'] as String?) ?? '',
+      drinkEmoji: (drink['emoji'] as String?) ?? '',
+      rating: (json['rating'] as num?)?.toInt(),
+      likes: (stats['likes'] ?? 0) as int,
+      comments: (stats['comments'] ?? 0) as int,
+      totalReactions: (stats['reactions'] ?? 0) as int,
+      views: (stats['views'] ?? 0) as int,
+      imageUrl: (json['imageUrl'] ?? '') as String,
+      imagePath: json['imagePath'] as String?,
+      selfieUrl: (json['selfieUrl'] ?? '') as String,
+      selfiePath: json['selfiePath'] as String?,
+      likedByMe: (json['likedByMe'] ?? false) as bool,
+      drinkingNow: (user['drinkingNow'] ?? false) as bool,
+      myReaction: myReaction,
+      reactions: rawReactions
+          .map(
+            (e) => PostReaction.fromJson(e as Map<String, dynamic>, myReaction),
+          )
+          .toList(),
+      selfieReactions: rawSelfieReactions
+          .map((e) => SelfieReaction.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      mentions: (json['mentions'] as List<dynamic>? ?? [])
+          .map((e) => PostMention.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      lat: (json['lat'] as num?)?.toDouble(),
+      lng: (json['lng'] as num?)?.toDouble(),
+      country: json['country'] as String?,
+    );
+  }
+
+  // ── SQLite serialization ──────────────────────────────────────────────────
+
+  factory FeedPost.fromSqliteRow(Map<String, dynamic> row) {
+    final myReaction = row['my_reaction'] as String?;
+    final rawReactions =
+        jsonDecode(row['reactions'] as String) as List<dynamic>;
+    final rawSelfieReactions =
+        jsonDecode(row['selfie_reactions'] as String? ?? '[]') as List<dynamic>;
+    return FeedPost(
+      id: row['id'] as String,
+      userId: row['user_id'] as String,
+      username: row['username'] as String,
+      avatarUrl: row['avatar_url'] as String?,
+      avatarColor: row['avatar_color'] as String?,
+      avatarInitial: row['avatar_initial'] as String?,
+      caption: row['caption'] as String,
+      drinkName: row['drink_name'] as String,
+      drinkEmoji: row['drink_emoji'] as String,
+      rating: row['rating'] as int?,
+      likes: row['likes'] as int,
+      comments: row['comments'] as int,
+      totalReactions: row['total_reactions'] as int,
+      views: row['views'] as int,
+      imageUrl: row['image_url'] as String,
+      imagePath: row['image_path'] as String?,
+      selfieUrl: row['selfie_url'] as String,
+      selfiePath: row['selfie_path'] as String?,
+      likedByMe: (row['liked_by_me'] as int) == 1,
+      drinkingNow: (row['drinking_now'] as int) == 1,
+      myReaction: myReaction,
+      reactions: rawReactions
+          .map(
+            (e) => PostReaction.fromJson(e as Map<String, dynamic>, myReaction),
+          )
+          .toList(),
+      selfieReactions: rawSelfieReactions
+          .map((e) => SelfieReaction.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      mentions: (jsonDecode(row['mentions'] as String? ?? '[]') as List<dynamic>)
+          .map((e) => PostMention.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      createdAt: DateTime.parse(row['created_at'] as String),
+      lat: row['lat'] as double?,
+      lng: row['lng'] as double?,
+      country: row['country'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toSqliteRow(int sortOrder) => {
+    'id': id,
+    'sort_order': sortOrder,
+    'user_id': userId,
+    'username': username,
+    'avatar_url': avatarUrl,
+    'avatar_color': avatarColor,
+    'avatar_initial': avatarInitial,
+    'caption': caption,
+    'drink_name': drinkName,
+    'drink_emoji': drinkEmoji,
+    'rating': rating,
+    'likes': likes,
+    'comments': comments,
+    'total_reactions': totalReactions,
+    'views': views,
+    'image_url': imageUrl,
+    'image_path': imagePath,
+    'selfie_url': selfieUrl,
+    'selfie_path': selfiePath,
+    'liked_by_me': likedByMe ? 1 : 0,
+    'drinking_now': drinkingNow ? 1 : 0,
+    'my_reaction': myReaction,
+    'reactions': jsonEncode(
+      reactions.map((r) => {'emoji': r.emoji, 'count': r.count}).toList(),
+    ),
+    'selfie_reactions': jsonEncode(
+      selfieReactions.map((r) => r.toJson()).toList(),
+    ),
+    'mentions': jsonEncode(
+      mentions.map((m) => m.toJson()).toList(),
+    ),
+    'created_at': createdAt.toIso8601String(),
+    'lat': lat,
+    'lng': lng,
+    'country': country,
+  };
+
+  FeedPost copyWith({
+    int? likes,
+    bool? likedByMe,
+    int? totalReactions,
+    String? myReaction,
+    List<PostReaction>? reactions,
+    List<SelfieReaction>? selfieReactions,
+    bool clearMyReaction = false,
+    int? comments,
+    int? views,
+    String? country,
+    String? caption,
+    String? drinkName,
+    String? drinkEmoji,
+    List<PostMention>? mentions,
+  }) => FeedPost(
+    id: id,
+    userId: userId,
+    username: username,
+    avatarUrl: avatarUrl,
+    avatarColor: avatarColor,
+    avatarInitial: avatarInitial,
+    caption: caption ?? this.caption,
+    drinkName: drinkName ?? this.drinkName,
+    drinkEmoji: drinkEmoji ?? this.drinkEmoji,
+    rating: rating,
+    likes: likes ?? this.likes,
+    comments: comments ?? this.comments,
+    totalReactions: totalReactions ?? this.totalReactions,
+    views: views ?? this.views,
+    imageUrl: imageUrl,
+    imagePath: imagePath,
+    selfieUrl: selfieUrl,
+    selfiePath: selfiePath,
+    likedByMe: likedByMe ?? this.likedByMe,
+    drinkingNow: drinkingNow,
+    myReaction: clearMyReaction ? null : (myReaction ?? this.myReaction),
+    reactions: reactions ?? this.reactions,
+    selfieReactions: selfieReactions ?? this.selfieReactions,
+    mentions: mentions ?? this.mentions,
+    createdAt: createdAt,
+    lat: lat,
+    lng: lng,
+    country: country ?? this.country,
+  );
+
+  String get timeAgo {
+    final diff = DateTime.now().difference(createdAt);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m';
+    if (diff.inHours < 24) {
+      final m = diff.inMinutes % 60;
+      return m > 0 ? '${diff.inHours}h ${m}m' : '${diff.inHours}h';
+    }
+    return '${diff.inDays}d';
+  }
+
+  static const _monthNames = [
+    'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez',
+  ];
+
+  String get formattedDateTime {
+    final h = createdAt.hour.toString().padLeft(2, '0');
+    final m = createdAt.minute.toString().padLeft(2, '0');
+    final mon = _monthNames[createdAt.month - 1];
+    final now = DateTime.now();
+    final isThisYear = createdAt.year == now.year;
+    final datePart = isThisYear
+        ? '${createdAt.day}. $mon'
+        : '${createdAt.day}. $mon ${createdAt.year}';
+    return '$h:$m · $datePart';
+  }
+}
+
+/// Builds an 84-cell heatmap grid (col-major, 12 weeks × 7 days) from a list
+/// of posts. Cell 0 = 83 days ago, cell 83 = today.
+List<int> buildHeatmapFromPosts(List<FeedPost> posts) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final grid = List<int>.filled(84, 0);
+  for (final post in posts) {
+    final postDay = DateTime(
+      post.createdAt.year,
+      post.createdAt.month,
+      post.createdAt.day,
+    );
+    final daysAgo = today.difference(postDay).inDays;
+    if (daysAgo < 0 || daysAgo > 83) continue;
+    final index = 83 - daysAgo;
+    grid[index]++;
+  }
+  return grid;
+}

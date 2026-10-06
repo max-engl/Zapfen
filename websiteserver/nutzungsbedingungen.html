@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nutzungsbedingungen – Zapfen.</title>
+<link rel="icon" type="image/png" href="app_icon.png" />
+<link rel="apple-touch-icon" href="app_icon.png" />
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --text: #ffffff;
+    --muted: rgba(255,255,255,0.56);
+    --faint: rgba(255,255,255,0.30);
+    --border: rgba(255,255,255,0.09);
+    --gold: #F6B733;
+    --goldInk: #3a1f02;
+    --goldText: #F6B733;
+    --goldSoft: rgba(246,183,51,0.15);
+    --goldBorder: rgba(246,183,51,0.30);
+    --maxw: 720px;
+    --font: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Monaco, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: var(--goldText); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  ::selection { background: var(--gold); color: var(--goldInk); }
+
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,10,10,0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+  }
+  .nav-inner {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .back-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 14px; font-weight: 600; color: var(--muted);
+    transition: color .15s;
+  }
+  .back-btn:hover { color: var(--text); text-decoration: none; }
+  .back-btn svg { flex: none; }
+  .nav-title {
+    font-size: 15px; font-weight: 700; letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .nav-sep { color: var(--faint); font-size: 13px; }
+
+  main {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 48px 28px 80px;
+  }
+  .page-kicker {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--goldText);
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  h1 {
+    margin: 0 0 40px;
+    font-size: clamp(28px, 5vw, 42px);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+  }
+
+  .section { margin-bottom: 28px; }
+  .section h2 {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    margin: 0 0 8px;
+  }
+  .section p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--muted);
+    white-space: pre-line;
+  }
+
+  .divider { height: 1px; background: var(--border); margin: 32px 0; }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 28px;
+    text-align: center;
+  }
+  .footer-inner {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 20px;
+    font-size: 13px;
+    color: var(--faint);
+  }
+  .footer-inner a { color: var(--faint); }
+  .footer-inner a:hover { color: var(--muted); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a class="back-btn" href="/">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Zapfen.
+    </a>
+    <span class="nav-sep">/</span>
+    <span class="nav-title">Nutzungsbedingungen</span>
+  </div>
+</nav>
+
+<main>
+  <div class="page-kicker">Rechtliches</div>
+  <h1>Nutzungs&shy;bedingungen</h1>
+
+  <div class="section">
+    <p>Stand: Juni 2026
+
+Diese Nutzungsbedingungen regeln die Nutzung der App Zapfen. Mit der Registrierung und Nutzung der App akzeptierst du diese Bedingungen.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>1. Anbieter</h2>
+    <p>Zapfen wird angeboten von:
+
+Maximilian Engl
+Am Tennenbach 26
+91080 Spardorf
+Deutschland
+
+E-Mail: <a href="mailto:engl.devmail@gmail.com">engl.devmail@gmail.com</a></p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>2. Mindestalter</h2>
+    <p>Die Nutzung von Zapfen ist ausschließlich Personen gestattet, die das 18. Lebensjahr vollendet haben. Mit der Registrierung bestätigst du, mindestens 18 Jahre alt zu sein. Konten minderjähriger Nutzer können ohne vorherige Ankündigung gelöscht werden.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>3. Registrierung und Konto</h2>
+    <p>Für die Nutzung bestimmter Funktionen ist ein Benutzerkonto erforderlich. Du bist verpflichtet, bei der Registrierung richtige Angaben zu machen und deine Zugangsdaten vertraulich zu behandeln. Dein Konto ist persönlich und darf nicht an Dritte übertragen werden. Du bist für alle Aktivitäten verantwortlich, die über dein Konto erfolgen.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>4. Zweck der App</h2>
+    <p>Zapfen ist eine Social-App zum Austausch über Bier, Bierkultur und damit verbundene Inhalte. Die App dient nicht der Förderung von gefährlichem, exzessivem oder unverantwortlichem Alkoholkonsum.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>5. Erlaubte Nutzung</h2>
+    <p>Du darfst Zapfen nur im Rahmen dieser Nutzungsbedingungen, der Community-Regeln und geltender Gesetze nutzen. Eine kommerzielle Nutzung, automatisierte Nutzung, massenhafte Datenauslesung, Spam, Bots, Scraping oder sonstiger Missbrauch sind ohne ausdrückliche Genehmigung untersagt.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>6. Nutzerinhalte</h2>
+    <p>Du kannst in Zapfen eigene Inhalte veröffentlichen, insbesondere Beiträge, Bilder, Kommentare und Reaktionen. Du bist selbst dafür verantwortlich, dass deine Inhalte rechtmäßig sind und keine Rechte Dritter verletzen. Du darfst nur Inhalte hochladen, an denen du die erforderlichen Rechte besitzt.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>7. Nutzungsrechte an deinen Inhalten</h2>
+    <p>Du behältst grundsätzlich alle Rechte an den von dir veröffentlichten Inhalten. Durch das Hochladen räumst du dem Anbieter ein einfaches, nicht-exklusives, unentgeltliches, räumlich unbeschränktes Nutzungsrecht ein, deine Inhalte innerhalb der App zu speichern, zu verarbeiten, darzustellen und anderen Nutzern zugänglich zu machen. Dieses Recht endet, wenn du den jeweiligen Inhalt oder dein Konto löschst, soweit keine rechtlichen Gründe eine weitere Speicherung erfordern.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>8. Verbotene Inhalte</h2>
+    <p>Nicht erlaubt sind insbesondere:
+
+• rechtswidrige Inhalte
+• beleidigende, bedrohende, belästigende oder diskriminierende Inhalte
+• Hassrede, extremistische Inhalte oder Gewaltverherrlichung
+• sexuell explizite oder stark anstößige Inhalte
+• Inhalte, die Minderjährige im Zusammenhang mit Alkohol zeigen oder gefährden
+• Inhalte, die gefährlichen oder exzessiven Alkoholkonsum fördern
+• Spam, Betrug, Werbung ohne Genehmigung oder irreführende Inhalte
+• Inhalte, die Urheberrechte, Markenrechte, Persönlichkeitsrechte oder sonstige Rechte Dritter verletzen</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>9. Meldungen und Moderation</h2>
+    <p>Nutzer können Beiträge über die Meldefunktion melden. Gemeldete Inhalte werden geprüft und können bei Verstößen gegen diese Nutzungsbedingungen, die Community-Regeln oder geltendes Recht entfernt werden. Ein Anspruch auf Entfernung bestimmter Inhalte besteht nicht. Der Anbieter behält sich vor, Inhalte zu entfernen, Funktionen einzuschränken, Konten vorübergehend zu sperren oder dauerhaft zu löschen.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>10. Blockieren von Nutzern</h2>
+    <p>Nutzer können andere Nutzer blockieren. Nach einer Blockierung können die betroffenen Nutzer die Inhalte des jeweils anderen Nutzers nicht mehr einsehen oder mit diesen interagieren, soweit dies technisch möglich ist. Die Blockierfunktion dient dem Schutz der Nutzer und der Community.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>11. Account-Löschung</h2>
+    <p>Du kannst dein Konto jederzeit direkt in der App löschen. Bei der Löschung werden die mit deinem Konto verbundenen personenbezogenen Daten und Inhalte gelöscht, soweit keine gesetzlichen Aufbewahrungspflichten bestehen. Dazu gehören insbesondere Beiträge, Bilder, Kommentare, Reaktionen, Freundschaften, Blockierungen und weitere kontobezogene Daten.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>12. Verfügbarkeit und Änderungen</h2>
+    <p>Es besteht kein Anspruch auf eine jederzeitige Verfügbarkeit der App. Die App kann weiterentwickelt, geändert, eingeschränkt oder eingestellt werden. Funktionen können angepasst werden, wenn dies aus technischen, rechtlichen oder sicherheitsbezogenen Gründen erforderlich ist.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>13. Haftung</h2>
+    <p>Der Anbieter haftet unbeschränkt bei Vorsatz und grober Fahrlässigkeit sowie bei Verletzung von Leben, Körper oder Gesundheit. Bei leichter Fahrlässigkeit haftet der Anbieter nur bei Verletzung wesentlicher Vertragspflichten und begrenzt auf den vorhersehbaren, vertragstypischen Schaden. Für Inhalte von Nutzern übernimmt der Anbieter keine Verantwortung, solange keine Kenntnis von rechtswidrigen Inhalten besteht.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>14. Änderungen der Nutzungsbedingungen</h2>
+    <p>Diese Nutzungsbedingungen können angepasst werden, wenn dies aufgrund neuer Funktionen, rechtlicher Änderungen oder Sicherheitsanforderungen erforderlich ist. Über wesentliche Änderungen wirst du in geeigneter Weise informiert.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="section">
+    <h2>15. Anwendbares Recht</h2>
+    <p>Es gilt das Recht der Bundesrepublik Deutschland unter Ausschluss des UN-Kaufrechts. Gesetzliche Verbraucherschutzvorschriften bleiben unberührt.</p>
+  </div>
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <span>© 2026 Maximilian Engl</span>
+    <a href="/impressum">Impressum</a>
+    <a href="/datenschutz">Datenschutz</a>
+    <a href="/nutzungsbedingungen">Nutzungsbedingungen</a>
+    <a href="/community-regeln">Community-Regeln</a>
+  </div>
+</footer>
+
+</body>
+</html>
